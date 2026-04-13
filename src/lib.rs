@@ -18,6 +18,7 @@ use pkcore::hand_history::{HandCollection, HandHistory};
 use pkcore::suit::Suit;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -65,7 +66,11 @@ pub fn init_game(rand_seed: f64) -> String {
     RNG.with(|r| *r.borrow_mut() = SmallRng::seed_from_u64(rand_seed.to_bits()));
 
     // Build 9-player table: hero at seat 0, bots at seats 1-8.
-    let bots = BotProfile::default_profiles();
+    // Shuffle all available profiles and pick 8 so the lineup varies each game.
+    let mut profile_pool = BotProfile::default_profiles();
+    profile_pool.push(BotProfile::joker());
+    RNG.with(|r| profile_pool.shuffle(&mut *r.borrow_mut()));
+    let bots: Vec<BotProfile> = profile_pool.into_iter().take(8).collect();
     let bot_names: Vec<String> = bots.iter().map(|b| b.name.clone()).collect();
 
     let mut seats_vec = vec![SeatNoCell::new(PlayerNoCell::new_with_chips(
@@ -506,7 +511,11 @@ fn build_game_state() -> String {
         let bb_seat = table.determine_big_blind();
 
         let to_call = table.to_call(0);
-        let min_raise = table.min_raise();
+        // min_raise is the minimum *total* bet/raise-to amount.
+        // Raise(n) validates n - table.bet >= min_raise_increment, so the
+        // minimum valid total is table.bet + increment.  Bet on a fresh street
+        // has table.bet == 0, so the formula still gives the right answer (1 BB).
+        let min_raise = table.bet + table.min_raise();
         let hero_chips = table
             .seats
             .get_seat(0)

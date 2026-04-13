@@ -20,6 +20,7 @@ target
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+playwright-report/
 node_modules/
 package-lock.json
 Cargo.lock

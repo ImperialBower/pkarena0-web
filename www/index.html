@@ -46,7 +46,7 @@
     /* ── SVG table ── */
     #poker-table {
       width: 100%;
-      max-width: 900px;
+      max-width: 800px;
       height: auto;
       display: block;
     }
@@ -264,17 +264,24 @@
 
     <!-- Background -->
     <rect width="1200" height="800" fill="#1a1a2e"/>
-    <!-- Table structure (static) -->
-    <ellipse cx="600" cy="400" rx="480" ry="280" fill="#1a0e08" opacity="0.6"/>
-    <ellipse cx="600" cy="395" rx="475" ry="275" fill="url(#rimGrad)" stroke="#2a1508" stroke-width="3"/>
-    <ellipse cx="600" cy="395" rx="460" ry="262" fill="#4a3020" stroke="#3a2010" stroke-width="2"/>
-    <ellipse cx="600" cy="395" rx="455" ry="258" fill="#5a3828" stroke="#6a4838" stroke-width="1"/>
-    <ellipse cx="600" cy="395" rx="430" ry="240" fill="url(#feltGrad)" filter="url(#feltNoise)"/>
-    <ellipse cx="600" cy="395" rx="380" ry="210" fill="none" stroke="#1f7a44" stroke-width="2" opacity="0.5"/>
-    <text x="600" y="315" text-anchor="middle" font-family="Georgia,serif" font-size="14" fill="#c8a84e" opacity="0.7" letter-spacing="4">NO LIMIT HOLD'EM</text>
+    <!-- Table structure (static — ~25% smaller felt) -->
+    <ellipse cx="600" cy="400" rx="360" ry="210" fill="#1a0e08" opacity="0.6"/>
+    <ellipse cx="600" cy="395" rx="356" ry="206" fill="url(#rimGrad)" stroke="#2a1508" stroke-width="3"/>
+    <ellipse cx="600" cy="395" rx="345" ry="196" fill="#4a3020" stroke="#3a2010" stroke-width="2"/>
+    <ellipse cx="600" cy="395" rx="341" ry="193" fill="#5a3828" stroke="#6a4838" stroke-width="1"/>
+    <ellipse cx="600" cy="395" rx="323" ry="180" fill="url(#feltGrad)" filter="url(#feltNoise)"/>
+    <ellipse cx="600" cy="395" rx="285" ry="157" fill="none" stroke="#1f7a44" stroke-width="2" opacity="0.5"/>
+    <text x="600" y="292" text-anchor="middle" font-family="Georgia,serif" font-size="14" fill="#c8a84e" opacity="0.7" letter-spacing="4">NO LIMIT HOLD'EM</text>
 
-    <!-- ── Community cards ── -->
-    <g id="board-area" transform="translate(380, 360)" filter="url(#cardShadow)">
+    <!-- ── Hand result overlay (shown above cards at HandComplete) ── -->
+    <g id="hand-result-group" visibility="hidden">
+      <rect id="hand-result-bg" x="420" y="304" width="360" height="48" rx="14" fill="#0a1e12" opacity="0.92"/>
+      <text id="hand-result-text" x="600" y="336" text-anchor="middle"
+            font-family="'Trebuchet MS',sans-serif" font-size="26" font-weight="bold" fill="#44ff88" letter-spacing="1"></text>
+    </g>
+
+    <!-- ── Community cards (centred at x=600) ── -->
+    <g id="board-area" transform="translate(478, 360)" filter="url(#cardShadow)">
       <g id="board-card-0" transform="translate(0,0)"></g>
       <g id="board-card-1" transform="translate(50,0)"></g>
       <g id="board-card-2" transform="translate(100,0)"></g>
@@ -283,40 +290,42 @@
     </g>
 
     <!-- ── Pot ── -->
-    <g transform="translate(540,440)" filter="url(#chipShadow)">
+    <g transform="translate(572,432)" filter="url(#chipShadow)">
       <use href="#chipBlack" x="0" y="0" width="24" height="24"/>
       <use href="#chipBlack" x="2" y="-4" width="24" height="24"/>
       <use href="#chipRed"   x="18" y="2" width="24" height="24"/>
       <use href="#chipGreen" x="36" y="-1" width="24" height="24"/>
       <use href="#chipBlue"  x="54" y="1" width="24" height="24"/>
     </g>
-    <text id="pot-amount" x="600" y="480" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#ffdd66" font-weight="bold">POT: $0</text>
+    <text id="pot-amount" x="600" y="476" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#ffdd66" font-weight="bold">POT: $0</text>
 
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- SEAT 0 — Hero (bottom center) -->
     <g id="seat-0-group" transform="translate(600,680)">
-      <ellipse id="seat-0-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#c8a84e" opacity="0"/>
-      <rect id="seat-0-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#c8a84e" stroke-width="1.5" opacity="0.9"/>
-      <text id="seat-0-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#f0d060" font-weight="bold">YOU</text>
-      <text id="seat-0-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <ellipse id="seat-0-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#c8a84e" opacity="0"/>
+      <rect id="seat-0-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#c8a84e" stroke-width="1.5" opacity="0.9"/>
+      <text id="seat-0-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#f0d060" font-weight="bold">YOU</text>
+      <text id="seat-0-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-0-card-0" transform="translate(-32,-90)" filter="url(#cardShadow)"></g>
       <g id="seat-0-card-1" transform="translate(-6,-90)" filter="url(#cardShadow)"></g>
-      <text id="seat-0-bet" x="0" y="22" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
-      <!-- Status badge -->
-      <g id="seat-0-badge" visibility="hidden">
-        <rect x="-30" y="30" width="60" height="16" rx="8" id="seat-0-badge-rect"/>
-        <text id="seat-0-badge-text" x="0" y="42" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      <text id="seat-0-bet" x="0" y="56" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-0-action" visibility="hidden">
+        <rect id="seat-0-action-bg" x="-68" y="20" width="136" height="26" rx="13" fill="#333"/>
+        <text id="seat-0-action-text" x="0" y="37" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="13" font-weight="bold" fill="#fff"></text>
       </g>
-      <!-- D / SB / BB markers (right side) -->
-      <g id="seat-0-btn-d" visibility="hidden" transform="translate(42,-50)">
+      <g id="seat-0-badge" visibility="hidden">
+        <rect x="-30" y="52" width="60" height="16" rx="8" id="seat-0-badge-rect"/>
+        <text id="seat-0-badge-text" x="0" y="64" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-0-btn-d" visibility="hidden" transform="translate(82,-46)">
         <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
         <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
       </g>
-      <g id="seat-0-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-0-btn-sb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
       </g>
-      <g id="seat-0-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-0-btn-bb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
       </g>
@@ -324,26 +333,30 @@
 
     <!-- SEAT 1 — Bottom left -->
     <g id="seat-1-group" transform="translate(280,640)">
-      <ellipse id="seat-1-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
-      <rect id="seat-1-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <text id="seat-1-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
-      <text id="seat-1-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <ellipse id="seat-1-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
+      <rect id="seat-1-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-1-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-1-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-1-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
       <g id="seat-1-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
-      <text id="seat-1-bet" x="55" y="-40" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
-      <g id="seat-1-badge" visibility="hidden">
-        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-1-badge-rect"/>
-        <text id="seat-1-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      <text id="seat-1-bet" x="78" y="-36" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-1-action" visibility="hidden">
+        <rect id="seat-1-action-bg" x="-68" y="20" width="136" height="26" rx="13" fill="#333"/>
+        <text id="seat-1-action-text" x="0" y="37" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="13" font-weight="bold" fill="#fff"></text>
       </g>
-      <g id="seat-1-btn-d" visibility="hidden" transform="translate(42,-50)">
+      <g id="seat-1-badge" visibility="hidden">
+        <rect x="-30" y="52" width="60" height="16" rx="8" id="seat-1-badge-rect"/>
+        <text id="seat-1-badge-text" x="0" y="64" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-1-btn-d" visibility="hidden" transform="translate(82,-46)">
         <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
         <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
       </g>
-      <g id="seat-1-btn-sb" visibility="hidden" transform="translate(42,-50)">
+      <g id="seat-1-btn-sb" visibility="hidden" transform="translate(82,-46)">
         <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
       </g>
-      <g id="seat-1-btn-bb" visibility="hidden" transform="translate(42,-50)">
+      <g id="seat-1-btn-bb" visibility="hidden" transform="translate(82,-46)">
         <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
       </g>
@@ -351,26 +364,30 @@
 
     <!-- SEAT 2 — Left -->
     <g id="seat-2-group" transform="translate(140,480)">
-      <ellipse id="seat-2-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
-      <rect id="seat-2-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <text id="seat-2-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
-      <text id="seat-2-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <ellipse id="seat-2-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
+      <rect id="seat-2-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-2-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-2-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-2-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
       <g id="seat-2-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
-      <text id="seat-2-bet" x="62" y="-35" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
-      <g id="seat-2-badge" visibility="hidden">
-        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-2-badge-rect"/>
-        <text id="seat-2-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      <text id="seat-2-bet" x="80" y="-32" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-2-action" visibility="hidden">
+        <rect id="seat-2-action-bg" x="-68" y="20" width="136" height="26" rx="13" fill="#333"/>
+        <text id="seat-2-action-text" x="0" y="37" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="13" font-weight="bold" fill="#fff"></text>
       </g>
-      <g id="seat-2-btn-d" visibility="hidden" transform="translate(55,-40)">
+      <g id="seat-2-badge" visibility="hidden">
+        <rect x="-30" y="52" width="60" height="16" rx="8" id="seat-2-badge-rect"/>
+        <text id="seat-2-badge-text" x="0" y="64" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-2-btn-d" visibility="hidden" transform="translate(82,-44)">
         <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
         <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
       </g>
-      <g id="seat-2-btn-sb" visibility="hidden" transform="translate(55,-40)">
+      <g id="seat-2-btn-sb" visibility="hidden" transform="translate(82,-44)">
         <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
       </g>
-      <g id="seat-2-btn-bb" visibility="hidden" transform="translate(55,-40)">
+      <g id="seat-2-btn-bb" visibility="hidden" transform="translate(82,-44)">
         <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
       </g>
@@ -378,26 +395,30 @@
 
     <!-- SEAT 3 — Upper left -->
     <g id="seat-3-group" transform="translate(170,260)">
-      <ellipse id="seat-3-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
-      <rect id="seat-3-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <text id="seat-3-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
-      <text id="seat-3-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <ellipse id="seat-3-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
+      <rect id="seat-3-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-3-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-3-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-3-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
       <g id="seat-3-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
-      <text id="seat-3-bet" x="62" y="-35" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
-      <g id="seat-3-badge" visibility="hidden">
-        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-3-badge-rect"/>
-        <text id="seat-3-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      <text id="seat-3-bet" x="80" y="-32" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-3-action" visibility="hidden">
+        <rect id="seat-3-action-bg" x="-68" y="20" width="136" height="26" rx="13" fill="#333"/>
+        <text id="seat-3-action-text" x="0" y="37" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="13" font-weight="bold" fill="#fff"></text>
       </g>
-      <g id="seat-3-btn-d" visibility="hidden" transform="translate(55,-40)">
+      <g id="seat-3-badge" visibility="hidden">
+        <rect x="-30" y="52" width="60" height="16" rx="8" id="seat-3-badge-rect"/>
+        <text id="seat-3-badge-text" x="0" y="64" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-3-btn-d" visibility="hidden" transform="translate(82,-44)">
         <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
         <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
       </g>
-      <g id="seat-3-btn-sb" visibility="hidden" transform="translate(-55,-40)">
+      <g id="seat-3-btn-sb" visibility="hidden" transform="translate(-82,-44)">
         <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
       </g>
-      <g id="seat-3-btn-bb" visibility="hidden" transform="translate(-55,-40)">
+      <g id="seat-3-btn-bb" visibility="hidden" transform="translate(-82,-44)">
         <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
       </g>
@@ -405,26 +426,30 @@
 
     <!-- SEAT 4 — Top left -->
     <g id="seat-4-group" transform="translate(340,140)">
-      <ellipse id="seat-4-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
-      <rect id="seat-4-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <text id="seat-4-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
-      <text id="seat-4-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <ellipse id="seat-4-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
+      <rect id="seat-4-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-4-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-4-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-4-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
       <g id="seat-4-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
-      <text id="seat-4-bet" x="55" y="-38" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
-      <g id="seat-4-badge" visibility="hidden">
-        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-4-badge-rect"/>
-        <text id="seat-4-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      <text id="seat-4-bet" x="80" y="-34" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-4-action" visibility="hidden">
+        <rect id="seat-4-action-bg" x="-68" y="20" width="136" height="26" rx="13" fill="#333"/>
+        <text id="seat-4-action-text" x="0" y="37" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="13" font-weight="bold" fill="#fff"></text>
       </g>
-      <g id="seat-4-btn-d" visibility="hidden" transform="translate(42,-50)">
+      <g id="seat-4-badge" visibility="hidden">
+        <rect x="-30" y="52" width="60" height="16" rx="8" id="seat-4-badge-rect"/>
+        <text id="seat-4-badge-text" x="0" y="64" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-4-btn-d" visibility="hidden" transform="translate(82,-46)">
         <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
         <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
       </g>
-      <g id="seat-4-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-4-btn-sb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
       </g>
-      <g id="seat-4-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-4-btn-bb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
       </g>
@@ -432,26 +457,30 @@
 
     <!-- SEAT 5 — Top center -->
     <g id="seat-5-group" transform="translate(600,108)">
-      <ellipse id="seat-5-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
-      <rect id="seat-5-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <text id="seat-5-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
-      <text id="seat-5-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <ellipse id="seat-5-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
+      <rect id="seat-5-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-5-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-5-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-5-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
       <g id="seat-5-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
-      <text id="seat-5-bet" x="55" y="-38" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
-      <g id="seat-5-badge" visibility="hidden">
-        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-5-badge-rect"/>
-        <text id="seat-5-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      <text id="seat-5-bet" x="80" y="-34" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-5-action" visibility="hidden">
+        <rect id="seat-5-action-bg" x="-68" y="20" width="136" height="26" rx="13" fill="#333"/>
+        <text id="seat-5-action-text" x="0" y="37" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="13" font-weight="bold" fill="#fff"></text>
       </g>
-      <g id="seat-5-btn-d" visibility="hidden" transform="translate(42,-50)">
+      <g id="seat-5-badge" visibility="hidden">
+        <rect x="-30" y="52" width="60" height="16" rx="8" id="seat-5-badge-rect"/>
+        <text id="seat-5-badge-text" x="0" y="64" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-5-btn-d" visibility="hidden" transform="translate(82,-46)">
         <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
         <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
       </g>
-      <g id="seat-5-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-5-btn-sb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
       </g>
-      <g id="seat-5-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-5-btn-bb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
       </g>
@@ -459,26 +488,30 @@
 
     <!-- SEAT 6 — Top right -->
     <g id="seat-6-group" transform="translate(860,140)">
-      <ellipse id="seat-6-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
-      <rect id="seat-6-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <text id="seat-6-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
-      <text id="seat-6-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <ellipse id="seat-6-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
+      <rect id="seat-6-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-6-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-6-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-6-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
       <g id="seat-6-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
-      <text id="seat-6-bet" x="-62" y="-35" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
-      <g id="seat-6-badge" visibility="hidden">
-        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-6-badge-rect"/>
-        <text id="seat-6-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      <text id="seat-6-bet" x="-80" y="-32" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-6-action" visibility="hidden">
+        <rect id="seat-6-action-bg" x="-68" y="20" width="136" height="26" rx="13" fill="#333"/>
+        <text id="seat-6-action-text" x="0" y="37" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="13" font-weight="bold" fill="#fff"></text>
       </g>
-      <g id="seat-6-btn-d" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-6-badge" visibility="hidden">
+        <rect x="-30" y="52" width="60" height="16" rx="8" id="seat-6-badge-rect"/>
+        <text id="seat-6-badge-text" x="0" y="64" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-6-btn-d" visibility="hidden" transform="translate(-82,-46)">
         <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
         <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
       </g>
-      <g id="seat-6-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-6-btn-sb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
       </g>
-      <g id="seat-6-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-6-btn-bb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
       </g>
@@ -486,26 +519,30 @@
 
     <!-- SEAT 7 — Upper right -->
     <g id="seat-7-group" transform="translate(1030,260)">
-      <ellipse id="seat-7-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
-      <rect id="seat-7-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <text id="seat-7-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
-      <text id="seat-7-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <ellipse id="seat-7-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
+      <rect id="seat-7-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-7-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-7-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-7-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
       <g id="seat-7-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
-      <text id="seat-7-bet" x="-62" y="-35" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
-      <g id="seat-7-badge" visibility="hidden">
-        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-7-badge-rect"/>
-        <text id="seat-7-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      <text id="seat-7-bet" x="-80" y="-32" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-7-action" visibility="hidden">
+        <rect id="seat-7-action-bg" x="-68" y="20" width="136" height="26" rx="13" fill="#333"/>
+        <text id="seat-7-action-text" x="0" y="37" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="13" font-weight="bold" fill="#fff"></text>
       </g>
-      <g id="seat-7-btn-d" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-7-badge" visibility="hidden">
+        <rect x="-30" y="52" width="60" height="16" rx="8" id="seat-7-badge-rect"/>
+        <text id="seat-7-badge-text" x="0" y="64" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-7-btn-d" visibility="hidden" transform="translate(-82,-46)">
         <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
         <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
       </g>
-      <g id="seat-7-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-7-btn-sb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
       </g>
-      <g id="seat-7-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-7-btn-bb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
       </g>
@@ -513,26 +550,30 @@
 
     <!-- SEAT 8 — Bottom right -->
     <g id="seat-8-group" transform="translate(920,640)">
-      <ellipse id="seat-8-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
-      <rect id="seat-8-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <text id="seat-8-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
-      <text id="seat-8-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <ellipse id="seat-8-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
+      <rect id="seat-8-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-8-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-8-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-8-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
       <g id="seat-8-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
-      <text id="seat-8-bet" x="-55" y="-50" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
-      <g id="seat-8-badge" visibility="hidden">
-        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-8-badge-rect"/>
-        <text id="seat-8-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      <text id="seat-8-bet" x="-80" y="-46" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-8-action" visibility="hidden">
+        <rect id="seat-8-action-bg" x="-68" y="20" width="136" height="26" rx="13" fill="#333"/>
+        <text id="seat-8-action-text" x="0" y="37" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="13" font-weight="bold" fill="#fff"></text>
       </g>
-      <g id="seat-8-btn-d" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-8-badge" visibility="hidden">
+        <rect x="-30" y="52" width="60" height="16" rx="8" id="seat-8-badge-rect"/>
+        <text id="seat-8-badge-text" x="0" y="64" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-8-btn-d" visibility="hidden" transform="translate(-82,-46)">
         <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
         <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
       </g>
-      <g id="seat-8-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-8-btn-sb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
       </g>
-      <g id="seat-8-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+      <g id="seat-8-btn-bb" visibility="hidden" transform="translate(-82,-46)">
         <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
         <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
       </g>
@@ -572,12 +613,102 @@
     // ── Constants ─────────────────────────────────────────────────────────────
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const BOT_ACTION_MS = 1000;   // pause between each bot action
-    const HAND_COMPLETE_MS = 2200; // pause to show showdown/result before next hand
+    const HAND_COMPLETE_MS = 5000; // pause to show result before starting next hand
     const STARTING_CHIPS = 10_000;
+    const BOT_EMOJIS = {
+      'gto':               '🤖',
+      'tight_passive':     '🐢',
+      'loose_aggressive':  '🔥',
+      'tight_aggressive':  '🎯',
+      'loose_passive':     '🐑',
+      'maniac':            '💣',
+      'abc':               '📖',
+      'short_stack_ninja': '🥷',
+      'joker':             '🤡',
+    };
+
+    // ── Action callout state ──────────────────────────────────────────────────
+    // Tracks each seat's most recent action label so renderTableVisuals can
+    // restore them after WASM state refreshes wipe out prior SVG updates.
+    const lastActions = {};
+    let betState = null;          // game state captured when bet controls open
+    let handStartHeroChips = STARTING_CHIPS; // hero's chips at the start of the current hand
+
+    // ── Action callout helpers ────────────────────────────────────────────────
+
+    // Returns background fill + text color for a given action label string.
+    function actionColors(label) {
+      const l = (label ?? '').toLowerCase();
+      if (l.startsWith('fold'))                     return { fill: '#882222', color: '#ff8888' };
+      if (l.startsWith('check'))                    return { fill: '#1a5c2e', color: '#55dd88' };
+      if (l.startsWith('call'))                     return { fill: '#1a3a6e', color: '#66aaff' };
+      if (l.startsWith('bet') || l.startsWith('raise')) return { fill: '#5c4400', color: '#ffcc44' };
+      if (l.startsWith('all'))                      return { fill: '#884400', color: '#ff9922' };
+      return { fill: '#333', color: '#fff' };
+    }
+
+    // Shows (or hides) the action callout badge for a seat and persists the label.
+    function setActionLabel(seat, label) {
+      lastActions[seat] = label ?? null;
+      const actionGrp = document.getElementById('seat-' + seat + '-action');
+      const actionBg  = document.getElementById('seat-' + seat + '-action-bg');
+      const actionTxt = document.getElementById('seat-' + seat + '-action-text');
+      if (!actionGrp || !actionBg || !actionTxt) return;
+      if (!label) {
+        actionGrp.setAttribute('visibility', 'hidden');
+        return;
+      }
+      const { fill, color } = actionColors(label);
+      actionBg.setAttribute('fill', fill);
+      actionTxt.setAttribute('fill', color);
+      actionTxt.textContent = label;
+      actionGrp.setAttribute('visibility', 'visible');
+    }
+
+    // Clears all action callouts — called at the start of each new hand.
+    function clearAllActions() {
+      for (let i = 0; i < 9; i++) {
+        lastActions[i] = null;
+        const g = document.getElementById('seat-' + i + '-action');
+        if (g) g.setAttribute('visibility', 'hidden');
+      }
+    }
+
+    // Shows the hand-result overlay above the community cards.
+    // isWin: true = green (won), false = red (lost), null = yellow (even).
+    function showHandResult(text, isWin) {
+      const grp = document.getElementById('hand-result-group');
+      const bg  = document.getElementById('hand-result-bg');
+      const txt = document.getElementById('hand-result-text');
+      if (!grp || !txt) return;
+      txt.textContent = text;
+      if (isWin === true)       { txt.setAttribute('fill', '#44ff88'); bg?.setAttribute('fill', '#0a3318'); }
+      else if (isWin === false) { txt.setAttribute('fill', '#ff6666'); bg?.setAttribute('fill', '#330a0a'); }
+      else                      { txt.setAttribute('fill', '#ffdd66'); bg?.setAttribute('fill', '#1a1a08'); }
+      grp.setAttribute('visibility', 'visible');
+    }
+
+    function hideHandResult() {
+      const grp = document.getElementById('hand-result-group');
+      if (grp) grp.setAttribute('visibility', 'hidden');
+    }
+
+    // Builds a readable action label for the hero's action.
+    function heroActionLabel(action, amount, state) {
+      switch (action) {
+        case 'Fold':  return 'folds';
+        case 'Check': return 'checks';
+        case 'Call':  return 'calls $' + (state?.to_call ?? amount).toLocaleString();
+        case 'Bet':   return 'bets $' + amount.toLocaleString();
+        case 'Raise': return 'raises $' + amount.toLocaleString();
+        case 'AllIn': return 'all-in $' + amount.toLocaleString();
+        default: return action.toLowerCase();
+      }
+    }
 
     // ── Bot animation loop ────────────────────────────────────────────────────
     // Calls step_bot() once per second until it's the human's turn or hand ends,
-    // showing each bot's action in the status bar.
+    // showing each bot's action in the status bar and as a graphical callout.
     async function stepBotsUntilHuman() {
       while (true) {
         const result = JSON.parse(step_bot());
@@ -588,6 +719,7 @@
         }
         setStatus(`${result.name} ${result.action_label}`);
         appendHandLog(`${result.name}: ${result.action_label}`);
+        setActionLabel(result.seat, result.action_label);
         // Re-render table with updated chips/bets but no action buttons.
         const state = JSON.parse(get_state());
         renderTableVisuals(state);
@@ -610,16 +742,20 @@
     // ── New game ──────────────────────────────────────────────────────────────
     document.getElementById('btn-new-game').addEventListener('click', () => {
       hideBetControls();
+      clearAllActions();
+      hideHandResult();
       const state = JSON.parse(init_game(Math.random()));
+      handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
       renderTableVisuals(state);
       setStatus('Dealing…');
       stepBotsUntilHuman();
     });
 
     // ── Human action ─────────────────────────────────────────────────────────
-    function onHumanAction(action, amount) {
+    function onHumanAction(action, amount, currentState) {
       hideBetControls();
       renderButtons([], null);   // clear buttons immediately so none appear while bots act
+      setActionLabel(0, heroActionLabel(action, amount, currentState));
       setStatus('…');
       const req = JSON.stringify({ action, amount: amount ?? 0 });
       const state = JSON.parse(human_action(req));
@@ -674,12 +810,30 @@
 
       if (state.phase === 'HandComplete') {
         const street = state.street ?? '';
-        setStatus(street === 'Showdown' ? 'Showdown!' : 'Hand complete.');
         appendHandLog('Hand #' + state.hand_number + ' complete — ' + street);
         enableYamlDownload();
         renderButtons([]);
+
+        // Advance the hand immediately so end_hand() distributes the pot and
+        // we can read the hero's resulting chip count to build the result label.
+        const nextState = JSON.parse(next_hand());
+        const heroChipsAfter = nextState.hero?.chips ?? state.hero?.chips ?? 0;
+        const diff = heroChipsAfter - handStartHeroChips;
+
+        let resultText, isWin;
+        if (diff > 0)      { resultText = `+$${diff.toLocaleString()}`; isWin = true; }
+        else if (diff < 0) { resultText = `-$${Math.abs(diff).toLocaleString()}`; isWin = false; }
+        else               { resultText = 'Even'; isWin = null; }
+        if (street === 'Showdown') resultText = 'Showdown  ' + resultText;
+
+        showHandResult(resultText, isWin);
+        setStatus(resultText);
+
         setTimeout(() => {
-          const nextState = JSON.parse(next_hand());
+          hideHandResult();
+          clearAllActions();
+          handStartHeroChips = heroChipsAfter;
+          if (nextState.phase === 'SessionOver') { renderState(nextState); return; }
           renderTableVisuals(nextState);
           stepBotsUntilHuman();
         }, HAND_COMPLETE_MS);
@@ -704,7 +858,8 @@
       grp.setAttribute('opacity', '1');
 
       // Name + chips
-      setText('seat-' + seatIdx + '-name', player.name || '—');
+      const emoji = seatIdx !== 0 ? (BOT_EMOJIS[player.name] ?? '') : '';
+      setText('seat-' + seatIdx + '-name', emoji ? emoji + ' ' + player.name : player.name || '—');
       setText('seat-' + seatIdx + '-chips', '$' + (player.chips ?? 0).toLocaleString());
 
       // Hole cards
@@ -766,6 +921,23 @@
           plateEl.setAttribute('stroke', '#333');
         } else {
           plateEl.setAttribute('stroke', '#4a90d9');
+        }
+      }
+
+      // Action callout — restore persisted label so renderTableVisuals doesn't wipe it
+      const actionGrp = document.getElementById('seat-' + seatIdx + '-action');
+      const actionBg  = document.getElementById('seat-' + seatIdx + '-action-bg');
+      const actionTxt = document.getElementById('seat-' + seatIdx + '-action-text');
+      if (actionGrp && actionBg && actionTxt) {
+        const label = lastActions[seatIdx];
+        if (label) {
+          const { fill, color } = actionColors(label);
+          actionBg.setAttribute('fill', fill);
+          actionTxt.setAttribute('fill', color);
+          actionTxt.textContent = label;
+          actionGrp.setAttribute('visibility', 'visible');
+        } else {
+          actionGrp.setAttribute('visibility', 'hidden');
         }
       }
     }
@@ -852,10 +1024,21 @@
         } else if (action === 'Call') {
           const amt = state.to_call ?? 0;
           btns.push({ label: 'Call $' + amt.toLocaleString(), cls: '', action });
-        } else if (action === 'Bet') {
-          btns.push({ label: 'Bet…', cls: 'primary', action: 'bet-open', betAction: 'Bet' });
-        } else if (action === 'Raise') {
-          btns.push({ label: 'Raise…', cls: 'primary', action: 'bet-open', betAction: 'Raise' });
+        } else if (action === 'Bet' || action === 'Raise') {
+          const minRaise = state.min_raise ?? 100;
+          const maxBet   = state.max_bet   ?? 10000;
+          const pot      = state.pot       ?? 0;
+          // Min raise — always shown
+          btns.push({ label: 'Min $' + minRaise.toLocaleString(), cls: 'primary', action: 'bet-direct', betAction: action, amount: minRaise });
+          // ½ pot — shown when it's meaningfully above min and below max
+          const halfPot = Math.round(pot / 2);
+          if (halfPot > minRaise && halfPot < maxBet)
+            btns.push({ label: '½ Pot $' + halfPot.toLocaleString(), cls: 'primary', action: 'bet-direct', betAction: action, amount: halfPot });
+          // Full pot — shown when it's above min and below max (all-in handles the rest)
+          if (pot > minRaise && pot < maxBet)
+            btns.push({ label: 'Pot $' + pot.toLocaleString(), cls: 'primary', action: 'bet-direct', betAction: action, amount: pot });
+          // Custom slider
+          btns.push({ label: action + '…', cls: 'primary', action: 'bet-open', betAction: action });
         } else if (action === 'AllIn') {
           const amt = state.max_bet ?? 0;
           btns.push({ label: 'All-In $' + amt.toLocaleString(), cls: 'danger', action: 'allin', amount: amt });
@@ -877,18 +1060,25 @@
         if (b.action === 'new-game') {
           btn.addEventListener('click', () => {
             hideBetControls();
+            clearAllActions();
+            hideHandResult();
             const s = JSON.parse(init_game(Math.random()));
-            renderState(s);
+            handStartHeroChips = s.hero?.chips ?? STARTING_CHIPS;
+            renderTableVisuals(s);
+            setStatus('Dealing…');
+            stepBotsUntilHuman();
           });
         } else if (b.action === 'bet-open') {
           btn.addEventListener('click', () => {
             pendingBetAction = b.betAction;
             showBetControls(state);
           });
+        } else if (b.action === 'bet-direct') {
+          btn.addEventListener('click', () => onHumanAction(b.betAction, b.amount, state));
         } else if (b.action === 'allin') {
-          btn.addEventListener('click', () => onHumanAction('AllIn', b.amount));
+          btn.addEventListener('click', () => onHumanAction('AllIn', b.amount, state));
         } else {
-          btn.addEventListener('click', () => onHumanAction(b.action, 0));
+          btn.addEventListener('click', () => onHumanAction(b.action, 0, state));
         }
         container.appendChild(btn);
       }
@@ -896,6 +1086,7 @@
 
     // ── Bet slider ────────────────────────────────────────────────────────────
     function showBetControls(state) {
+      betState = state;  // saved so the confirm handler can build the hero action label
       const minBet = state.min_raise ?? 100;
       const maxBet = state.max_bet ?? 10000;
       const slider = document.getElementById('bet-slider');
@@ -922,7 +1113,7 @@
     });
     document.getElementById('bet-confirm').addEventListener('click', () => {
       const amount = parseInt(document.getElementById('bet-input').value, 10);
-      if (!isNaN(amount)) onHumanAction(pendingBetAction, amount);
+      if (!isNaN(amount)) onHumanAction(pendingBetAction, amount, betState);
       hideBetControls();
     });
 
