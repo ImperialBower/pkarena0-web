@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pkarena0 — No-Limit Hold'em</title>
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0d0d1a;
+      color: #ccc;
+      font-family: 'Trebuchet MS', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 8px;
+    }
+
+    /* ── Score bar ── */
+    #score-bar {
+      display: flex;
+      gap: 24px;
+      padding: 6px 20px;
+      background: #1a1a2e;
+      border: 1px solid #2a2a44;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #aaa;
+    }
+    #score-bar strong { color: #f0d060; }
+    #sc-pnl.positive { color: #44dd66; }
+    #sc-pnl.negative { color: #ff6666; }
+
+    /* ── Status message ── */
+    #status-msg {
+      font-size: 13px;
+      color: #88aacc;
+      min-height: 18px;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+
+    /* ── SVG table ── */
+    #poker-table {
+      width: 100%;
+      max-width: 900px;
+      height: auto;
+      display: block;
+    }
+
+    /* ── Action panel ── */
+    #action-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      width: 100%;
+      max-width: 600px;
+    }
+    #action-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    #action-buttons button {
+      padding: 9px 18px;
+      border: 1px solid #4a90d9;
+      border-radius: 6px;
+      background: #1a2a3e;
+      color: #7ab8f5;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    #action-buttons button:hover { background: #2a3a5e; color: #aad4ff; }
+    #action-buttons button:disabled { opacity: 0.4; cursor: default; }
+    #action-buttons button.danger { border-color: #c04040; color: #ff9090; }
+    #action-buttons button.danger:hover { background: #3a1a1a; }
+    #action-buttons button.primary { border-color: #c8a84e; color: #f0d060; }
+    #action-buttons button.primary:hover { background: #2a2218; }
+    #action-buttons button.safe { border-color: #44aa66; color: #66dd88; }
+    #action-buttons button.safe:hover { background: #162a1e; }
+
+    /* ── Bet sizing controls ── */
+    #bet-controls {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: #1a1a2e;
+      border: 1px solid #2a2a44;
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    #bet-controls label { font-size: 12px; color: #aaa; }
+    #bet-slider { width: 180px; accent-color: #4a90d9; }
+    #bet-input {
+      width: 80px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #f0d060;
+      font-size: 13px;
+      padding: 3px 6px;
+      text-align: right;
+    }
+    #bet-confirm {
+      padding: 6px 14px;
+      background: #2a3a5e;
+      border: 1px solid #4a90d9;
+      border-radius: 5px;
+      color: #aad4ff;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #bet-confirm:hover { background: #3a4a6e; }
+
+    /* ── Hand log ── */
+    #hand-log-wrap {
+      margin-top: 8px;
+      width: 100%;
+      max-width: 700px;
+    }
+    #hand-log-wrap summary {
+      cursor: pointer;
+      color: #668;
+      font-size: 12px;
+      padding: 4px 0;
+    }
+    #hand-log {
+      font-size: 11px;
+      color: #778;
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 4px;
+      background: #0d0d1a;
+      border: 1px solid #222;
+      border-radius: 4px;
+      line-height: 1.6;
+    }
+    #hand-log p { margin: 1px 0; }
+
+    #yaml-bar {
+      margin-top: 8px;
+      text-align: center;
+    }
+    #btn-download-yaml {
+      padding: 6px 16px;
+      border: 1px solid #336;
+      border-radius: 6px;
+      background: #111;
+      color: #669;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    #btn-download-yaml:not([disabled]):hover { background: #1a1a2e; color: #99c; }
+    #btn-download-yaml:disabled { opacity: 0.35; cursor: default; }
+
+    footer {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #446;
+    }
+    footer a { color: #446; }
+  </style>
+</head>
+<body>
+
+  <div id="score-bar">
+    <span>Hand: <strong id="sc-hand">—</strong></span>
+    <span>Chips: <strong id="sc-chips">—</strong></span>
+    <span>P&amp;L: <strong id="sc-pnl">—</strong></span>
+  </div>
+
+  <div id="status-msg">Loading WASM…</div>
+
+  <!-- ── Poker table SVG (original design + dynamic IDs) ── -->
+  <svg id="poker-table" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="feltGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#1a6b3c"/>
+        <stop offset="70%" stop-color="#145a30"/>
+        <stop offset="100%" stop-color="#0e4825"/>
+      </radialGradient>
+      <linearGradient id="rimGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5c3a1e"/>
+        <stop offset="40%" stop-color="#8b5e3c"/>
+        <stop offset="60%" stop-color="#6b4226"/>
+        <stop offset="100%" stop-color="#3e2512"/>
+      </linearGradient>
+      <pattern id="cardBack" width="6" height="6" patternUnits="userSpaceOnUse">
+        <rect width="6" height="6" fill="#1a3a6b"/>
+        <path d="M0 3 L3 0 L6 3 L3 6 Z" fill="#1e4080" opacity="0.6"/>
+      </pattern>
+      <filter id="chipShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.4"/>
+      </filter>
+      <filter id="cardShadow" x="-10%" y="-10%" width="130%" height="130%">
+        <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.35"/>
+      </filter>
+      <filter id="potGlow">
+        <feGaussianBlur stdDeviation="8" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="feltNoise">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" result="noise"/>
+        <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+        <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blended"/>
+        <feComponentTransfer in="blended"><feFuncA type="linear" slope="1"/></feComponentTransfer>
+      </filter>
+
+      <!-- Suit symbols -->
+      <symbol id="spade" viewBox="0 0 20 20">
+        <path d="M10 2 C10 2 2 10 2 13 C2 16 5 17 7 16 C8 15.5 9 15 10 18 C11 15 12 15.5 13 16 C15 17 18 16 18 13 C18 10 10 2 10 2Z" fill="currentColor"/>
+        <rect x="9" y="15" width="2" height="4" rx="0.5" fill="currentColor"/>
+      </symbol>
+      <symbol id="heart" viewBox="0 0 20 20">
+        <path d="M10 18 C10 18 2 12 2 7 C2 4 4.5 2 7 2 C8.5 2 9.5 3 10 4 C10.5 3 11.5 2 13 2 C15.5 2 18 4 18 7 C18 12 10 18 10 18Z" fill="currentColor"/>
+      </symbol>
+      <symbol id="diamond" viewBox="0 0 20 20">
+        <path d="M10 1 L18 10 L10 19 L2 10 Z" fill="currentColor"/>
+      </symbol>
+      <symbol id="club" viewBox="0 0 20 20">
+        <circle cx="10" cy="7" r="4" fill="currentColor"/>
+        <circle cx="5.5" cy="12" r="4" fill="currentColor"/>
+        <circle cx="14.5" cy="12" r="4" fill="currentColor"/>
+        <rect x="9" y="14" width="2" height="5" rx="0.5" fill="currentColor"/>
+      </symbol>
+
+      <!-- Face-down card -->
+      <symbol id="cardDown" viewBox="0 0 44 62">
+        <rect x="0" y="0" width="44" height="62" rx="4" ry="4" fill="#fff" stroke="#999" stroke-width="0.5"/>
+        <rect x="2" y="2" width="40" height="58" rx="3" ry="3" fill="url(#cardBack)"/>
+        <rect x="2" y="2" width="40" height="58" rx="3" ry="3" fill="none" stroke="#c8a84e" stroke-width="1" opacity="0.5"/>
+      </symbol>
+
+      <!-- Chip templates -->
+      <symbol id="chipWhite" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="13" fill="#e8e8e8" stroke="#aaa" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="10" fill="none" stroke="#ccc" stroke-width="1" stroke-dasharray="3 3"/>
+      </symbol>
+      <symbol id="chipRed" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="13" fill="#cc2222" stroke="#881111" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="10" fill="none" stroke="#ff6666" stroke-width="1" stroke-dasharray="3 3"/>
+      </symbol>
+      <symbol id="chipGreen" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="13" fill="#1a8a3a" stroke="#0e5522" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="10" fill="none" stroke="#44cc66" stroke-width="1" stroke-dasharray="3 3"/>
+      </symbol>
+      <symbol id="chipBlack" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="13" fill="#222" stroke="#000" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="10" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="3 3"/>
+      </symbol>
+      <symbol id="chipBlue" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="13" fill="#2255bb" stroke="#113388" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="10" fill="none" stroke="#5588ee" stroke-width="1" stroke-dasharray="3 3"/>
+      </symbol>
+    </defs>
+
+    <!-- Background -->
+    <rect width="1200" height="800" fill="#1a1a2e"/>
+    <!-- Table structure (static) -->
+    <ellipse cx="600" cy="400" rx="480" ry="280" fill="#1a0e08" opacity="0.6"/>
+    <ellipse cx="600" cy="395" rx="475" ry="275" fill="url(#rimGrad)" stroke="#2a1508" stroke-width="3"/>
+    <ellipse cx="600" cy="395" rx="460" ry="262" fill="#4a3020" stroke="#3a2010" stroke-width="2"/>
+    <ellipse cx="600" cy="395" rx="455" ry="258" fill="#5a3828" stroke="#6a4838" stroke-width="1"/>
+    <ellipse cx="600" cy="395" rx="430" ry="240" fill="url(#feltGrad)" filter="url(#feltNoise)"/>
+    <ellipse cx="600" cy="395" rx="380" ry="210" fill="none" stroke="#1f7a44" stroke-width="2" opacity="0.5"/>
+    <text x="600" y="315" text-anchor="middle" font-family="Georgia,serif" font-size="14" fill="#c8a84e" opacity="0.7" letter-spacing="4">NO LIMIT HOLD'EM</text>
+
+    <!-- ── Community cards ── -->
+    <g id="board-area" transform="translate(380, 360)" filter="url(#cardShadow)">
+      <g id="board-card-0" transform="translate(0,0)"></g>
+      <g id="board-card-1" transform="translate(50,0)"></g>
+      <g id="board-card-2" transform="translate(100,0)"></g>
+      <g id="board-card-3" transform="translate(150,0)"></g>
+      <g id="board-card-4" transform="translate(200,0)"></g>
+    </g>
+
+    <!-- ── Pot ── -->
+    <g transform="translate(540,440)" filter="url(#chipShadow)">
+      <use href="#chipBlack" x="0" y="0" width="24" height="24"/>
+      <use href="#chipBlack" x="2" y="-4" width="24" height="24"/>
+      <use href="#chipRed"   x="18" y="2" width="24" height="24"/>
+      <use href="#chipGreen" x="36" y="-1" width="24" height="24"/>
+      <use href="#chipBlue"  x="54" y="1" width="24" height="24"/>
+    </g>
+    <text id="pot-amount" x="600" y="480" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#ffdd66" font-weight="bold">POT: $0</text>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SEAT 0 — Hero (bottom center) -->
+    <g id="seat-0-group" transform="translate(600,680)">
+      <ellipse id="seat-0-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#c8a84e" opacity="0"/>
+      <rect id="seat-0-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#c8a84e" stroke-width="1.5" opacity="0.9"/>
+      <text id="seat-0-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#f0d060" font-weight="bold">YOU</text>
+      <text id="seat-0-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <g id="seat-0-card-0" transform="translate(-32,-90)" filter="url(#cardShadow)"></g>
+      <g id="seat-0-card-1" transform="translate(-6,-90)" filter="url(#cardShadow)"></g>
+      <text id="seat-0-bet" x="0" y="22" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
+      <!-- Status badge -->
+      <g id="seat-0-badge" visibility="hidden">
+        <rect x="-30" y="30" width="60" height="16" rx="8" id="seat-0-badge-rect"/>
+        <text id="seat-0-badge-text" x="0" y="42" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <!-- D / SB / BB markers (right side) -->
+      <g id="seat-0-btn-d" visibility="hidden" transform="translate(42,-50)">
+        <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+        <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
+      </g>
+      <g id="seat-0-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+      </g>
+      <g id="seat-0-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+      </g>
+    </g>
+
+    <!-- SEAT 1 — Bottom left -->
+    <g id="seat-1-group" transform="translate(280,640)">
+      <ellipse id="seat-1-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
+      <rect id="seat-1-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-1-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-1-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <g id="seat-1-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
+      <g id="seat-1-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
+      <text id="seat-1-bet" x="55" y="-40" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-1-badge" visibility="hidden">
+        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-1-badge-rect"/>
+        <text id="seat-1-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-1-btn-d" visibility="hidden" transform="translate(42,-50)">
+        <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+        <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
+      </g>
+      <g id="seat-1-btn-sb" visibility="hidden" transform="translate(42,-50)">
+        <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+      </g>
+      <g id="seat-1-btn-bb" visibility="hidden" transform="translate(42,-50)">
+        <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+      </g>
+    </g>
+
+    <!-- SEAT 2 — Left -->
+    <g id="seat-2-group" transform="translate(140,480)">
+      <ellipse id="seat-2-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
+      <rect id="seat-2-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-2-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-2-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <g id="seat-2-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
+      <g id="seat-2-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
+      <text id="seat-2-bet" x="62" y="-35" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-2-badge" visibility="hidden">
+        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-2-badge-rect"/>
+        <text id="seat-2-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-2-btn-d" visibility="hidden" transform="translate(55,-40)">
+        <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+        <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
+      </g>
+      <g id="seat-2-btn-sb" visibility="hidden" transform="translate(55,-40)">
+        <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+      </g>
+      <g id="seat-2-btn-bb" visibility="hidden" transform="translate(55,-40)">
+        <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+      </g>
+    </g>
+
+    <!-- SEAT 3 — Upper left -->
+    <g id="seat-3-group" transform="translate(170,260)">
+      <ellipse id="seat-3-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
+      <rect id="seat-3-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-3-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-3-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <g id="seat-3-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
+      <g id="seat-3-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
+      <text id="seat-3-bet" x="62" y="-35" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-3-badge" visibility="hidden">
+        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-3-badge-rect"/>
+        <text id="seat-3-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-3-btn-d" visibility="hidden" transform="translate(55,-40)">
+        <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+        <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
+      </g>
+      <g id="seat-3-btn-sb" visibility="hidden" transform="translate(-55,-40)">
+        <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+      </g>
+      <g id="seat-3-btn-bb" visibility="hidden" transform="translate(-55,-40)">
+        <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+      </g>
+    </g>
+
+    <!-- SEAT 4 — Top left -->
+    <g id="seat-4-group" transform="translate(340,140)">
+      <ellipse id="seat-4-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
+      <rect id="seat-4-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-4-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-4-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <g id="seat-4-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
+      <g id="seat-4-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
+      <text id="seat-4-bet" x="55" y="-38" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-4-badge" visibility="hidden">
+        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-4-badge-rect"/>
+        <text id="seat-4-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-4-btn-d" visibility="hidden" transform="translate(42,-50)">
+        <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+        <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
+      </g>
+      <g id="seat-4-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+      </g>
+      <g id="seat-4-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+      </g>
+    </g>
+
+    <!-- SEAT 5 — Top center -->
+    <g id="seat-5-group" transform="translate(600,108)">
+      <ellipse id="seat-5-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
+      <rect id="seat-5-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-5-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-5-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <g id="seat-5-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
+      <g id="seat-5-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
+      <text id="seat-5-bet" x="55" y="-38" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-5-badge" visibility="hidden">
+        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-5-badge-rect"/>
+        <text id="seat-5-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-5-btn-d" visibility="hidden" transform="translate(42,-50)">
+        <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+        <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
+      </g>
+      <g id="seat-5-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+      </g>
+      <g id="seat-5-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+      </g>
+    </g>
+
+    <!-- SEAT 6 — Top right -->
+    <g id="seat-6-group" transform="translate(860,140)">
+      <ellipse id="seat-6-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
+      <rect id="seat-6-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-6-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-6-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <g id="seat-6-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
+      <g id="seat-6-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
+      <text id="seat-6-bet" x="-62" y="-35" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-6-badge" visibility="hidden">
+        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-6-badge-rect"/>
+        <text id="seat-6-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-6-btn-d" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+        <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
+      </g>
+      <g id="seat-6-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+      </g>
+      <g id="seat-6-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+      </g>
+    </g>
+
+    <!-- SEAT 7 — Upper right -->
+    <g id="seat-7-group" transform="translate(1030,260)">
+      <ellipse id="seat-7-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
+      <rect id="seat-7-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-7-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-7-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <g id="seat-7-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
+      <g id="seat-7-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
+      <text id="seat-7-bet" x="-62" y="-35" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-7-badge" visibility="hidden">
+        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-7-badge-rect"/>
+        <text id="seat-7-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-7-btn-d" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+        <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
+      </g>
+      <g id="seat-7-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+      </g>
+      <g id="seat-7-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+      </g>
+    </g>
+
+    <!-- SEAT 8 — Bottom right -->
+    <g id="seat-8-group" transform="translate(920,640)">
+      <ellipse id="seat-8-highlight" cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0"/>
+      <rect id="seat-8-plate" x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+      <text id="seat-8-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">—</text>
+      <text id="seat-8-chips" x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="10" fill="#aaa">$—</text>
+      <g id="seat-8-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
+      <g id="seat-8-card-1" transform="translate(-8,-85)" filter="url(#cardShadow)"></g>
+      <text id="seat-8-bet" x="-55" y="-50" font-family="'Trebuchet MS',sans-serif" font-size="9" fill="#ffdd66" visibility="hidden"></text>
+      <g id="seat-8-badge" visibility="hidden">
+        <rect x="-30" y="16" width="60" height="16" rx="8" id="seat-8-badge-rect"/>
+        <text id="seat-8-badge-text" x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="9" font-weight="bold"></text>
+      </g>
+      <g id="seat-8-btn-d" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+        <text y="4" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">D</text>
+      </g>
+      <g id="seat-8-btn-sb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+      </g>
+      <g id="seat-8-btn-bb" visibility="hidden" transform="translate(-42,-50)">
+        <circle r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+        <text y="3" text-anchor="middle" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+      </g>
+    </g>
+  </svg>
+
+  <!-- ── Action panel ── -->
+  <div id="action-panel">
+    <div id="action-buttons">
+      <button id="btn-new-game" class="primary" disabled>New Game</button>
+    </div>
+    <div id="bet-controls">
+      <label>Bet: $</label>
+      <input type="range" id="bet-slider" min="0" max="10000" step="50" value="0">
+      <input type="number" id="bet-input" min="0" max="10000" value="0">
+      <button id="bet-confirm">Confirm</button>
+    </div>
+  </div>
+
+  <details id="hand-log-wrap">
+    <summary>Hand log</summary>
+    <div id="hand-log"></div>
+  </details>
+
+  <div id="yaml-bar">
+    <button id="btn-download-yaml" disabled>Download hand history (YAML)</button>
+  </div>
+
+  <footer>
+    <a href="https://github.com/ImperialBower/pkarena0-web">ImperialBower/pkarena0-web</a>
+  </footer>
+
+  <script type="module">
+    import init, { init_game, human_action, next_hand, get_state, get_session_yaml, step_bot }
+      from './pkg/pkarena0_web.js';
+
+    // ── Constants ─────────────────────────────────────────────────────────────
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const BOT_ACTION_MS = 1000;   // pause between each bot action
+    const HAND_COMPLETE_MS = 2200; // pause to show showdown/result before next hand
+    const STARTING_CHIPS = 10_000;
+
+    // ── Bot animation loop ────────────────────────────────────────────────────
+    // Calls step_bot() once per second until it's the human's turn or hand ends,
+    // showing each bot's action in the status bar.
+    async function stepBotsUntilHuman() {
+      while (true) {
+        const result = JSON.parse(step_bot());
+        if (result.done) {
+          const state = JSON.parse(get_state());
+          renderState(state);
+          return;
+        }
+        setStatus(`${result.name} ${result.action_label}`);
+        appendHandLog(`${result.name}: ${result.action_label}`);
+        // Re-render table with updated chips/bets but no action buttons.
+        const state = JSON.parse(get_state());
+        renderTableVisuals(state);
+        await new Promise(r => setTimeout(r, BOT_ACTION_MS));
+      }
+    }
+
+    // ── Boot ──────────────────────────────────────────────────────────────────
+    async function boot() {
+      try {
+        await init();
+        setStatus('Click "New Game" to start.');
+        document.getElementById('btn-new-game').disabled = false;
+      } catch (e) {
+        setStatus('Failed to load WASM: ' + e);
+      }
+    }
+    boot();
+
+    // ── New game ──────────────────────────────────────────────────────────────
+    document.getElementById('btn-new-game').addEventListener('click', () => {
+      hideBetControls();
+      const state = JSON.parse(init_game(Math.random()));
+      renderTableVisuals(state);
+      setStatus('Dealing…');
+      stepBotsUntilHuman();
+    });
+
+    // ── Human action ─────────────────────────────────────────────────────────
+    function onHumanAction(action, amount) {
+      hideBetControls();
+      renderButtons([], null);   // clear buttons immediately so none appear while bots act
+      setStatus('…');
+      const req = JSON.stringify({ action, amount: amount ?? 0 });
+      const state = JSON.parse(human_action(req));
+      if (state.phase === 'Error') { renderState(state); return; }
+      renderTableVisuals(state);
+      stepBotsUntilHuman();
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
+
+    // Updates all SVG visuals and score bar; does NOT touch status or action buttons.
+    function renderTableVisuals(state) {
+      if (!state || state.phase === 'Error') return;
+
+      const chips = state.hero?.chips ?? 0;
+      const pnl = chips - STARTING_CHIPS;
+      document.getElementById('sc-hand').textContent = state.hand_number ?? '—';
+      document.getElementById('sc-chips').textContent = '$' + chips.toLocaleString();
+      const pnlEl = document.getElementById('sc-pnl');
+      pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toLocaleString();
+      pnlEl.className = pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : '';
+
+      document.getElementById('pot-amount').textContent =
+        'POT: $' + (state.pot ?? 0).toLocaleString();
+
+      for (let i = 0; i < 5; i++) {
+        renderCard('board-card-' + i, state.board?.[i] ?? null, true);
+      }
+
+      updateSeat(0, state.hero, state);
+      for (const p of state.players ?? []) {
+        updateSeat(p.seat, p, state);
+      }
+    }
+
+    // Full render: visuals + phase-appropriate status and action buttons.
+    function renderState(state) {
+      if (!state || state.phase === 'Error') {
+        setStatus('Error: ' + (state?.error ?? 'unknown'));
+        return;
+      }
+
+      renderTableVisuals(state);
+      const chips = state.hero?.chips ?? 0;
+
+      if (state.phase === 'SessionOver') {
+        setStatus('Session over! Final chips: $' + chips.toLocaleString());
+        renderButtons([{ label: 'New Game', cls: 'primary', action: 'new-game' }]);
+        appendHandLog('Session ended. Final chips: $' + chips.toLocaleString());
+        return;
+      }
+
+      if (state.phase === 'HandComplete') {
+        const street = state.street ?? '';
+        setStatus(street === 'Showdown' ? 'Showdown!' : 'Hand complete.');
+        appendHandLog('Hand #' + state.hand_number + ' complete — ' + street);
+        enableYamlDownload();
+        renderButtons([]);
+        setTimeout(() => {
+          const nextState = JSON.parse(next_hand());
+          renderTableVisuals(nextState);
+          stepBotsUntilHuman();
+        }, HAND_COMPLETE_MS);
+        return;
+      }
+
+      // WaitingForHuman
+      const street = state.street ?? 'Preflop';
+      setStatus('Hand #' + state.hand_number + ' — ' + street + ' — Your turn.');
+      renderActionButtons(state);
+    }
+
+    function updateSeat(seatIdx, player, state) {
+      const grp = document.getElementById('seat-' + seatIdx + '-group');
+      if (!grp) return;
+
+      if (!player || player.state === 'Out') {
+        grp.setAttribute('opacity', '0.25');
+        clearCards(seatIdx);
+        return;
+      }
+      grp.setAttribute('opacity', '1');
+
+      // Name + chips
+      setText('seat-' + seatIdx + '-name', player.name || '—');
+      setText('seat-' + seatIdx + '-chips', '$' + (player.chips ?? 0).toLocaleString());
+
+      // Hole cards
+      const cards = player.hole_cards ?? [];
+      renderCard('seat-' + seatIdx + '-card-0', cards[0] ?? null, false);
+      renderCard('seat-' + seatIdx + '-card-1', cards[1] ?? null, false);
+
+      // Current bet
+      const betEl = document.getElementById('seat-' + seatIdx + '-bet');
+      if (betEl) {
+        if (player.bet > 0) {
+          betEl.textContent = '$' + player.bet.toLocaleString();
+          betEl.setAttribute('visibility', 'visible');
+        } else {
+          betEl.setAttribute('visibility', 'hidden');
+        }
+      }
+
+      // Status badge
+      const badgeGrp = document.getElementById('seat-' + seatIdx + '-badge');
+      const badgeText = document.getElementById('seat-' + seatIdx + '-badge-text');
+      const badgeRect = document.getElementById('seat-' + seatIdx + '-badge-rect');
+      if (badgeGrp && badgeText && badgeRect) {
+        if (player.state === 'Fold') {
+          badgeGrp.setAttribute('visibility', 'visible');
+          badgeText.textContent = 'FOLD';
+          badgeText.setAttribute('fill', '#ff8888');
+          badgeRect.setAttribute('fill', '#882222');
+          badgeRect.setAttribute('opacity', '0.7');
+        } else if (player.state === 'AllIn') {
+          badgeGrp.setAttribute('visibility', 'visible');
+          badgeText.textContent = 'ALL-IN';
+          badgeText.setAttribute('fill', '#ffffff');
+          badgeRect.setAttribute('fill', '#cc8800');
+          badgeRect.setAttribute('opacity', '0.8');
+        } else {
+          badgeGrp.setAttribute('visibility', 'hidden');
+        }
+      }
+
+      // Position markers (D / SB / BB)
+      setVisibility('seat-' + seatIdx + '-btn-d',  player.is_dealer ? 'visible' : 'hidden');
+      setVisibility('seat-' + seatIdx + '-btn-sb', player.is_sb    ? 'visible' : 'hidden');
+      setVisibility('seat-' + seatIdx + '-btn-bb', player.is_bb    ? 'visible' : 'hidden');
+
+      // Active highlight (hero seat glow when it's our turn)
+      const hlEl = document.getElementById('seat-' + seatIdx + '-highlight');
+      if (hlEl) {
+        const isHeroTurn = seatIdx === 0 && state.phase === 'WaitingForHuman';
+        hlEl.setAttribute('opacity', isHeroTurn ? '0.10' : '0');
+      }
+
+      // Name plate border colour: hero = gold, folded = dim, active = bright
+      const plateEl = document.getElementById('seat-' + seatIdx + '-plate');
+      if (plateEl) {
+        if (seatIdx === 0) {
+          plateEl.setAttribute('stroke', '#c8a84e');
+        } else if (player.state === 'Fold' || player.state === 'Out') {
+          plateEl.setAttribute('stroke', '#333');
+        } else {
+          plateEl.setAttribute('stroke', '#4a90d9');
+        }
+      }
+    }
+
+    function clearCards(seatIdx) {
+      const c0 = document.getElementById('seat-' + seatIdx + '-card-0');
+      const c1 = document.getElementById('seat-' + seatIdx + '-card-1');
+      if (c0) while (c0.firstChild) c0.removeChild(c0.firstChild);
+      if (c1) while (c1.firstChild) c1.removeChild(c1.firstChild);
+    }
+
+    // ── Card rendering (SVG DOM, no innerHTML) ────────────────────────────────
+    function renderCard(groupId, cardStr, isBoardSlot) {
+      const g = document.getElementById(groupId);
+      if (!g) return;
+      while (g.firstChild) g.removeChild(g.firstChild);
+
+      if (!cardStr) {
+        if (!isBoardSlot) {
+          // Seat card: no card dealt yet — show nothing.
+        }
+        return;
+      }
+
+      if (cardStr === '__') {
+        // Face-down card
+        const u = document.createElementNS(SVG_NS, 'use');
+        u.setAttribute('href', '#cardDown');
+        u.setAttribute('width', '38');
+        u.setAttribute('height', '54');
+        g.appendChild(u);
+        return;
+      }
+
+      // Face-up card: two-char ASCII "As", "Kh", etc.
+      const rankChar = cardStr[0];
+      const suitChar = cardStr[1];
+      const rankLabel = rankChar === 'T' ? '10' : rankChar;
+      const suitId = { s: 'spade', h: 'heart', d: 'diamond', c: 'club' }[suitChar] ?? 'spade';
+      const fill = (suitChar === 'h' || suitChar === 'd') ? '#cc1111' : '#222';
+
+      const rect = document.createElementNS(SVG_NS, 'rect');
+      rect.setAttribute('width', '38');
+      rect.setAttribute('height', '54');
+      rect.setAttribute('rx', '3');
+      rect.setAttribute('fill', '#fff');
+      rect.setAttribute('stroke', '#ccc');
+      rect.setAttribute('stroke-width', '0.5');
+
+      const rankText = document.createElementNS(SVG_NS, 'text');
+      rankText.setAttribute('x', '3');
+      rankText.setAttribute('y', '13');
+      rankText.setAttribute('font-family', 'Georgia,serif');
+      rankText.setAttribute('font-size', rankLabel === '10' ? '10' : '12');
+      rankText.setAttribute('font-weight', 'bold');
+      rankText.setAttribute('fill', fill);
+      rankText.textContent = rankLabel;
+
+      const suitUse = document.createElementNS(SVG_NS, 'use');
+      suitUse.setAttribute('href', '#' + suitId);
+      suitUse.setAttribute('x', '10');
+      suitUse.setAttribute('y', '19');
+      suitUse.setAttribute('width', '18');
+      suitUse.setAttribute('height', '18');
+      suitUse.setAttribute('color', fill);
+
+      g.appendChild(rect);
+      g.appendChild(rankText);
+      g.appendChild(suitUse);
+    }
+
+    // ── Action buttons ────────────────────────────────────────────────────────
+    let pendingBetAction = 'Bet';
+
+    function renderActionButtons(state) {
+      const actions = state.legal_actions ?? [];
+      const btns = [];
+
+      for (const action of actions) {
+        if (action === 'Fold') {
+          btns.push({ label: 'Fold', cls: 'danger', action });
+        } else if (action === 'Check') {
+          btns.push({ label: 'Check', cls: 'safe', action });
+        } else if (action === 'Call') {
+          const amt = state.to_call ?? 0;
+          btns.push({ label: 'Call $' + amt.toLocaleString(), cls: '', action });
+        } else if (action === 'Bet') {
+          btns.push({ label: 'Bet…', cls: 'primary', action: 'bet-open', betAction: 'Bet' });
+        } else if (action === 'Raise') {
+          btns.push({ label: 'Raise…', cls: 'primary', action: 'bet-open', betAction: 'Raise' });
+        } else if (action === 'AllIn') {
+          const amt = state.max_bet ?? 0;
+          btns.push({ label: 'All-In $' + amt.toLocaleString(), cls: 'danger', action: 'allin', amount: amt });
+        }
+      }
+
+      renderButtons(btns, state);
+    }
+
+    function renderButtons(btns, state) {
+      const container = document.getElementById('action-buttons');
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      for (const b of btns) {
+        const btn = document.createElement('button');
+        btn.textContent = b.label;
+        if (b.cls) btn.className = b.cls;
+
+        if (b.action === 'new-game') {
+          btn.addEventListener('click', () => {
+            hideBetControls();
+            const s = JSON.parse(init_game(Math.random()));
+            renderState(s);
+          });
+        } else if (b.action === 'bet-open') {
+          btn.addEventListener('click', () => {
+            pendingBetAction = b.betAction;
+            showBetControls(state);
+          });
+        } else if (b.action === 'allin') {
+          btn.addEventListener('click', () => onHumanAction('AllIn', b.amount));
+        } else {
+          btn.addEventListener('click', () => onHumanAction(b.action, 0));
+        }
+        container.appendChild(btn);
+      }
+    }
+
+    // ── Bet slider ────────────────────────────────────────────────────────────
+    function showBetControls(state) {
+      const minBet = state.min_raise ?? 100;
+      const maxBet = state.max_bet ?? 10000;
+      const slider = document.getElementById('bet-slider');
+      const input = document.getElementById('bet-input');
+      slider.min = minBet;
+      slider.max = maxBet;
+      slider.step = Math.max(1, Math.floor((maxBet - minBet) / 100));
+      slider.value = minBet;
+      input.min = minBet;
+      input.max = maxBet;
+      input.value = minBet;
+      document.getElementById('bet-controls').style.display = 'flex';
+    }
+
+    function hideBetControls() {
+      document.getElementById('bet-controls').style.display = 'none';
+    }
+
+    document.getElementById('bet-slider').addEventListener('input', function () {
+      document.getElementById('bet-input').value = this.value;
+    });
+    document.getElementById('bet-input').addEventListener('input', function () {
+      document.getElementById('bet-slider').value = this.value;
+    });
+    document.getElementById('bet-confirm').addEventListener('click', () => {
+      const amount = parseInt(document.getElementById('bet-input').value, 10);
+      if (!isNaN(amount)) onHumanAction(pendingBetAction, amount);
+      hideBetControls();
+    });
+
+    // ── Utilities ─────────────────────────────────────────────────────────────
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    }
+
+    function setVisibility(id, vis) {
+      const el = document.getElementById(id);
+      if (el) el.setAttribute('visibility', vis);
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status-msg').textContent = msg;
+    }
+
+    function disableActionButtons() {
+      const btns = document.querySelectorAll('#action-buttons button');
+      btns.forEach(b => b.disabled = true);
+    }
+
+    function appendHandLog(entry) {
+      const log = document.getElementById('hand-log');
+      const p = document.createElement('p');
+      p.textContent = entry;
+      log.appendChild(p);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    // ── YAML download ─────────────────────────────────────────────────────────
+    document.getElementById('btn-download-yaml').addEventListener('click', () => {
+      const yaml = get_session_yaml();
+      const blob = new Blob([yaml], { type: 'text/yaml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pkarena0-session.yaml';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Enable the download button once a game is running.
+    function enableYamlDownload() {
+      document.getElementById('btn-download-yaml').disabled = false;
+    }
+  </script>
+</body>
+</html>
