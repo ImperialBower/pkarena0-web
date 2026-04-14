@@ -1,6 +1,8 @@
 [package]
 name = "pkarena0-web"
-version = "0.0.1"
+description = "single player playing agains a table of bots using pkcore."
+repository = "https://github.com/ImperialBower/pkarena0-web"
+version = "0.0.2"
 edition = "2024"
 rust-version = "1.91.0"
 license = "GPL-3.0-or-later"
