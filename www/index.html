@@ -29,6 +29,8 @@
       margin-bottom: 6px;
       font-size: 13px;
       color: #aaa;
+      flex-wrap: wrap;
+      justify-content: center;
     }
     #score-bar strong { color: #f0d060; }
     #sc-pnl.positive { color: #44dd66; }
@@ -68,7 +70,7 @@
       justify-content: center;
     }
     #action-buttons button {
-      padding: 9px 18px;
+      padding: 11px 18px;
       border: 1px solid #4a90d9;
       border-radius: 6px;
       background: #1a2a3e;
@@ -77,6 +79,7 @@
       font-weight: bold;
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
+      min-height: 44px;
     }
     #action-buttons button:hover { background: #2a3a5e; color: #aad4ff; }
     #action-buttons button:disabled { opacity: 0.4; cursor: default; }
@@ -96,27 +99,33 @@
       border: 1px solid #2a2a44;
       border-radius: 8px;
       padding: 8px 12px;
+      width: 100%;
+      flex-wrap: wrap;
+      box-sizing: border-box;
     }
-    #bet-controls label { font-size: 12px; color: #aaa; }
-    #bet-slider { width: 180px; accent-color: #4a90d9; }
+    #bet-controls label { font-size: 13px; color: #aaa; white-space: nowrap; }
+    #bet-slider { flex: 1 1 auto; min-width: 100px; accent-color: #4a90d9; }
     #bet-input {
       width: 80px;
       background: #111;
       border: 1px solid #333;
       border-radius: 4px;
       color: #f0d060;
-      font-size: 13px;
-      padding: 3px 6px;
+      font-size: 16px;
+      padding: 6px 8px;
       text-align: right;
+      min-height: 36px;
     }
     #bet-confirm {
-      padding: 6px 14px;
+      padding: 10px 16px;
       background: #2a3a5e;
       border: 1px solid #4a90d9;
       border-radius: 5px;
       color: #aad4ff;
       cursor: pointer;
       font-weight: bold;
+      min-height: 44px;
+      white-space: nowrap;
     }
     #bet-confirm:hover { background: #3a4a6e; }
 
@@ -129,13 +138,16 @@
     #hand-log-wrap summary {
       cursor: pointer;
       color: #668;
-      font-size: 12px;
-      padding: 4px 0;
+      font-size: 13px;
+      padding: 10px 4px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
     }
     #hand-log {
-      font-size: 11px;
+      font-size: 12px;
       color: #778;
-      max-height: 120px;
+      max-height: 160px;
       overflow-y: auto;
       padding: 4px;
       background: #0d0d1a;
@@ -150,26 +162,28 @@
       text-align: center;
     }
     #btn-download-yaml {
-      padding: 6px 16px;
+      padding: 10px 16px;
       border: 1px solid #336;
       border-radius: 6px;
       background: #111;
       color: #669;
-      font-size: 12px;
+      font-size: 13px;
       cursor: pointer;
+      min-height: 44px;
     }
     #btn-download-yaml:not([disabled]):hover { background: #1a1a2e; color: #99c; }
     #btn-download-yaml:disabled { opacity: 0.35; cursor: default; }
 
     #btn-current-game {
       margin-left: 8px;
-      padding: 6px 16px;
+      padding: 10px 16px;
       border: 1px solid #363;
       border-radius: 6px;
       background: #111;
       color: #696;
-      font-size: 12px;
+      font-size: 13px;
       cursor: pointer;
+      min-height: 44px;
     }
     #btn-current-game:not([disabled]):hover { background: #1a2e1a; color: #9c9; }
     #btn-current-game:disabled { opacity: 0.35; cursor: default; }
@@ -207,9 +221,16 @@
       background: none;
       border: none;
       color: #669;
-      font-size: 16px;
+      font-size: 18px;
       cursor: pointer;
-      padding: 0 4px;
+      padding: 8px 12px;
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      border-radius: 4px;
     }
     #game-state-close:hover { color: #99c; }
     #game-state-pre {
@@ -226,6 +247,93 @@
       color: #446;
     }
     footer a { color: #446; }
+
+    /* ── Mobile: portrait phones ≤480px ── */
+    @media (max-width: 480px) {
+      body { padding: 6px; }
+
+      #score-bar {
+        gap: 12px;
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+
+      #status-msg {
+        font-size: 14px;
+        min-height: 22px;
+        padding: 0 8px;
+      }
+
+      #action-panel {
+        gap: 10px;
+        padding: 0 4px;
+      }
+
+      #action-buttons {
+        flex-direction: column;
+        width: 100%;
+      }
+      #action-buttons button {
+        width: 100%;
+        font-size: 15px;
+      }
+
+      #bet-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px;
+      }
+      #bet-slider {
+        width: 100%;
+        flex: none;
+      }
+      .bet-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      #bet-input {
+        flex: 1;
+        width: auto;
+        font-size: 18px;
+      }
+
+      #hand-log { max-height: 120px; }
+
+      #yaml-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+        text-align: left;
+      }
+      #btn-download-yaml,
+      #btn-current-game {
+        width: 100%;
+        margin-left: 0;
+        text-align: center;
+      }
+
+      #game-state-box {
+        max-width: 98vw;
+        max-height: 90vh;
+        padding: 12px;
+      }
+      #game-state-pre { font-size: 10px; }
+    }
+
+    /* ── Tablet / landscape phone ── */
+    @media (min-width: 481px) and (max-width: 767px) {
+      #action-buttons button { min-width: 110px; }
+
+      #yaml-bar {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+      #btn-current-game { margin-left: 0; }
+    }
   </style>
 </head>
 <body>
@@ -239,7 +347,7 @@
   <div id="status-msg">Loading WASM…</div>
 
   <!-- ── Poker table SVG (original design + dynamic IDs) ── -->
-  <svg id="poker-table" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+  <svg id="poker-table" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
     <defs>
       <radialGradient id="feltGrad" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="#1a6b3c"/>
@@ -653,10 +761,12 @@
       <button id="btn-new-game" class="primary" disabled>New Game</button>
     </div>
     <div id="bet-controls">
-      <label>Bet: $</label>
+      <label for="bet-slider">Bet: $</label>
       <input type="range" id="bet-slider" min="0" max="10000" step="50" value="0">
-      <input type="number" id="bet-input" min="0" max="10000" value="0">
-      <button id="bet-confirm">Confirm</button>
+      <div class="bet-row">
+        <input type="number" id="bet-input" min="0" max="10000" value="0">
+        <button id="bet-confirm">Confirm</button>
+      </div>
     </div>
   </div>
 
