@@ -161,6 +161,65 @@
     #btn-download-yaml:not([disabled]):hover { background: #1a1a2e; color: #99c; }
     #btn-download-yaml:disabled { opacity: 0.35; cursor: default; }
 
+    #btn-current-game {
+      margin-left: 8px;
+      padding: 6px 16px;
+      border: 1px solid #363;
+      border-radius: 6px;
+      background: #111;
+      color: #696;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    #btn-current-game:not([disabled]):hover { background: #1a2e1a; color: #9c9; }
+    #btn-current-game:disabled { opacity: 0.35; cursor: default; }
+
+    #game-state-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #game-state-overlay.open { display: flex; }
+    #game-state-box {
+      background: #0d0d1a;
+      border: 1px solid #336;
+      border-radius: 8px;
+      padding: 16px;
+      max-width: 90vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #game-state-box header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #99c;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    #game-state-close {
+      background: none;
+      border: none;
+      color: #669;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    #game-state-close:hover { color: #99c; }
+    #game-state-pre {
+      overflow: auto;
+      font-size: 11px;
+      color: #9c9;
+      white-space: pre;
+      margin: 0;
+    }
+
     footer {
       margin-top: 12px;
       font-size: 11px;
@@ -607,7 +666,18 @@
   </details>
 
   <div id="yaml-bar">
-    <button id="btn-download-yaml" disabled>Download hand history (YAML)</button>
+    <button id="btn-download-yaml" disabled>Download game history (YAML)</button>
+    <button id="btn-current-game" disabled>Current game</button>
+  </div>
+
+  <div id="game-state-overlay">
+    <div id="game-state-box">
+      <header>
+        <span>Current game state (JSON)</span>
+        <button id="game-state-close">✕</button>
+      </header>
+      <pre id="game-state-pre"></pre>
+    </div>
   </div>
 
   <footer>
@@ -763,6 +833,7 @@
       handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
       renderTableVisuals(state);
       setStatus('Dealing…');
+      enableCurrentGameButton();
       stepBotsUntilHuman();
     });
 
@@ -839,31 +910,33 @@
         renderButtons([]);
 
         // Advance the hand immediately so end_hand() distributes the pot and
-        // we can read the hero's resulting chip count to build the result label.
+        // last_result (winner info) is available on nextState.
         const nextState = JSON.parse(next_hand());
         const heroChipsAfter = nextState.hero?.chips ?? state.hero?.chips ?? 0;
-        const diff = heroChipsAfter - handStartHeroChips;
 
-        // Only show a result when the hero had chips in this hand.
-        // When busted, handStartHeroChips is 0 and diff is always 0 → "Even"
-        // for every spectator hand, which is misleading — skip the overlay.
-        const heroPlaying = handStartHeroChips > 0;
-        let resultText, isWin;
-        if (heroPlaying) {
-          if (diff > 0)      { resultText = `+$${diff.toLocaleString()}`; isWin = true; }
-          else if (diff < 0) { resultText = `-$${Math.abs(diff).toLocaleString()}`; isWin = false; }
-          else               { resultText = 'Even'; isWin = null; }
-          if (street === 'Showdown') resultText = 'Showdown  ' + resultText;
-          showHandResult(resultText, isWin);
+        // Build the result message from the engine's winner summary.
+        const result = nextState.last_result?.[0];
+        let resultText, isWin = null;
+        if (result) {
+          const heroWon = result.seats.includes(0);
+          const displayNames = result.names.map(n => n === 'You' ? 'You' : n);
+          const isSplit = displayNames.length > 1;
+          const winnerStr = isSplit
+            ? displayNames.slice(0, -1).join(', ') + ' & ' + displayNames.at(-1)
+            : (displayNames[0] ?? 'Unknown');
+          const verb = isSplit ? 'split' : 'won';
+          const handStr = result.hand ? ` — ${result.hand}` : '';
+          resultText = `${winnerStr} ${verb} $${result.amount.toLocaleString()}${handStr}`;
+          isWin = heroWon;
         }
+        if (resultText) showHandResult(resultText, isWin);
 
         // When the session is over, say so immediately in the status bar.
         if (nextState.phase === 'SessionOver') {
-          setStatus(heroPlaying ? resultText + ' — Session over!' : 'Session over!');
-        } else if (heroPlaying) {
+          setStatus(resultText ? resultText + ' — Session over!' : 'Session over!');
+        } else if (resultText) {
           setStatus(resultText);
         }
-        // When hero is out and session continues: leave status as last bot action.
 
         setTimeout(() => {
           hideHandResult();
@@ -1108,6 +1181,7 @@
             handStartHeroChips = s.hero?.chips ?? STARTING_CHIPS;
             renderTableVisuals(s);
             setStatus('Dealing…');
+            enableCurrentGameButton();
             stepBotsUntilHuman();
           });
         } else if (b.action === 'bet-open') {
@@ -1199,9 +1273,36 @@
       URL.revokeObjectURL(url);
     });
 
-    // Enable the download button once a game is running.
+    // ── Current game state debug overlay ──────────────────────────────────────
+    const gameStateOverlay = document.getElementById('game-state-overlay');
+    const gameStatePre     = document.getElementById('game-state-pre');
+
+    document.getElementById('btn-current-game').addEventListener('click', () => {
+      const raw = get_state();
+      try {
+        gameStatePre.textContent = JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        gameStatePre.textContent = raw;
+      }
+      gameStateOverlay.classList.add('open');
+    });
+
+    document.getElementById('game-state-close').addEventListener('click', () => {
+      gameStateOverlay.classList.remove('open');
+    });
+
+    gameStateOverlay.addEventListener('click', (e) => {
+      if (e.target === gameStateOverlay) gameStateOverlay.classList.remove('open');
+    });
+
+    // Enable the YAML download button once a hand has completed.
     function enableYamlDownload() {
       document.getElementById('btn-download-yaml').disabled = false;
+    }
+
+    // Enable the current-game debug button as soon as a game is initialized.
+    function enableCurrentGameButton() {
+      document.getElementById('btn-current-game').disabled = false;
     }
   </script>
 </body>

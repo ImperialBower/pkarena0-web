@@ -11,6 +11,7 @@ use pkcore::casino::game::ForcedBets;
 use pkcore::casino::session::PokerSession;
 use pkcore::casino::state::PlayerState;
 use pkcore::casino::table::event::TableAction;
+use pkcore::analysis::name::HandRankName;
 use pkcore::casino::table::winnings::Winnings;
 use pkcore::casino::table_no_cell::{PlayerNoCell, SeatNoCell, SeatsNoCell, TableNoCell};
 use pkcore::card::Card;
@@ -47,6 +48,8 @@ thread_local! {
     static COLLECTION: RefCell<HandCollection> = RefCell::new(HandCollection::new());
     /// One-shot error message surfaced to the UI without locking the game.
     static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
+    /// One-shot hand result populated by next_hand(), consumed by build_game_state().
+    static LAST_HAND_RESULT: RefCell<Option<Vec<PotResult>>> = const { RefCell::new(None) };
 }
 
 // ── WASM entry point ──────────────────────────────────────────────────────────
@@ -287,6 +290,27 @@ pub fn next_hand() -> String {
                     "pkarena0",
                 );
                 COLLECTION.with(|c| c.borrow_mut().push(hh));
+
+                // Build per-pot winner summary for the UI.
+                let pot_results: Vec<PotResult> = winnings.vec().iter().map(|pot_win| {
+                    let seats: Vec<u8> = (0u8..9)
+                        .filter(|&i| pot_win.equity.seats.contains(i))
+                        .collect();
+                    let names: Vec<String> = seats.iter().map(|&seat| {
+                        s.player_snapshot
+                            .iter()
+                            .find(|(sn, _, _, _)| *sn == seat)
+                            .map(|(_, name, _, _)| name.clone())
+                            .unwrap_or_default()
+                    }).collect();
+                    PotResult {
+                        seats,
+                        names,
+                        amount: pot_win.equity.chips,
+                        hand: hand_rank_name_to_str(pot_win.eval.hand_rank.name),
+                    }
+                }).collect();
+                LAST_HAND_RESULT.with(|r| *r.borrow_mut() = Some(pot_results));
             }
         });
     }
@@ -361,6 +385,16 @@ struct ActionRequest {
     amount: usize,
 }
 
+/// Per-pot winner summary, included in `GameState.last_result` immediately after a hand ends.
+#[derive(Serialize, Clone)]
+struct PotResult {
+    seats: Vec<u8>,
+    names: Vec<String>,
+    amount: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hand: Option<String>,
+}
+
 #[derive(Serialize)]
 struct GameState {
     hand_number: u32,
@@ -380,6 +414,8 @@ struct GameState {
     session_over: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_result: Option<Vec<PotResult>>,
 }
 
 #[derive(Serialize)]
@@ -504,6 +540,7 @@ fn build_game_state() -> String {
                 bb_seat: 0,
                 session_over: false,
                 error: None,
+                last_result: None,
             })
             .unwrap_or_else(|_| r#"{"error":"serialize failed"}"#.to_string());
         };
@@ -565,9 +602,9 @@ fn build_game_state() -> String {
             })
             .collect();
 
-        // Consume any one-shot error (e.g. from a rejected action) so it is
-        // surfaced to the UI exactly once without locking the game phase.
+        // Consume any one-shot values so they surface to the UI exactly once.
         let last_error = LAST_ERROR.with(|e| e.borrow_mut().take());
+        let last_result = LAST_HAND_RESULT.with(|r| r.borrow_mut().take());
 
         let state = GameState {
             hand_number: session.hand_number,
@@ -586,6 +623,7 @@ fn build_game_state() -> String {
             bb_seat,
             session_over: phase_val == SessionPhase::SessionOver,
             error: last_error,
+            last_result,
         };
 
         serde_json::to_string(&state)
@@ -738,5 +776,20 @@ fn error_state(msg: &str) -> String {
         "session_over": false
     })
     .to_string()
+}
+
+fn hand_rank_name_to_str(name: HandRankName) -> Option<String> {
+    match name {
+        HandRankName::StraightFlush  => Some("Straight Flush".to_string()),
+        HandRankName::FourOfAKind    => Some("Four of a Kind".to_string()),
+        HandRankName::FullHouse      => Some("Full House".to_string()),
+        HandRankName::Flush          => Some("Flush".to_string()),
+        HandRankName::Straight       => Some("Straight".to_string()),
+        HandRankName::ThreeOfAKind   => Some("Three of a Kind".to_string()),
+        HandRankName::TwoPair        => Some("Two Pair".to_string()),
+        HandRankName::Pair           => Some("Pair".to_string()),
+        HandRankName::HighCard       => Some("High Card".to_string()),
+        HandRankName::Invalid        => None,
+    }
 }
 
