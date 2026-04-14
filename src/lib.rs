@@ -45,6 +45,8 @@ thread_local! {
     static HAND_START_CHIPS: RefCell<Vec<(u8, usize)>> = const { RefCell::new(Vec::new()) };
     /// Accumulated hand histories for the session; exported via get_session_yaml().
     static COLLECTION: RefCell<HandCollection> = RefCell::new(HandCollection::new());
+    /// One-shot error message surfaced to the UI without locking the game.
+    static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 // ── WASM entry point ──────────────────────────────────────────────────────────
@@ -153,7 +155,10 @@ pub fn human_action(action_json: &str) -> String {
     });
 
     if let Some(err) = apply_result {
-        return error_state(&err);
+        // Store the error so build_game_state() can surface it, but keep the
+        // phase as WaitingForHuman so the action buttons remain usable.
+        LAST_ERROR.with(|e| *e.borrow_mut() = Some(err));
+        return build_game_state();
     }
 
     PHASE.with(|p| *p.borrow_mut() = SessionPhase::BotsActing);
@@ -560,6 +565,10 @@ fn build_game_state() -> String {
             })
             .collect();
 
+        // Consume any one-shot error (e.g. from a rejected action) so it is
+        // surfaced to the UI exactly once without locking the game phase.
+        let last_error = LAST_ERROR.with(|e| e.borrow_mut().take());
+
         let state = GameState {
             hand_number: session.hand_number,
             phase: phase_str.to_string(),
@@ -576,7 +585,7 @@ fn build_game_state() -> String {
             sb_seat,
             bb_seat,
             session_over: phase_val == SessionPhase::SessionOver,
-            error: None,
+            error: last_error,
         };
 
         serde_json::to_string(&state)
@@ -649,15 +658,18 @@ fn derive_legal_actions(to_call: usize, hero_chips: usize, current_bet: usize) -
     if to_call == 0 {
         // No bet facing us.
         let mut actions = vec!["Check".to_string()];
-        if hero_chips > 0 {
-            actions.push("Bet".to_string());
-            actions.push("AllIn".to_string());
-        }
+        actions.push("Bet".to_string());
+        actions.push("AllIn".to_string());
         actions
     } else {
         // There is a bet to call/raise.
-        let mut actions = vec!["Fold".to_string(), "Call".to_string()];
-        // Can raise if we have more than the call amount and there's room to raise.
+        let mut actions = vec!["Fold".to_string()];
+        // Only offer Call when the player can cover the full amount; when they
+        // can't, AllIn is the correct action (calling for less / going all-in).
+        if hero_chips >= to_call {
+            actions.push("Call".to_string());
+        }
+        // Can raise only if chips exceed the call and exceed the current bet.
         if hero_chips > to_call && hero_chips > current_bet {
             actions.push("Raise".to_string());
         }

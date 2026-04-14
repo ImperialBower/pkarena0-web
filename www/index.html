@@ -774,7 +774,16 @@
       setStatus('…');
       const req = JSON.stringify({ action, amount: amount ?? 0 });
       const state = JSON.parse(human_action(req));
+      // Legacy hard-error path (should not occur after the derive_legal_actions fix).
       if (state.phase === 'Error') { renderState(state); return; }
+      // Recoverable error: action was rejected but game is still WaitingForHuman.
+      // Show the message and re-render buttons so the player can try again.
+      if (state.error) {
+        setStatus('Error: ' + state.error);
+        renderTableVisuals(state);
+        renderActionButtons(state);
+        return;
+      }
       renderTableVisuals(state);
       stepBotsUntilHuman();
     }
