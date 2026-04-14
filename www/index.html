@@ -827,7 +827,13 @@
         if (street === 'Showdown') resultText = 'Showdown  ' + resultText;
 
         showHandResult(resultText, isWin);
-        setStatus(resultText);
+        // When the session is over, say so immediately in the status bar so the
+        // player knows the game has ended — not just the hand result.
+        if (nextState.phase === 'SessionOver') {
+          setStatus(resultText + ' — Session over!');
+        } else {
+          setStatus(resultText);
+        }
 
         setTimeout(() => {
           hideHandResult();

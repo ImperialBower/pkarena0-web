@@ -286,6 +286,15 @@ pub fn next_hand() -> String {
         });
     }
 
+    // pkcore's TableNoCell::reset() does not clear event_log, so it accumulates
+    // across every hand.  Clear it here, after the hand history snapshot has
+    // been recorded, so each new hand starts with a clean log.
+    SESSION.with(|s| {
+        if let Some(session) = s.borrow_mut().as_mut() {
+            session.table.event_log.clear();
+        }
+    });
+
     SESSION.with(|s| {
         if let Some(session) = s.borrow_mut().as_mut() {
             session.eliminate_busted();
