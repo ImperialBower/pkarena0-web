@@ -47,10 +47,21 @@
 
     /* ── SVG table ── */
     #poker-table {
-      width: 100%;
+      /* Never wider than 800px, but also cap width so the table's height
+         leaves ~240px for the score bar, status, buttons and gaps above/below. */
+      width: min(100%, 800px, calc((100vh - 240px) * 1.5));
       max-width: 800px;
       height: auto;
       display: block;
+    }
+
+    /* ── Right column wrapper (status + action panel) ── */
+    #right-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      gap: 8px;
     }
 
     /* ── Action panel ── */
@@ -59,7 +70,6 @@
       flex-direction: column;
       align-items: center;
       gap: 8px;
-      margin-top: 8px;
       width: 100%;
       max-width: 600px;
     }
@@ -248,6 +258,36 @@
     }
     footer a { color: #446; }
 
+    /* ── Readable card displays (HTML, outside SVG) ── */
+    #hero-cards, #board-cards {
+      display: none;
+      gap: 6px;
+      justify-content: center;
+    }
+    #hero-cards.has-cards, #board-cards.has-cards { display: flex; }
+    .card-display {
+      background: #fff;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: Georgia, serif;
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      user-select: none;
+      line-height: 1.1;
+    }
+    .card-display.red { color: #cc1111; }
+    /* Hero hole cards — largest */
+    #hero-cards .card-display { width: 54px; height: 76px; }
+    #hero-cards .cd-rank { font-size: 24px; }
+    #hero-cards .cd-suit { font-size: 20px; }
+    /* Board / community cards — slightly smaller */
+    #board-cards .card-display { width: 40px; height: 56px; }
+    #board-cards .cd-rank { font-size: 17px; }
+    #board-cards .cd-suit { font-size: 14px; }
+
     /* ── Mobile: portrait phones ≤480px ── */
     @media (max-width: 480px) {
       body { padding: 6px; }
@@ -323,7 +363,7 @@
       #game-state-pre { font-size: 10px; }
     }
 
-    /* ── Tablet / landscape phone ── */
+    /* ── Tablet / wide ── */
     @media (min-width: 481px) and (max-width: 767px) {
       #action-buttons button { min-width: 110px; }
 
@@ -334,6 +374,123 @@
       }
       #btn-current-game { margin-left: 0; }
     }
+
+    /* ── Landscape mobile: two-column layout ── */
+    /* pointer:coarse = touch device (phone/tablet); excludes desktop mice */
+    @media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+      body {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        padding: 4px;
+        gap: 0;
+      }
+
+      /* Score bar spans full width at top */
+      #score-bar {
+        flex: 0 0 100%;
+        margin-bottom: 4px;
+        gap: 16px;
+        padding: 4px 12px;
+      }
+
+      /* Hide status — active player is visible on the table; saves row space */
+      #status-msg { display: none; }
+
+      /* SVG on the left */
+      #poker-table {
+        flex: 0 0 58%;
+        width: 58%;      /* override the min() height-based constraint */
+        max-width: none;
+      }
+
+      /* Right column fills the right side */
+      #right-col {
+        flex: 0 0 40%;
+        padding: 0 6px;
+        align-items: stretch;
+      }
+
+      /* Action panel fills its right-col parent */
+      #action-panel {
+        max-width: none;
+        margin-top: 0;
+        align-items: stretch;
+      }
+
+      /* Stack buttons vertically so they fill the column */
+      #action-buttons {
+        flex-direction: column;
+        width: 100%;
+      }
+      #action-buttons button {
+        width: 100%;
+        min-height: 40px;
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+
+      /* Slightly shorter confirm button to fit */
+      #bet-confirm {
+        min-height: 40px;
+        padding: 8px 12px;
+      }
+
+      /* Re-enable HTML card displays (overrides the ≥768px hide rule) */
+      #hero-cards.has-cards, #board-cards.has-cards { display: flex; }
+
+      /* Slightly smaller cards to fit the narrow right column */
+      #hero-cards .card-display { width: 46px; height: 64px; }
+      #hero-cards .cd-rank { font-size: 20px; }
+      #hero-cards .cd-suit { font-size: 16px; }
+      #board-cards .card-display { width: 34px; height: 48px; }
+      #board-cards .cd-rank { font-size: 14px; }
+      #board-cards .cd-suit { font-size: 12px; }
+
+      /* Hide non-gameplay elements to save space */
+      #hand-log-wrap,
+      #yaml-bar,
+      footer { display: none; }
+    }
+
+    /* ── Desktop two-column layout (CSS Grid) ── */
+    @media (min-width: 768px) {
+      /* Named grid areas guarantee correct placement regardless of DOM order
+         quirks. The SVG column is 1fr (fills all space minus the 260px
+         right column); the right column is fixed at 260px. */
+      body {
+        display: grid;
+        grid-template-columns: 1fr 260px;
+        grid-template-areas:
+          "score    score"
+          "table    rightcol"
+          "log      log"
+          "yaml     yaml"
+          "foot     foot";
+        gap: 8px;
+        padding: 8px;
+        align-items: start;
+      }
+
+      #score-bar   { grid-area: score;    margin-bottom: 0; }
+      #poker-table { grid-area: table;    width: 100%; max-width: 800px; height: auto; }
+      #right-col   { grid-area: rightcol; display: flex; flex-direction: column;
+                     align-items: stretch; gap: 6px; width: auto; }
+      #hand-log-wrap { grid-area: log;   max-width: none; margin-top: 0; }
+      #yaml-bar    { grid-area: yaml; }
+      footer       { grid-area: foot; }
+
+      #status-msg   { text-align: left; min-height: 0; }
+      #action-panel { max-width: none; margin-top: 0; align-items: stretch; }
+      #action-buttons { flex-direction: column; width: 100%; }
+      #action-buttons button { width: 100%; }
+
+      /* Hide HTML card displays on desktop — SVG is large enough.
+         Placed here (after the base .has-cards { display:flex } rule) so
+         source order guarantees this wins at equal specificity. */
+      #hero-cards, #board-cards,
+      #hero-cards.has-cards, #board-cards.has-cards { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -343,8 +500,6 @@
     <span>Chips: <strong id="sc-chips">—</strong></span>
     <span>P&amp;L: <strong id="sc-pnl">—</strong></span>
   </div>
-
-  <div id="status-msg">Loading WASM…</div>
 
   <!-- ── Poker table SVG (original design + dynamic IDs) ── -->
   <svg id="poker-table" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
@@ -755,8 +910,14 @@
     </g>
   </svg>
 
+  <!-- ── Right column: status + action panel ── -->
+  <div id="right-col">
+  <div id="status-msg">Loading WASM…</div>
+
   <!-- ── Action panel ── -->
   <div id="action-panel">
+    <div id="hero-cards"></div>
+    <div id="board-cards"></div>
     <div id="action-buttons">
       <button id="btn-new-game" class="primary" disabled>New Game</button>
     </div>
@@ -769,6 +930,7 @@
       </div>
     </div>
   </div>
+  </div><!-- /#right-col -->
 
   <details id="hand-log-wrap">
     <summary>Hand log</summary>
@@ -923,6 +1085,43 @@
     }
 
     // ── Boot ──────────────────────────────────────────────────────────────────
+    // ── Adaptive table-text scaling ───────────────────────────────────────────
+    // Computes the SVG's current pixel scale and bumps font-size attributes so
+    // seat labels remain legible when the table shrinks on mobile/landscape.
+    function scaleTableText() {
+      const svg = document.getElementById('poker-table');
+      const w = svg.getBoundingClientRect().width;
+      if (!w) return;
+      const scale = w / 1200; // rendered px / viewBox width
+
+      // Target minimum legible sizes in CSS px; capped to avoid plate overflow.
+      // Plate is 44 viewBox units tall with name at y=-12, chips at y=6.
+      const nameSize   = Math.min(26, Math.max(14, Math.round(10 / scale)));
+      const chipsSize  = Math.min(21, Math.max(12, Math.round( 8 / scale)));
+      const actionSize = Math.min(21, Math.max(13, Math.round(10 / scale)));
+      const badgeSize  = Math.min(15, Math.max( 9, Math.round( 7 / scale)));
+      const potSize    = Math.min(23, Math.max(14, Math.round(10 / scale)));
+      // Push chips label down a touch when name font is enlarged to avoid overlap
+      const chipsY = nameSize > 16 ? 10 : 6;
+
+      for (let i = 0; i <= 8; i++) {
+        const name   = document.getElementById('seat-' + i + '-name');
+        const chips  = document.getElementById('seat-' + i + '-chips');
+        const action = document.getElementById('seat-' + i + '-action-text');
+        const badge  = document.getElementById('seat-' + i + '-badge-text');
+        if (name)   name  .setAttribute('font-size', nameSize);
+        if (chips)  { chips.setAttribute('font-size', chipsSize); chips.setAttribute('y', chipsY); }
+        if (action) action.setAttribute('font-size', actionSize);
+        if (badge)  badge .setAttribute('font-size', badgeSize);
+      }
+      const potEl = document.getElementById('pot-amount');
+      if (potEl) potEl.setAttribute('font-size', potSize);
+    }
+    // Fire once on load and again whenever the SVG element changes size
+    // (covers orientation flip, window resize, or layout column reflow).
+    new ResizeObserver(scaleTableText).observe(document.getElementById('poker-table'));
+    setTimeout(scaleTableText, 0); // initial pass before first paint
+
     async function boot() {
       try {
         await init();
@@ -994,6 +1193,9 @@
       for (const p of state.players ?? []) {
         updateSeat(p.seat, p, state);
       }
+
+      updateHeroCardsDisplay(state.hero);
+      updateBoardCardsDisplay(state.board);
     }
 
     // Full render: visuals + phase-appropriate status and action buttons.
@@ -1174,6 +1376,47 @@
       if (c1) while (c1.firstChild) c1.removeChild(c1.firstChild);
     }
 
+    // ── HTML card displays (large, readable outside the SVG) ─────────────────
+    function makeCardEl(cardStr) {
+      if (!cardStr || cardStr === '__') return null;
+      const suit = cardStr[cardStr.length - 1];
+      const rank = cardStr.slice(0, -1);
+      const rankLabel = rank === 'T' ? '10' : rank;
+      const suitChar = { s: '\u2660', h: '\u2665', d: '\u2666', c: '\u2663' }[suit] ?? '?';
+      const isRed = suit === 'h' || suit === 'd';
+      const div = document.createElement('div');
+      div.className = 'card-display' + (isRed ? ' red' : '');
+      const rankSpan = document.createElement('span');
+      rankSpan.className = 'cd-rank';
+      rankSpan.textContent = rankLabel;
+      const suitSpan = document.createElement('span');
+      suitSpan.className = 'cd-suit';
+      suitSpan.textContent = suitChar;
+      div.appendChild(rankSpan);
+      div.appendChild(suitSpan);
+      return div;
+    }
+
+    function updateHeroCardsDisplay(hero) {
+      const el = document.getElementById('hero-cards');
+      if (!el) return;
+      const cards = hero?.hole_cards;
+      el.className = '';
+      while (el.firstChild) el.removeChild(el.firstChild);
+      if (!cards || cards.length < 2 || !cards[0]) return;
+      cards.forEach(c => { const node = makeCardEl(c); if (node) el.appendChild(node); });
+      el.className = 'has-cards';
+    }
+
+    function updateBoardCardsDisplay(board) {
+      const el = document.getElementById('board-cards');
+      if (!el) return;
+      while (el.firstChild) el.removeChild(el.firstChild);
+      if (!board || board.length === 0) { el.className = ''; return; }
+      board.forEach(c => { const node = makeCardEl(c); if (node) el.appendChild(node); });
+      el.className = 'has-cards';
+    }
+
     // ── Card rendering (SVG DOM, no innerHTML) ────────────────────────────────
     function renderCard(groupId, cardStr, isBoardSlot) {
       const g = document.getElementById(groupId);
@@ -1191,8 +1434,8 @@
         // Face-down card
         const u = document.createElementNS(SVG_NS, 'use');
         u.setAttribute('href', '#cardDown');
-        u.setAttribute('width', '38');
-        u.setAttribute('height', '54');
+        u.setAttribute('width', '44');
+        u.setAttribute('height', '62');
         g.appendChild(u);
         return;
       }
@@ -1205,28 +1448,28 @@
       const fill = (suitChar === 'h' || suitChar === 'd') ? '#cc1111' : '#222';
 
       const rect = document.createElementNS(SVG_NS, 'rect');
-      rect.setAttribute('width', '38');
-      rect.setAttribute('height', '54');
-      rect.setAttribute('rx', '3');
+      rect.setAttribute('width', '44');
+      rect.setAttribute('height', '62');
+      rect.setAttribute('rx', '4');
       rect.setAttribute('fill', '#fff');
       rect.setAttribute('stroke', '#ccc');
       rect.setAttribute('stroke-width', '0.5');
 
       const rankText = document.createElementNS(SVG_NS, 'text');
       rankText.setAttribute('x', '3');
-      rankText.setAttribute('y', '13');
+      rankText.setAttribute('y', '16');
       rankText.setAttribute('font-family', 'Georgia,serif');
-      rankText.setAttribute('font-size', rankLabel === '10' ? '10' : '12');
+      rankText.setAttribute('font-size', rankLabel === '10' ? '12' : '14');
       rankText.setAttribute('font-weight', 'bold');
       rankText.setAttribute('fill', fill);
       rankText.textContent = rankLabel;
 
       const suitUse = document.createElementNS(SVG_NS, 'use');
       suitUse.setAttribute('href', '#' + suitId);
-      suitUse.setAttribute('x', '10');
-      suitUse.setAttribute('y', '19');
-      suitUse.setAttribute('width', '18');
-      suitUse.setAttribute('height', '18');
+      suitUse.setAttribute('x', '12');
+      suitUse.setAttribute('y', '24');
+      suitUse.setAttribute('width', '20');
+      suitUse.setAttribute('height', '20');
       suitUse.setAttribute('color', fill);
 
       g.appendChild(rect);
