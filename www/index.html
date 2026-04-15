@@ -1226,6 +1226,20 @@
         const nextState = JSON.parse(next_hand());
         const heroChipsAfter = nextState.hero?.chips ?? state.hero?.chips ?? 0;
 
+        // Immediately refresh chip labels so the score bar shows settled winnings
+        // rather than $0 when the hero was all-in when the hand ended.
+        {
+          const pnl = heroChipsAfter - STARTING_CHIPS;
+          document.getElementById('sc-chips').textContent = '$' + heroChipsAfter.toLocaleString();
+          const pnlEl = document.getElementById('sc-pnl');
+          pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toLocaleString();
+          pnlEl.className = pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : '';
+          setText('seat-0-chips', '$' + heroChipsAfter.toLocaleString());
+          for (const p of nextState.players ?? []) {
+            setText('seat-' + p.seat + '-chips', '$' + (p.chips ?? 0).toLocaleString());
+          }
+        }
+
         // Build the result message from the engine's winner summary.
         const result = nextState.last_result?.[0];
         let resultText, isWin = null;

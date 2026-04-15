@@ -209,7 +209,9 @@ pub fn next_hand() -> String {
                         .find(|(s, _)| *s == seat_num)
                         .map_or(0, |(_, c)| *c);
                     // Hole cards as Unicode strings (e.g. "A♠ K♦") for hand history.
-                    let hole_str = if is_in_hand(&seat.player.state) {
+                    // Always record the hero's cards (seat 0) so their holdings
+                    // appear in the YAML even on hands they fold.
+                    let hole_str = if is_in_hand(&seat.player.state) || seat_num == 0 {
                         let s: String = seat
                             .cards
                             .as_slice()
