@@ -1075,7 +1075,8 @@
           return;
         }
         setStatus(`${result.name} ${result.action_label}`);
-        appendHandLog(`${result.name}: ${result.action_label}`);
+        const botCards = cardsToLogStr(result.hole_cards);
+        appendHandLog(`${result.name}${botCards ? ' ' + botCards : ''}: ${result.action_label}`);
         setActionLabel(result.seat, result.action_label);
         // Re-render table with updated chips/bets but no action buttons.
         const state = JSON.parse(get_state());
@@ -1150,7 +1151,10 @@
     function onHumanAction(action, amount, currentState) {
       hideBetControls();
       renderButtons([], null);   // clear buttons immediately so none appear while bots act
-      setActionLabel(0, heroActionLabel(action, amount, currentState));
+      const label = heroActionLabel(action, amount, currentState);
+      setActionLabel(0, label);
+      const heroCards = cardsToLogStr(currentState.hero?.hole_cards);
+      appendHandLog(`You${heroCards ? ' ' + heroCards : ''}: ${label}`);
       setStatus('…');
       const req = JSON.stringify({ action, amount: amount ?? 0 });
       const state = JSON.parse(human_action(req));
@@ -1626,6 +1630,21 @@
       p.textContent = entry;
       log.appendChild(p);
       log.scrollTop = log.scrollHeight;
+    }
+
+    // Convert a two-char ASCII card code ("Ks", "Td", "Ah") to a unicode string ("K♠", "10♦", "A♥").
+    function cardToLogStr(c) {
+      if (!c || c === '__') return '?';
+      const suit = c[c.length - 1];
+      const rank = c.slice(0, -1);
+      const suitSym = { s: '♠', h: '♥', d: '♦', c: '♣' }[suit] ?? suit;
+      return (rank === 'T' ? '10' : rank) + suitSym;
+    }
+
+    // Format an array of card codes as "[K♠ Q♥]", or "" if empty/absent.
+    function cardsToLogStr(cards) {
+      if (!cards || cards.length === 0) return '';
+      return '[' + cards.map(cardToLogStr).join(' ') + ']';
     }
 
     // ── YAML download ─────────────────────────────────────────────────────────
