@@ -1075,7 +1075,8 @@
           return;
         }
         setStatus(`${result.name} ${result.action_label}`);
-        appendHandLog(`${result.name}: ${result.action_label}`);
+        const botCards = cardsToLogStr(result.hole_cards);
+        appendHandLog(`${result.name}${botCards ? ' ' + botCards : ''}: ${result.action_label}`);
         setActionLabel(result.seat, result.action_label);
         // Re-render table with updated chips/bets but no action buttons.
         const state = JSON.parse(get_state());
@@ -1150,7 +1151,10 @@
     function onHumanAction(action, amount, currentState) {
       hideBetControls();
       renderButtons([], null);   // clear buttons immediately so none appear while bots act
-      setActionLabel(0, heroActionLabel(action, amount, currentState));
+      const label = heroActionLabel(action, amount, currentState);
+      setActionLabel(0, label);
+      const heroCards = cardsToLogStr(currentState.hero?.hole_cards);
+      appendHandLog(`You${heroCards ? ' ' + heroCards : ''}: ${label}`);
       setStatus('…');
       const req = JSON.stringify({ action, amount: amount ?? 0 });
       const state = JSON.parse(human_action(req));
@@ -1224,7 +1228,24 @@
         // Advance the hand immediately so end_hand() distributes the pot and
         // last_result (winner info) is available on nextState.
         const nextState = JSON.parse(next_hand());
+        if (nextState.phase === 'Error') {
+          console.error('[pkarena] next_hand() failed:', nextState.error);
+        }
         const heroChipsAfter = nextState.hero?.chips ?? state.hero?.chips ?? 0;
+
+        // Immediately refresh chip labels so the score bar shows settled winnings
+        // rather than $0 when the hero was all-in when the hand ended.
+        {
+          const pnl = heroChipsAfter - STARTING_CHIPS;
+          document.getElementById('sc-chips').textContent = '$' + heroChipsAfter.toLocaleString();
+          const pnlEl = document.getElementById('sc-pnl');
+          pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toLocaleString();
+          pnlEl.className = pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : '';
+          setText('seat-0-chips', '$' + heroChipsAfter.toLocaleString());
+          for (const p of nextState.players ?? []) {
+            setText('seat-' + p.seat + '-chips', '$' + (p.chips ?? 0).toLocaleString());
+          }
+        }
 
         // Build the result message from the engine's winner summary.
         const result = nextState.last_result?.[0];
@@ -1246,6 +1267,8 @@
         // When the session is over, say so immediately in the status bar.
         if (nextState.phase === 'SessionOver') {
           setStatus(resultText ? resultText + ' — Session over!' : 'Session over!');
+        } else if (nextState.phase === 'Error') {
+          setStatus('Engine error — see details shortly…');
         } else if (resultText) {
           setStatus(resultText);
         }
@@ -1255,6 +1278,11 @@
           clearAllActions();
           handStartHeroChips = heroChipsAfter;
           if (nextState.phase === 'SessionOver') { renderState(nextState); return; }
+          if (nextState.phase === 'Error') {
+            setStatus('Engine error: ' + (nextState.error ?? 'unknown'));
+            renderButtons([{ label: 'New Game', cls: 'primary', action: 'new-game' }]);
+            return;
+          }
           renderTableVisuals(nextState);
           stepBotsUntilHuman();
         }, HAND_COMPLETE_MS);
@@ -1612,6 +1640,21 @@
       p.textContent = entry;
       log.appendChild(p);
       log.scrollTop = log.scrollHeight;
+    }
+
+    // Convert a two-char ASCII card code ("Ks", "Td", "Ah") to a unicode string ("K♠", "10♦", "A♥").
+    function cardToLogStr(c) {
+      if (!c || c === '__') return '?';
+      const suit = c[c.length - 1];
+      const rank = c.slice(0, -1);
+      const suitSym = { s: '♠', h: '♥', d: '♦', c: '♣' }[suit] ?? suit;
+      return (rank === 'T' ? '10' : rank) + suitSym;
+    }
+
+    // Format an array of card codes as "[K♠ Q♥]", or "" if empty/absent.
+    function cardsToLogStr(cards) {
+      if (!cards || cards.length === 0) return '';
+      return '[' + cards.map(cardToLogStr).join(' ') + ']';
     }
 
     // ── YAML download ─────────────────────────────────────────────────────────

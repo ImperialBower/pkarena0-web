@@ -209,7 +209,9 @@ pub fn next_hand() -> String {
                         .find(|(s, _)| *s == seat_num)
                         .map_or(0, |(_, c)| *c);
                     // Hole cards as Unicode strings (e.g. "A♠ K♦") for hand history.
-                    let hole_str = if is_in_hand(&seat.player.state) {
+                    // Record cards for every player who was dealt in, regardless of
+                    // whether they folded.
+                    let hole_str = {
                         let s: String = seat
                             .cards
                             .as_slice()
@@ -219,8 +221,6 @@ pub fn next_hand() -> String {
                             .collect::<Vec<_>>()
                             .join(" ");
                         if s.is_empty() { None } else { Some(s) }
-                    } else {
-                        None
                     };
                     Some((seat_num, seat.player.handle.clone(), starting, hole_str))
                 })
@@ -460,7 +460,7 @@ pub fn step_bot() -> String {
             serde_json::json!({"done": true}).to_string()
         }
         Some(seat) => {
-            let (action, call_amount, allin_chips, name) = SESSION.with(|s| {
+            let (action, call_amount, allin_chips, name, hole_cards) = SESSION.with(|s| {
                 BOTS.with(|b| {
                     RNG.with(|r| {
                         let bots = b.borrow();
@@ -474,12 +474,19 @@ pub fn step_bot() -> String {
                             let name = session.table.seats.get_seat(seat)
                                 .map(|s| s.player.handle.clone())
                                 .unwrap_or_default();
+                            let hole_cards: Vec<String> = session.table.seats.get_seat(seat)
+                                .map_or_else(Vec::new, |s| {
+                                    s.cards.as_slice().iter()
+                                        .filter(|c| **c != Card::BLANK)
+                                        .map(card_to_str)
+                                        .collect()
+                                });
                             if let Some(bot) = bots.get(bot_idx) {
                                 let act = bot.decide(&session.table, seat, &mut *rng);
-                                return (act, call_amt, chips, name);
+                                return (act, call_amt, chips, name, hole_cards);
                             }
                         }
-                        (PlayerAction::Fold, 0, 0, String::new())
+                        (PlayerAction::Fold, 0, 0, String::new(), Vec::new())
                     })
                 })
             });
@@ -509,6 +516,7 @@ pub fn step_bot() -> String {
                 "seat": seat,
                 "name": name,
                 "action_label": action_label,
+                "hole_cards": hole_cards,
             })
             .to_string()
         }
