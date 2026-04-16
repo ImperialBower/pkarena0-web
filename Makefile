@@ -1,4 +1,7 @@
-.PHONY: help build serve build-release clean install-playwright test test-ui test-yaml
+.PHONY: help build serve build-release clean install-playwright test test-ui test-yaml ayce default
+
+# Default target
+default: ayce
 
 help:
 	@echo "pkarena0-web — available targets:"
@@ -39,3 +42,6 @@ test-ui: build
 test-yaml: build
 	npx playwright test tests/yaml-download.spec.ts
 	cargo run --bin validate-yaml -- tests/fixtures/session.yaml
+
+# All You Can Eat - clean, build, and test
+ayce: clean build test
