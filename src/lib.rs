@@ -251,8 +251,22 @@ pub fn next_hand() -> String {
         }
     });
 
+    // pkcore bug: in some multiway showdown scenarios orphaned NONE equity
+    // entries (folded players' chips above an all-in winner's level) are not
+    // distributed, causing the chip audit to fail.  Table::reset() already ran
+    // before the audit, so the table is in a clean state.  Surface the error as
+    // a warning and continue the session rather than freezing the UI.
+    let had_audit_failure;
     let winnings = match winnings_result {
-        Ok(w) => w,
+        Ok(w) => {
+            had_audit_failure = false;
+            w
+        }
+        Err(err) if err.contains("Chip audit failed") => {
+            had_audit_failure = true;
+            LAST_ERROR.with(|e| *e.borrow_mut() = Some(format!("Engine error: {err}")));
+            Winnings::default()
+        }
         Err(err) => return error_state(&err),
     };
 
@@ -277,40 +291,44 @@ pub fn next_hand() -> String {
                 // Store as starting chips for the next hand.
                 HAND_START_CHIPS.with(|h| *h.borrow_mut() = ending_stacks.clone());
 
-                let hh = HandHistory::from_table_state(
-                    s.hand_num,
-                    0, // ts_secs — no wall clock in WASM
-                    s.button,
-                    &s.forced,
-                    &s.player_snapshot,
-                    &s.board_str,
-                    &winnings,
-                    &s.event_log,
-                    &ending_stacks,
-                    "pkarena0",
-                );
-                COLLECTION.with(|c| c.borrow_mut().push(hh));
+                // Skip hand history and winner display when the chip audit failed;
+                // the winnings are either absent or unreliable.
+                if !had_audit_failure {
+                    let hh = HandHistory::from_table_state(
+                        s.hand_num,
+                        0, // ts_secs — no wall clock in WASM
+                        s.button,
+                        &s.forced,
+                        &s.player_snapshot,
+                        &s.board_str,
+                        &winnings,
+                        &s.event_log,
+                        &ending_stacks,
+                        "pkarena0",
+                    );
+                    COLLECTION.with(|c| c.borrow_mut().push(hh));
 
-                // Build per-pot winner summary for the UI.
-                let pot_results: Vec<PotResult> = winnings.vec().iter().map(|pot_win| {
-                    let seats: Vec<u8> = (0u8..9)
-                        .filter(|&i| pot_win.equity.seats.contains(i))
-                        .collect();
-                    let names: Vec<String> = seats.iter().map(|&seat| {
-                        s.player_snapshot
-                            .iter()
-                            .find(|(sn, _, _, _)| *sn == seat)
-                            .map(|(_, name, _, _)| name.clone())
-                            .unwrap_or_default()
+                    // Build per-pot winner summary for the UI.
+                    let pot_results: Vec<PotResult> = winnings.vec().iter().map(|pot_win| {
+                        let seats: Vec<u8> = (0u8..9)
+                            .filter(|&i| pot_win.equity.seats.contains(i))
+                            .collect();
+                        let names: Vec<String> = seats.iter().map(|&seat| {
+                            s.player_snapshot
+                                .iter()
+                                .find(|(sn, _, _, _)| *sn == seat)
+                                .map(|(_, name, _, _)| name.clone())
+                                .unwrap_or_default()
+                        }).collect();
+                        PotResult {
+                            seats,
+                            names,
+                            amount: pot_win.equity.chips,
+                            hand: hand_rank_name_to_str(pot_win.eval.hand_rank.name),
+                        }
                     }).collect();
-                    PotResult {
-                        seats,
-                        names,
-                        amount: pot_win.equity.chips,
-                        hand: hand_rank_name_to_str(pot_win.eval.hand_rank.name),
-                    }
-                }).collect();
-                LAST_HAND_RESULT.with(|r| *r.borrow_mut() = Some(pot_results));
+                    LAST_HAND_RESULT.with(|r| *r.borrow_mut() = Some(pot_results));
+                }
             }
         });
     }

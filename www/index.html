@@ -1271,6 +1271,8 @@
           setStatus('Engine error — see details shortly…');
         } else if (resultText) {
           setStatus(resultText);
+        } else if (nextState.error) {
+          setStatus(nextState.error);
         }
 
         setTimeout(() => {
