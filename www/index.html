@@ -1228,6 +1228,9 @@
         // Advance the hand immediately so end_hand() distributes the pot and
         // last_result (winner info) is available on nextState.
         const nextState = JSON.parse(next_hand());
+        if (nextState.phase === 'Error') {
+          console.error('[pkarena] next_hand() failed:', nextState.error);
+        }
         const heroChipsAfter = nextState.hero?.chips ?? state.hero?.chips ?? 0;
 
         // Immediately refresh chip labels so the score bar shows settled winnings
@@ -1264,6 +1267,8 @@
         // When the session is over, say so immediately in the status bar.
         if (nextState.phase === 'SessionOver') {
           setStatus(resultText ? resultText + ' — Session over!' : 'Session over!');
+        } else if (nextState.phase === 'Error') {
+          setStatus('Engine error — see details shortly…');
         } else if (resultText) {
           setStatus(resultText);
         }
@@ -1273,6 +1278,11 @@
           clearAllActions();
           handStartHeroChips = heroChipsAfter;
           if (nextState.phase === 'SessionOver') { renderState(nextState); return; }
+          if (nextState.phase === 'Error') {
+            setStatus('Engine error: ' + (nextState.error ?? 'unknown'));
+            renderButtons([{ label: 'New Game', cls: 'primary', action: 'new-game' }]);
+            return;
+          }
           renderTableVisuals(nextState);
           stepBotsUntilHuman();
         }, HAND_COMPLETE_MS);
