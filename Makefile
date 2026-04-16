@@ -1,4 +1,4 @@
-.PHONY: help build serve build-release clean install-playwright test test-ui
+.PHONY: help build serve build-release clean install-playwright test test-ui test-yaml
 
 help:
 	@echo "pkarena0-web — available targets:"
@@ -10,6 +10,7 @@ help:
 	@echo "  install-playwright  npm install + playwright install chromium"
 	@echo "  test                dev build + playwright headless tests"
 	@echo "  test-ui             dev build + playwright interactive UI"
+	@echo "  test-yaml           browser download test + pkcore YAML validation"
 
 build:
 	wasm-pack build --target web --out-dir www/pkg
@@ -34,3 +35,7 @@ test: build
 
 test-ui: build
 	npx playwright test --ui
+
+test-yaml: build
+	npx playwright test tests/yaml-download.spec.ts
+	cargo run --bin validate-yaml -- tests/fixtures/session.yaml

@@ -34,3 +34,8 @@ export async function statusContains(page: Page, text: string): Promise<boolean>
   const msg = await page.textContent('#status-msg');
   return (msg ?? '').toLowerCase().includes(text.toLowerCase());
 }
+
+/** Wait until at least one hand has completed and YAML is ready to download. */
+export async function waitForYamlReady(page: Page): Promise<void> {
+  await page.waitForSelector('#btn-download-yaml:not([disabled])', { timeout: 30_000 });
+}
