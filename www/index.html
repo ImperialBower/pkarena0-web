@@ -251,6 +251,96 @@
       margin: 0;
     }
 
+    /* ── Settings overlay ── */
+    #settings-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #settings-overlay.open { display: flex; }
+    #settings-box {
+      background: #0d0d1a;
+      border: 1px solid #336;
+      border-radius: 8px;
+      padding: 16px;
+      min-width: 300px;
+      max-width: 90vw;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #settings-box header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #99c;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    #settings-close {
+      background: none;
+      border: none;
+      color: #669;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 8px 12px;
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      border-radius: 4px;
+    }
+    #settings-close:hover { color: #99c; }
+    #settings-content {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #settings-content label {
+      color: #aaa;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .speed-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #669;
+      font-size: 12px;
+    }
+    .speed-row input[type=range] {
+      flex: 1;
+      accent-color: #4a90d9;
+    }
+    #speed-label {
+      text-align: center;
+      color: #f0d060;
+      font-size: 12px;
+    }
+    #settings-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: #669;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+    #settings-btn:hover { color: #99c; }
+
     footer {
       margin-top: 12px;
       font-size: 11px;
@@ -499,6 +589,7 @@
     <span>Hand: <strong id="sc-hand">—</strong></span>
     <span>Chips: <strong id="sc-chips">—</strong></span>
     <span>P&amp;L: <strong id="sc-pnl">—</strong></span>
+    <button id="settings-btn" title="Settings">⚙</button>
   </div>
 
   <!-- ── Poker table SVG (original design + dynamic IDs) ── -->
@@ -952,6 +1043,24 @@
     </div>
   </div>
 
+  <div id="settings-overlay">
+    <div id="settings-box">
+      <header>
+        <span>Settings</span>
+        <button id="settings-close">✕</button>
+      </header>
+      <div id="settings-content">
+        <label for="speed-slider">Game Speed</label>
+        <div class="speed-row">
+          <span>Slow</span>
+          <input type="range" id="speed-slider" min="1" max="10" value="5">
+          <span>Fast</span>
+        </div>
+        <div id="speed-label">Normal (1×)</div>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <a href="https://github.com/ImperialBower/pkarena0-web">ImperialBower/pkarena0-web</a>
   </footer>
@@ -962,8 +1071,8 @@
 
     // ── Constants ─────────────────────────────────────────────────────────────
     const SVG_NS = 'http://www.w3.org/2000/svg';
-    const BOT_ACTION_MS = 1000;   // pause between each bot action
-    const HAND_COMPLETE_MS = 5000; // pause to show result before starting next hand
+    let BOT_ACTION_MS = 1000;   // pause between each bot action (configurable via settings)
+    let HAND_COMPLETE_MS = 5000; // pause to show result before starting next hand (configurable)
     const STARTING_CHIPS = 10_000;
     const BOT_EMOJIS = {
       'gto':               '🤖',
@@ -1691,6 +1800,41 @@
 
     gameStateOverlay.addEventListener('click', (e) => {
       if (e.target === gameStateOverlay) gameStateOverlay.classList.remove('open');
+    });
+
+    // ── Settings overlay ───────────────────────────────────────────────────────
+    const settingsOverlay = document.getElementById('settings-overlay');
+
+    document.getElementById('settings-btn').addEventListener('click', () => {
+      settingsOverlay.classList.add('open');
+    });
+
+    document.getElementById('settings-close').addEventListener('click', () => {
+      settingsOverlay.classList.remove('open');
+    });
+
+    settingsOverlay.addEventListener('click', (e) => {
+      if (e.target === settingsOverlay) settingsOverlay.classList.remove('open');
+    });
+
+    const SPEED_PRESETS = [
+      { label: 'Very Slow (0.25×)', bot: 4000, hand: 20000 },
+      { label: 'Slow (0.5×)',       bot: 2000, hand: 10000 },
+      { label: 'Slow (0.75×)',      bot: 1500, hand:  7500 },
+      { label: 'Normal (1×)',       bot: 1000, hand:  5000 },
+      { label: 'Fast (1.5×)',       bot:  700, hand:  3500 },
+      { label: 'Fast (2×)',         bot:  500, hand:  2500 },
+      { label: 'Fast (3×)',         bot:  350, hand:  1750 },
+      { label: 'Fast (4×)',         bot:  250, hand:  1250 },
+      { label: 'Very Fast (6×)',    bot:  150, hand:   800 },
+      { label: 'Turbo (10×)',       bot:   75, hand:   400 },
+    ];
+
+    document.getElementById('speed-slider').addEventListener('input', (e) => {
+      const preset = SPEED_PRESETS[e.target.value - 1];
+      BOT_ACTION_MS = preset.bot;
+      HAND_COMPLETE_MS = preset.hand;
+      document.getElementById('speed-label').textContent = preset.label;
     });
 
     // Enable the YAML download button once a hand has completed.
