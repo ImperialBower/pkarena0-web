@@ -341,6 +341,59 @@
     }
     #settings-btn:hover { color: #99c; }
 
+    /* ── Tab bar (lives inside #right-col, always top-right) ── */
+    #tab-bar {
+      display: flex;
+      gap: 2px;
+      border-bottom: 1px solid #224;
+      margin-bottom: 4px;
+    }
+    .tab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #669;
+      padding: 6px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      letter-spacing: 0.05em;
+    }
+    .tab.active {
+      color: #f0d060;
+      border-bottom-color: #f0d060;
+    }
+    .tab:hover:not(.active) { color: #99c; }
+
+    /* ── Arena panel (inside #right-col, shown only in Arena mode) ── */
+    #arena-panel {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      padding: 6px 0;
+    }
+    #arena-status {
+      color: #aaa;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    #arena-start-btn {
+      background: none;
+      border: 1px solid #4a90d9;
+      color: #9ac4f0;
+      padding: 8px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      align-self: flex-start;
+    }
+    #arena-start-btn:hover { background: #1a2e3a; }
+
+    /* ── Arena mode: swap action-panel for arena-panel; hide human-specific UI ── */
+    body.arena-active #action-panel  { display: none; }
+    body.arena-active #arena-panel   { display: flex; }
+    body.arena-active #hand-log-wrap { display: none; }
+    body.arena-active .play-only     { display: none; }
+
     footer {
       margin-top: 12px;
       font-size: 11px;
@@ -587,8 +640,8 @@
 
   <div id="score-bar">
     <span>Hand: <strong id="sc-hand">—</strong></span>
-    <span>Chips: <strong id="sc-chips">—</strong></span>
-    <span>P&amp;L: <strong id="sc-pnl">—</strong></span>
+    <span class="play-only">Chips: <strong id="sc-chips">—</strong></span>
+    <span class="play-only">P&amp;L: <strong id="sc-pnl">—</strong></span>
     <button id="settings-btn" title="Settings">⚙</button>
   </div>
 
@@ -1001,11 +1054,17 @@
     </g>
   </svg>
 
-  <!-- ── Right column: status + action panel ── -->
+  <!-- ── Right column: tabs + status + action panel ── -->
   <div id="right-col">
+
+  <nav id="tab-bar">
+    <button class="tab active" data-tab="play">Play</button>
+    <button class="tab" data-tab="arena">Arena</button>
+  </nav>
+
   <div id="status-msg">Loading WASM…</div>
 
-  <!-- ── Action panel ── -->
+  <!-- ── Action panel (Play mode) ── -->
   <div id="action-panel">
     <div id="hero-cards"></div>
     <div id="board-cards"></div>
@@ -1021,6 +1080,13 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Arena controls (Arena mode) ── -->
+  <div id="arena-panel">
+    <button id="arena-start-btn">Start Arena</button>
+    <span id="arena-status">Press Start Arena to watch 9 bots play to the finish.</span>
+  </div>
+
   </div><!-- /#right-col -->
 
   <details id="hand-log-wrap">
@@ -1066,7 +1132,7 @@
   </footer>
 
   <script type="module">
-    import init, { init_game, human_action, next_hand, get_state, get_session_yaml, step_bot }
+    import init, { init_game, init_bot_game, human_action, next_hand, get_state, get_session_yaml, step_bot }
       from './pkg/pkarena0_web.js';
 
     // ── Constants ─────────────────────────────────────────────────────────────
@@ -1835,6 +1901,66 @@
       BOT_ACTION_MS = preset.bot;
       HAND_COMPLETE_MS = preset.hand;
       document.getElementById('speed-label').textContent = preset.label;
+    });
+
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        document.body.classList.toggle('arena-active', btn.dataset.tab === 'arena');
+      });
+    });
+
+    // ── Arena game loop ───────────────────────────────────────────────────────
+    let arenaRunning = false;
+
+    async function runArena() {
+      arenaRunning = true;
+      while (arenaRunning) {
+        // Step all bots through the current hand
+        while (true) {
+          const result = JSON.parse(step_bot());
+          const state  = JSON.parse(get_state());
+          renderState(state);
+          updateArenaStatus(state);
+          if (result.done) break;
+          await new Promise(r => setTimeout(r, BOT_ACTION_MS));
+          if (!arenaRunning) return;
+        }
+
+        const state = JSON.parse(get_state());
+        if (state.phase === 'SessionOver') {
+          const winner = [...state.players].sort((a, b) => b.chips - a.chips)[0];
+          document.getElementById('arena-status').textContent =
+            `Session over! Winner: ${winner.name} — ${state.hand_number} hands played.`;
+          document.getElementById('arena-start-btn').textContent = 'New Arena';
+          arenaRunning = false;
+          return;
+        }
+
+        // Pause to show hand result, then auto-advance
+        await new Promise(r => setTimeout(r, HAND_COMPLETE_MS));
+        if (!arenaRunning) return;
+        next_hand();
+      }
+    }
+
+    function updateArenaStatus(state) {
+      const active = state.players.filter(p => p.chips > 0);
+      const leader = [...state.players].sort((a, b) => b.chips - a.chips)[0];
+      document.getElementById('arena-status').textContent =
+        `Hand #${state.hand_number} · ${active.length} players left · Leader: ${leader.name} $${leader.chips.toLocaleString()}`;
+    }
+
+    document.getElementById('arena-start-btn').addEventListener('click', () => {
+      arenaRunning = false;  // stop any running loop before restarting
+      const seed = Date.now();
+      const state = JSON.parse(init_bot_game(seed));
+      renderState(state);
+      updateArenaStatus(state);
+      document.getElementById('arena-start-btn').textContent = 'New Arena';
+      runArena();
     });
 
     // Enable the YAML download button once a hand has completed.

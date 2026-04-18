@@ -50,6 +50,8 @@ thread_local! {
     static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
     /// One-shot hand result populated by next_hand(), consumed by build_game_state().
     static LAST_HAND_RESULT: RefCell<Option<Vec<PotResult>>> = const { RefCell::new(None) };
+    /// When true, seat 0 is a bot (Arena mode); step_bot() never sets WaitingForHuman.
+    static IS_ALL_BOT: RefCell<bool> = const { RefCell::new(false) };
 }
 
 // ── WASM entry point ──────────────────────────────────────────────────────────
@@ -67,6 +69,7 @@ pub fn main() {
 /// until it is the human's turn. Returns a `GameState` JSON string.
 #[wasm_bindgen]
 pub fn init_game(rand_seed: f64) -> String {
+    IS_ALL_BOT.with(|f| *f.borrow_mut() = false);
     // Seed RNG.
     RNG.with(|r| *r.borrow_mut() = SmallRng::seed_from_u64(rand_seed.to_bits()));
 
@@ -90,6 +93,52 @@ pub fn init_game(rand_seed: f64) -> String {
     }
 
     // Capture chip counts BEFORE start_hand() posts blinds.
+    let start_chips: Vec<(u8, usize)> = seats_vec
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (i as u8, s.player.chips))
+        .collect();
+    HAND_START_CHIPS.with(|h| *h.borrow_mut() = start_chips);
+    COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
+
+    let table = TableNoCell::nlh_from_seats(
+        SeatsNoCell::new(seats_vec),
+        ForcedBets::new(50, 100),
+    );
+
+    let mut session = PokerSession::new(table);
+    if session.start_hand().is_err() {
+        return error_state("Failed to deal first hand");
+    }
+
+    BOTS.with(|b| *b.borrow_mut() = bots);
+    SESSION.with(|s| *s.borrow_mut() = Some(session));
+    PHASE.with(|p| *p.borrow_mut() = SessionPhase::BotsActing);
+
+    build_game_state()
+}
+
+/// Initialise an all-bot Arena session with 9 bots (no human player).
+///
+/// All seats are filled by bots; `step_bot()` will never pause for human input.
+/// Returns a `GameState` JSON string.
+#[wasm_bindgen]
+pub fn init_bot_game(rand_seed: f64) -> String {
+    IS_ALL_BOT.with(|f| *f.borrow_mut() = true);
+    RNG.with(|r| *r.borrow_mut() = SmallRng::seed_from_u64(rand_seed.to_bits()));
+
+    // Pick 9 bot profiles so every seat has a bot (seat 0 included).
+    let mut profile_pool = BotProfile::default_profiles();
+    profile_pool.push(BotProfile::joker());
+    RNG.with(|r| profile_pool.shuffle(&mut *r.borrow_mut()));
+    let bots: Vec<BotProfile> = profile_pool.into_iter().take(9).collect();
+    let bot_names: Vec<String> = bots.iter().map(|b| b.name.clone()).collect();
+
+    let seats_vec: Vec<SeatNoCell> = bot_names
+        .iter()
+        .map(|name| SeatNoCell::new(PlayerNoCell::new_with_chips(name.clone(), 10_000)))
+        .collect();
+
     let start_chips: Vec<(u8, usize)> = seats_vec
         .iter()
         .enumerate()
@@ -473,17 +522,20 @@ pub fn step_bot() -> String {
             PHASE.with(|p| *p.borrow_mut() = SessionPhase::HandComplete);
             serde_json::json!({"done": true}).to_string()
         }
-        Some(0) => {
+        Some(0) if !IS_ALL_BOT.with(|f| *f.borrow()) => {
             PHASE.with(|p| *p.borrow_mut() = SessionPhase::WaitingForHuman);
             serde_json::json!({"done": true}).to_string()
         }
         Some(seat) => {
+            let all_bot = IS_ALL_BOT.with(|f| *f.borrow());
             let (action, call_amount, allin_chips, name, hole_cards) = SESSION.with(|s| {
                 BOTS.with(|b| {
                     RNG.with(|r| {
                         let bots = b.borrow();
                         let mut rng = r.borrow_mut();
-                        let bot_idx = (seat as usize).saturating_sub(1);
+                        // In all-bot mode seat N → bot N directly.
+                        // In normal mode seats 1-8 → bots 0-7 (seat 0 is human).
+                        let bot_idx = if all_bot { seat as usize } else { (seat as usize).saturating_sub(1) };
                         let session_ref = s.borrow();
                         if let Some(session) = session_ref.as_ref() {
                             let call_amt = session.table.to_call(seat);
