@@ -236,6 +236,7 @@ pub fn next_hand() -> String {
         board_str: String,
         event_log: Vec<TableAction>,
         player_snapshot: Vec<(u8, String, usize, Option<String>)>,
+        shuffled_deck_str: Option<String>,
     }
 
     let snap: Option<PreEnd> = SESSION.with(|s| {
@@ -287,6 +288,7 @@ pub fn next_hand() -> String {
                     .join(" "),
                 event_log: table.event_log.clone(),
                 player_snapshot,
+                shuffled_deck_str: session.shuffled_deck_str.clone(),
             }
         })
     });
@@ -354,6 +356,7 @@ pub fn next_hand() -> String {
                         &s.event_log,
                         &ending_stacks,
                         "pkarena0",
+                        s.shuffled_deck_str,
                     );
                     COLLECTION.with(|c| c.borrow_mut().push(hh));
 

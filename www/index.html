@@ -1139,6 +1139,7 @@
     const SVG_NS = 'http://www.w3.org/2000/svg';
     let BOT_ACTION_MS = 1000;   // pause between each bot action (configurable via settings)
     let HAND_COMPLETE_MS = 5000; // pause to show result before starting next hand (configurable)
+    let gameSeed = 0;            // seed used for the current session (saved to URL)
     const STARTING_CHIPS = 10_000;
     const BOT_EMOJIS = {
       'gto':               '🤖',
@@ -1298,11 +1299,101 @@
     new ResizeObserver(scaleTableText).observe(document.getElementById('poker-table'));
     setTimeout(scaleTableText, 0); // initial pass before first paint
 
+    // ── URL state persistence ──────────────────────────────────────────────────
+
+    function updateUrlState(mode, handNumber) {
+      history.replaceState(null, '', `#mode=${mode}&seed=${gameSeed}&hand=${handNumber}`);
+    }
+
+    function parseUrlHash() {
+      const h = location.hash.slice(1);
+      if (!h) return null;
+      const params = Object.fromEntries(h.split('&').map(p => p.split('=')));
+      const seed = parseFloat(params.seed);
+      const hand = parseInt(params.hand, 10);
+      const mode = params.mode;
+      if (!mode || isNaN(seed) || isNaN(hand) || hand < 1) return null;
+      return { mode, seed, hand };
+    }
+
+    async function fastForwardToHand(targetHand) {
+      const savedBot  = BOT_ACTION_MS;
+      const savedHand = HAND_COMPLETE_MS;
+      BOT_ACTION_MS   = 0;
+      HAND_COMPLETE_MS = 0;
+      arenaRunning = true;
+
+      while (arenaRunning) {
+        while (true) {
+          const result = JSON.parse(step_bot());
+          if (result.done) break;
+        }
+        const state = JSON.parse(get_state());
+        renderState(state);
+        updateArenaStatus(state);
+
+        if (state.phase === 'SessionOver') {
+          arenaRunning = false;
+          document.getElementById('arena-start-btn').textContent = 'New Arena';
+          BOT_ACTION_MS   = savedBot;
+          HAND_COMPLETE_MS = savedHand;
+          return;
+        }
+        if (state.hand_number >= targetHand) break;
+        next_hand();
+        // yield to browser between hands so the tab stays responsive
+        await new Promise(r => setTimeout(r, 0));
+      }
+
+      BOT_ACTION_MS   = savedBot;
+      HAND_COMPLETE_MS = savedHand;
+      runArena();
+    }
+
+    async function restoreFromUrl() {
+      const saved = parseUrlHash();
+      if (!saved) return false;
+
+      gameSeed = saved.seed;
+      document.getElementById('btn-new-game').disabled = false;
+
+      if (saved.mode === 'arena') {
+        document.querySelectorAll('.tab').forEach(t =>
+          t.classList.toggle('active', t.dataset.tab === 'arena'));
+        document.body.classList.add('arena-active');
+        document.getElementById('arena-start-btn').textContent = 'New Arena';
+
+        const state = JSON.parse(init_bot_game(gameSeed));
+        renderState(state);
+        updateArenaStatus(state);
+
+        if (saved.hand > 1) {
+          setStatus(`Restoring arena to hand #${saved.hand}…`);
+          await fastForwardToHand(saved.hand);
+        } else {
+          runArena();
+        }
+      } else {
+        // Play: restore same bot lineup; human actions aren't saved so restart from hand 1
+        gameSeed = saved.seed;
+        const state = JSON.parse(init_game(gameSeed));
+        handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
+        renderTableVisuals(state);
+        setStatus('Resumed — same opponents, starting from hand 1.');
+        enableCurrentGameButton();
+        stepBotsUntilHuman();
+      }
+      return true;
+    }
+
     async function boot() {
       try {
         await init();
-        setStatus('Click "New Game" to start.');
-        document.getElementById('btn-new-game').disabled = false;
+        const restored = await restoreFromUrl();
+        if (!restored) {
+          setStatus('Click "New Game" to start.');
+          document.getElementById('btn-new-game').disabled = false;
+        }
       } catch (e) {
         setStatus('Failed to load WASM: ' + e);
       }
@@ -1314,8 +1405,10 @@
       hideBetControls();
       clearAllActions();
       hideHandResult();
-      const state = JSON.parse(init_game(Math.random()));
+      gameSeed = Math.random();
+      const state = JSON.parse(init_game(gameSeed));
       handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
+      updateUrlState('play', 1);
       renderTableVisuals(state);
       setStatus('Dealing…');
       enableCurrentGameButton();
@@ -1460,6 +1553,7 @@
             renderButtons([{ label: 'New Game', cls: 'primary', action: 'new-game' }]);
             return;
           }
+          updateUrlState('play', nextState.hand_number);
           renderTableVisuals(nextState);
           stepBotsUntilHuman();
         }, HAND_COMPLETE_MS);
@@ -1735,8 +1829,10 @@
             hideBetControls();
             clearAllActions();
             hideHandResult();
-            const s = JSON.parse(init_game(Math.random()));
+            gameSeed = Math.random();
+            const s = JSON.parse(init_game(gameSeed));
             handStartHeroChips = s.hero?.chips ?? STARTING_CHIPS;
+            updateUrlState('play', 1);
             renderTableVisuals(s);
             setStatus('Dealing…');
             enableCurrentGameButton();
@@ -1943,6 +2039,7 @@
         await new Promise(r => setTimeout(r, HAND_COMPLETE_MS));
         if (!arenaRunning) return;
         next_hand();
+        updateUrlState('arena', JSON.parse(get_state()).hand_number);
       }
     }
 
@@ -1955,8 +2052,9 @@
 
     document.getElementById('arena-start-btn').addEventListener('click', () => {
       arenaRunning = false;  // stop any running loop before restarting
-      const seed = Date.now();
-      const state = JSON.parse(init_bot_game(seed));
+      gameSeed = Date.now();
+      const state = JSON.parse(init_bot_game(gameSeed));
+      updateUrlState('arena', 1);
       renderState(state);
       updateArenaStatus(state);
       document.getElementById('arena-start-btn').textContent = 'New Arena';
