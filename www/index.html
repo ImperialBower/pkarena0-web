@@ -2097,7 +2097,7 @@
       }
     }
 
-    function restoreArenaTabState(wasRunning) {
+    function restoreArenaTabState() {
       if (!_arenaMod) return;
       let state;
       try { state = JSON.parse(_arenaMod.get_state()); } catch { state = null; }
@@ -2109,19 +2109,18 @@
       }
       renderTableVisuals(state);
       updateArenaStatus(state);
-      if (wasRunning && state.phase !== 'SessionOver') {
-        runArena(); // arenaGeneration increment prevents old winding-down loop from conflicting
+      if (state.phase !== 'SessionOver') {
+        runArena(); // resume; arenaGeneration prevents any winding-down loop from conflicting
       }
     }
 
     function switchTab(id) {
       if (document.body.dataset.tab === id) return;
-      const wasArenaRunning = arenaRunning;
       arenaRunning = false;
       playLoopRunning = false;
       activateTab(id);
       if (id === 'play')  restorePlayTabState();
-      if (id === 'arena') restoreArenaTabState(wasArenaRunning);
+      if (id === 'arena') restoreArenaTabState();
     }
 
     // Build tab bar from GAME_MODES and wire click handlers
