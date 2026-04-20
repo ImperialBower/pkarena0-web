@@ -341,22 +341,25 @@
     }
     #settings-btn:hover { color: #99c; }
 
-    /* ── Tab bar (lives inside #right-col, always top-right) ── */
+    /* ── Tab bar (top-level nav, sits above the table/controls grid) ── */
     #tab-bar {
       display: flex;
-      gap: 2px;
-      border-bottom: 1px solid #224;
-      margin-bottom: 4px;
+      gap: 0;
+      border-bottom: 2px solid #224;
+      width: 100%;
+      background: #111122;
     }
     .tab {
       background: none;
       border: none;
-      border-bottom: 2px solid transparent;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
       color: #669;
-      padding: 6px 16px;
+      padding: 8px 22px;
       cursor: pointer;
       font-size: 13px;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
     }
     .tab.active {
       color: #f0d060;
@@ -388,11 +391,11 @@
     }
     #arena-start-btn:hover { background: #1a2e3a; }
 
-    /* ── Arena mode: swap action-panel for arena-panel; hide human-specific UI ── */
-    body.arena-active #action-panel  { display: none; }
-    body.arena-active #arena-panel   { display: flex; }
-    body.arena-active #hand-log-wrap { display: none; }
-    body.arena-active .play-only     { display: none; }
+    /* ── Tab-based panel visibility ── */
+    body[data-tab="arena"] #action-panel  { display: none; }
+    body[data-tab="arena"] #arena-panel   { display: flex; }
+    body[data-tab="arena"] #hand-log-wrap { display: none; }
+    body[data-tab="arena"] .play-only     { display: none; }
 
     footer {
       margin-top: 12px;
@@ -529,12 +532,16 @@
         gap: 0;
       }
 
-      /* Score bar spans full width at top */
+      /* Score bar and tab bar span full width at top */
       #score-bar {
         flex: 0 0 100%;
         margin-bottom: 4px;
         gap: 16px;
         padding: 4px 12px;
+      }
+      #tab-bar {
+        flex: 0 0 100%;
+        margin-bottom: 2px;
       }
 
       /* Hide status — active player is visible on the table; saves row space */
@@ -605,6 +612,7 @@
         display: grid;
         grid-template-columns: 1fr 260px;
         grid-template-areas:
+          "tabs     tabs"
           "score    score"
           "table    rightcol"
           "log      log"
@@ -616,6 +624,7 @@
       }
 
       #score-bar   { grid-area: score;    margin-bottom: 0; }
+      #tab-bar     { grid-area: tabs;     margin-bottom: 0; }
       #poker-table { grid-area: table;    width: 100%; max-width: 800px; height: auto; }
       #right-col   { grid-area: rightcol; display: flex; flex-direction: column;
                      align-items: stretch; gap: 6px; width: auto; }
@@ -637,6 +646,8 @@
   </style>
 </head>
 <body>
+
+  <nav id="tab-bar"></nav>
 
   <div id="score-bar">
     <span>Hand: <strong id="sc-hand">—</strong></span>
@@ -1054,13 +1065,8 @@
     </g>
   </svg>
 
-  <!-- ── Right column: tabs + status + action panel ── -->
+  <!-- ── Right column: status + active panel ── -->
   <div id="right-col">
-
-  <nav id="tab-bar">
-    <button class="tab active" data-tab="play">Play</button>
-    <button class="tab" data-tab="arena">Arena</button>
-  </nav>
 
   <div id="status-msg">Loading WASM…</div>
 
@@ -1140,6 +1146,8 @@
     let BOT_ACTION_MS = 1000;   // pause between each bot action (configurable via settings)
     let HAND_COMPLETE_MS = 5000; // pause to show result before starting next hand (configurable)
     let gameSeed = 0;            // seed used for the current session (saved to URL)
+    let arenaRunning = false;
+    let playLoopRunning = false;
     const STARTING_CHIPS = 10_000;
     const BOT_EMOJIS = {
       'gto':               '🤖',
@@ -1243,7 +1251,8 @@
     // Calls step_bot() once per second until it's the human's turn or hand ends,
     // showing each bot's action in the status bar and as a graphical callout.
     async function stepBotsUntilHuman() {
-      while (true) {
+      playLoopRunning = true;
+      while (playLoopRunning) {
         const result = JSON.parse(step_bot());
         if (result.done) {
           const state = JSON.parse(get_state());
@@ -1254,7 +1263,6 @@
         const botCards = cardsToLogStr(result.hole_cards);
         appendHandLog(`${result.name}${botCards ? ' ' + botCards : ''}: ${result.action_label}`);
         setActionLabel(result.seat, result.action_label);
-        // Re-render table with updated chips/bets but no action buttons.
         const state = JSON.parse(get_state());
         renderTableVisuals(state);
         await new Promise(r => setTimeout(r, BOT_ACTION_MS));
@@ -1358,9 +1366,7 @@
       document.getElementById('btn-new-game').disabled = false;
 
       if (saved.mode === 'arena') {
-        document.querySelectorAll('.tab').forEach(t =>
-          t.classList.toggle('active', t.dataset.tab === 'arena'));
-        document.body.classList.add('arena-active');
+        switchTab('arena');
         document.getElementById('arena-start-btn').textContent = 'New Arena';
 
         const state = JSON.parse(init_bot_game(gameSeed));
@@ -1999,18 +2005,33 @@
       document.getElementById('speed-label').textContent = preset.label;
     });
 
-    // ── Tab switching ─────────────────────────────────────────────────────────
-    document.querySelectorAll('.tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        btn.classList.add('active');
-        document.body.classList.toggle('arena-active', btn.dataset.tab === 'arena');
-      });
+    // ── Game modes — add a new entry here to add a tab ──────────────────────
+    const GAME_MODES = [
+      { id: 'play',  label: 'Play' },
+      { id: 'arena', label: 'Arena' },
+    ];
+
+    function switchTab(id) {
+      arenaRunning = false;
+      playLoopRunning = false;
+      document.querySelectorAll('.tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.tab === id));
+      document.body.dataset.tab = id;
+    }
+
+    // Build tab bar from GAME_MODES and wire click handlers
+    const tabBar = document.getElementById('tab-bar');
+    GAME_MODES.forEach(mode => {
+      const btn = document.createElement('button');
+      btn.className = 'tab';
+      btn.dataset.tab = mode.id;
+      btn.textContent = mode.label;
+      btn.addEventListener('click', () => switchTab(mode.id));
+      tabBar.appendChild(btn);
     });
+    switchTab('play'); // default active tab
 
     // ── Arena game loop ───────────────────────────────────────────────────────
-    let arenaRunning = false;
-
     async function runArena() {
       arenaRunning = true;
       while (arenaRunning) {

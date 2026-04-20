@@ -1,0 +1,66 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - text: "Hand:"
+      - strong [ref=e4]: —
+    - button "⚙" [ref=e9] [cursor=pointer]
+  - navigation [ref=e10]:
+    - button "Play" [ref=e11] [cursor=pointer]
+    - button "Arena" [active] [ref=e12] [cursor=pointer]
+  - img [ref=e13]:
+    - generic [ref=e21]: NO LIMIT HOLD'EM
+    - generic [ref=e28]: "POT: $0"
+    - generic [ref=e29]:
+      - generic [ref=e32]: YOU
+      - generic [ref=e33]: $—
+    - generic [ref=e34]:
+      - link "click to see config" [ref=e37] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e38]: —
+      - generic [ref=e39]: $—
+    - generic [ref=e40]:
+      - link "click to see config" [ref=e43] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e44]: —
+      - generic [ref=e45]: $—
+    - generic [ref=e46]:
+      - link "click to see config" [ref=e49] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e50]: —
+      - generic [ref=e51]: $—
+    - generic [ref=e52]:
+      - link "click to see config" [ref=e55] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e56]: —
+      - generic [ref=e57]: $—
+    - generic [ref=e58]:
+      - link "click to see config" [ref=e61] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e62]: —
+      - generic [ref=e63]: $—
+    - generic [ref=e64]:
+      - link "click to see config" [ref=e67] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e68]: —
+      - generic [ref=e69]: $—
+    - generic [ref=e70]:
+      - link "click to see config" [ref=e73] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e74]: —
+      - generic [ref=e75]: $—
+    - generic [ref=e76]:
+      - link "click to see config" [ref=e79] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e80]: —
+      - generic [ref=e81]: $—
+  - generic [ref=e82]:
+    - generic [ref=e83]: Click "New Game" to start.
+    - generic [ref=e94]:
+      - button "Start Arena" [ref=e95] [cursor=pointer]
+      - generic [ref=e96]: Press Start Arena to watch 9 bots play to the finish.
+  - generic [ref=e89]:
+    - button "Download game history (YAML)" [disabled] [ref=e90]
+    - button "Current game" [disabled] [ref=e91]
+  - contentinfo [ref=e92]:
+    - link "ImperialBower/pkarena0-web" [ref=e93] [cursor=pointer]:
+      - /url: https://github.com/ImperialBower/pkarena0-web
