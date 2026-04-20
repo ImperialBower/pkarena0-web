@@ -1215,6 +1215,47 @@
       }
     }
 
+    function clearChildren(el) {
+      while (el && el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    // Resets all SVG table visuals to a blank pre-game state.
+    function clearTable() {
+      for (let i = 0; i < 5; i++) clearChildren(document.getElementById('board-card-' + i));
+      const heroCards  = document.getElementById('hero-cards');
+      const boardCards = document.getElementById('board-cards');
+      if (heroCards)  { heroCards.className = ''; clearChildren(heroCards); }
+      if (boardCards) { boardCards.className = ''; clearChildren(boardCards); }
+      const pot = document.getElementById('pot-amount');
+      if (pot) pot.textContent = 'POT: $0';
+      hideHandResult();
+      clearAllActions();
+      for (let i = 0; i < 9; i++) {
+        const p = 'seat-' + i + '-';
+        const h  = document.getElementById(p + 'highlight');
+        const b  = document.getElementById(p + 'bet');
+        const bx = document.getElementById(p + 'badge');
+        const d  = document.getElementById(p + 'btn-d');
+        const sb = document.getElementById(p + 'btn-sb');
+        const bb = document.getElementById(p + 'btn-bb');
+        if (h)  h.setAttribute('opacity', '0');
+        if (b)  b.setAttribute('visibility', 'hidden');
+        if (bx) bx.setAttribute('visibility', 'hidden');
+        if (d)  d.setAttribute('visibility', 'hidden');
+        if (sb) sb.setAttribute('visibility', 'hidden');
+        if (bb) bb.setAttribute('visibility', 'hidden');
+        clearChildren(document.getElementById(p + 'card-0'));
+        clearChildren(document.getElementById(p + 'card-1'));
+      }
+      document.getElementById('sc-hand').textContent  = '—';
+      document.getElementById('sc-chips').textContent = '—';
+      const pnl = document.getElementById('sc-pnl');
+      pnl.textContent = '—';
+      pnl.className   = '';
+      setStatus('');
+      hideBetControls();
+    }
+
     // Shows the hand-result overlay above the community cards.
     // isWin: true = green (won), false = red (lost), null = yellow (even).
     function showHandResult(text, isWin) {
@@ -1407,7 +1448,7 @@
     boot();
 
     // ── New game ──────────────────────────────────────────────────────────────
-    document.getElementById('btn-new-game').addEventListener('click', () => {
+    function startNewGame() {
       hideBetControls();
       clearAllActions();
       hideHandResult();
@@ -1419,7 +1460,20 @@
       setStatus('Dealing…');
       enableCurrentGameButton();
       stepBotsUntilHuman();
-    });
+    }
+
+    function showNewGameButton() {
+      const container = document.getElementById('action-buttons');
+      while (container.firstChild) container.removeChild(container.firstChild);
+      const btn = document.createElement('button');
+      btn.id = 'btn-new-game';
+      btn.className = 'primary';
+      btn.textContent = 'New Game';
+      btn.addEventListener('click', startNewGame);
+      container.appendChild(btn);
+    }
+
+    document.getElementById('btn-new-game').addEventListener('click', startNewGame);
 
     // ── Human action ─────────────────────────────────────────────────────────
     function onHumanAction(action, amount, currentState) {
@@ -1550,6 +1604,7 @@
         }
 
         setTimeout(() => {
+          if (document.body.dataset.tab !== 'play') return; // tab was switched away
           hideHandResult();
           clearAllActions();
           handStartHeroChips = heroChipsAfter;
@@ -2014,9 +2069,19 @@
     function switchTab(id) {
       arenaRunning = false;
       playLoopRunning = false;
+      clearTable();
       document.querySelectorAll('.tab').forEach(t =>
         t.classList.toggle('active', t.dataset.tab === id));
       document.body.dataset.tab = id;
+      if (id === 'play') {
+        showNewGameButton();
+        setStatus('Click "New Game" to start.');
+      }
+      if (id === 'arena') {
+        document.getElementById('arena-start-btn').textContent = 'Start Arena';
+        document.getElementById('arena-status').textContent =
+          'Press Start Arena to watch 9 bots play to the finish.';
+      }
     }
 
     // Build tab bar from GAME_MODES and wire click handlers
@@ -2039,7 +2104,7 @@
         while (true) {
           const result = JSON.parse(step_bot());
           const state  = JSON.parse(get_state());
-          renderState(state);
+          renderTableVisuals(state);   // not renderState — avoids triggering play-mode hand flow
           updateArenaStatus(state);
           if (result.done) break;
           await new Promise(r => setTimeout(r, BOT_ACTION_MS));
