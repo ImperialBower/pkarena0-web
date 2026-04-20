@@ -1138,8 +1138,8 @@
   </footer>
 
   <script type="module">
-    import init, { init_game, init_bot_game, human_action, next_hand, get_state, get_session_yaml, step_bot }
-      from './pkg/pkarena0_web.js';
+    let _playMod = null, _arenaMod = null;
+    let arenaGeneration = 0;
 
     // ── Constants ─────────────────────────────────────────────────────────────
     const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -1294,9 +1294,9 @@
     async function stepBotsUntilHuman() {
       playLoopRunning = true;
       while (playLoopRunning) {
-        const result = JSON.parse(step_bot());
+        const result = JSON.parse(_playMod.step_bot());
         if (result.done) {
-          const state = JSON.parse(get_state());
+          const state = JSON.parse(_playMod.get_state());
           renderState(state);
           return;
         }
@@ -1304,7 +1304,7 @@
         const botCards = cardsToLogStr(result.hole_cards);
         appendHandLog(`${result.name}${botCards ? ' ' + botCards : ''}: ${result.action_label}`);
         setActionLabel(result.seat, result.action_label);
-        const state = JSON.parse(get_state());
+        const state = JSON.parse(_playMod.get_state());
         renderTableVisuals(state);
         await new Promise(r => setTimeout(r, BOT_ACTION_MS));
       }
@@ -1374,11 +1374,11 @@
 
       while (arenaRunning) {
         while (true) {
-          const result = JSON.parse(step_bot());
+          const result = JSON.parse(_arenaMod.step_bot());
           if (result.done) break;
         }
-        const state = JSON.parse(get_state());
-        renderState(state);
+        const state = JSON.parse(_arenaMod.get_state());
+        renderTableVisuals(state);
         updateArenaStatus(state);
 
         if (state.phase === 'SessionOver') {
@@ -1389,7 +1389,7 @@
           return;
         }
         if (state.hand_number >= targetHand) break;
-        next_hand();
+        _arenaMod.next_hand();
         // yield to browser between hands so the tab stays responsive
         await new Promise(r => setTimeout(r, 0));
       }
@@ -1407,12 +1407,11 @@
       document.getElementById('btn-new-game').disabled = false;
 
       if (saved.mode === 'arena') {
-        switchTab('arena');
-        document.getElementById('arena-start-btn').textContent = 'New Arena';
-
-        const state = JSON.parse(init_bot_game(gameSeed));
-        renderState(state);
+        activateTab('arena');                                         // UI only — WASM not ready yet
+        const state = JSON.parse(_arenaMod.init_bot_game(gameSeed)); // init WASM first
+        renderTableVisuals(state);
         updateArenaStatus(state);
+        document.getElementById('arena-start-btn').textContent = 'New Arena';
 
         if (saved.hand > 1) {
           setStatus(`Restoring arena to hand #${saved.hand}…`);
@@ -1422,8 +1421,8 @@
         }
       } else {
         // Play: restore same bot lineup; human actions aren't saved so restart from hand 1
-        gameSeed = saved.seed;
-        const state = JSON.parse(init_game(gameSeed));
+        activateTab('play');                                     // UI only — WASM not ready yet
+        const state = JSON.parse(_playMod.init_game(gameSeed)); // init WASM first
         handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
         renderTableVisuals(state);
         setStatus('Resumed — same opponents, starting from hand 1.');
@@ -1435,7 +1434,10 @@
 
     async function boot() {
       try {
-        await init();
+        [_playMod, _arenaMod] = await Promise.all([
+          import('./pkg/pkarena0_web.js?tab=play').then(async m  => { await m.default(); return m; }),
+          import('./pkg/pkarena0_web.js?tab=arena').then(async m => { await m.default(); return m; }),
+        ]);
         const restored = await restoreFromUrl();
         if (!restored) {
           setStatus('Click "New Game" to start.');
@@ -1453,7 +1455,7 @@
       clearAllActions();
       hideHandResult();
       gameSeed = Math.random();
-      const state = JSON.parse(init_game(gameSeed));
+      const state = JSON.parse(_playMod.init_game(gameSeed));
       handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
       updateUrlState('play', 1);
       renderTableVisuals(state);
@@ -1485,7 +1487,7 @@
       appendHandLog(`You${heroCards ? ' ' + heroCards : ''}: ${label}`);
       setStatus('…');
       const req = JSON.stringify({ action, amount: amount ?? 0 });
-      const state = JSON.parse(human_action(req));
+      const state = JSON.parse(_playMod.human_action(req));
       // Legacy hard-error path (should not occur after the derive_legal_actions fix).
       if (state.phase === 'Error') { renderState(state); return; }
       // Recoverable error: action was rejected but game is still WaitingForHuman.
@@ -1555,7 +1557,7 @@
 
         // Advance the hand immediately so end_hand() distributes the pot and
         // last_result (winner info) is available on nextState.
-        const nextState = JSON.parse(next_hand());
+        const nextState = JSON.parse(_playMod.next_hand());
         if (nextState.phase === 'Error') {
           console.error('[pkarena] next_hand() failed:', nextState.error);
         }
@@ -1891,7 +1893,7 @@
             clearAllActions();
             hideHandResult();
             gameSeed = Math.random();
-            const s = JSON.parse(init_game(gameSeed));
+            const s = JSON.parse(_playMod.init_game(gameSeed));
             handStartHeroChips = s.hero?.chips ?? STARTING_CHIPS;
             updateUrlState('play', 1);
             renderTableVisuals(s);
@@ -1993,7 +1995,8 @@
 
     // ── YAML download ─────────────────────────────────────────────────────────
     document.getElementById('btn-download-yaml').addEventListener('click', () => {
-      const yaml = get_session_yaml();
+      const mod = document.body.dataset.tab === 'arena' ? _arenaMod : _playMod;
+      const yaml = mod.get_session_yaml();
       const blob = new Blob([yaml], { type: 'text/yaml' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2008,7 +2011,8 @@
     const gameStatePre     = document.getElementById('game-state-pre');
 
     document.getElementById('btn-current-game').addEventListener('click', () => {
-      const raw = get_state();
+      const mod = document.body.dataset.tab === 'arena' ? _arenaMod : _playMod;
+      const raw = mod.get_state();
       try {
         gameStatePre.textContent = JSON.stringify(JSON.parse(raw), null, 2);
       } catch {
@@ -2066,22 +2070,58 @@
       { id: 'arena', label: 'Arena' },
     ];
 
-    function switchTab(id) {
-      arenaRunning = false;
-      playLoopRunning = false;
-      clearTable();
+    // UI-only tab switch — safe to call before WASM is initialized
+    function activateTab(id) {
       document.querySelectorAll('.tab').forEach(t =>
         t.classList.toggle('active', t.dataset.tab === id));
       document.body.dataset.tab = id;
-      if (id === 'play') {
+    }
+
+    function restorePlayTabState() {
+      if (!_playMod) return;
+      let state;
+      try { state = JSON.parse(_playMod.get_state()); } catch { state = null; }
+      if (!state || !state.phase || state.phase === 'Uninitialized') {
         showNewGameButton();
         setStatus('Click "New Game" to start.');
+        return;
       }
-      if (id === 'arena') {
+      renderTableVisuals(state);
+      if (state.phase === 'WaitingForHuman') {
+        renderState(state);
+      } else if (state.phase === 'BotsActing') {
+        setStatus('Resuming…');
+        stepBotsUntilHuman();
+      } else {
+        renderState(state);
+      }
+    }
+
+    function restoreArenaTabState(wasRunning) {
+      if (!_arenaMod) return;
+      let state;
+      try { state = JSON.parse(_arenaMod.get_state()); } catch { state = null; }
+      if (!state || !state.phase || state.phase === 'Uninitialized') {
         document.getElementById('arena-start-btn').textContent = 'Start Arena';
         document.getElementById('arena-status').textContent =
           'Press Start Arena to watch 9 bots play to the finish.';
+        return;
       }
+      renderTableVisuals(state);
+      updateArenaStatus(state);
+      if (wasRunning && state.phase !== 'SessionOver') {
+        runArena(); // arenaGeneration increment prevents old winding-down loop from conflicting
+      }
+    }
+
+    function switchTab(id) {
+      if (document.body.dataset.tab === id) return;
+      const wasArenaRunning = arenaRunning;
+      arenaRunning = false;
+      playLoopRunning = false;
+      activateTab(id);
+      if (id === 'play')  restorePlayTabState();
+      if (id === 'arena') restoreArenaTabState(wasArenaRunning);
     }
 
     // Build tab bar from GAME_MODES and wire click handlers
@@ -2094,24 +2134,25 @@
       btn.addEventListener('click', () => switchTab(mode.id));
       tabBar.appendChild(btn);
     });
-    switchTab('play'); // default active tab
+    activateTab('play'); // default active tab (UI only — WASM initialized later in boot())
 
     // ── Arena game loop ───────────────────────────────────────────────────────
     async function runArena() {
+      const myGen = ++arenaGeneration;
       arenaRunning = true;
-      while (arenaRunning) {
+      while (arenaRunning && arenaGeneration === myGen) {
         // Step all bots through the current hand
         while (true) {
-          const result = JSON.parse(step_bot());
-          const state  = JSON.parse(get_state());
+          const result = JSON.parse(_arenaMod.step_bot());
+          const state  = JSON.parse(_arenaMod.get_state());
           renderTableVisuals(state);   // not renderState — avoids triggering play-mode hand flow
           updateArenaStatus(state);
           if (result.done) break;
           await new Promise(r => setTimeout(r, BOT_ACTION_MS));
-          if (!arenaRunning) return;
+          if (!arenaRunning || arenaGeneration !== myGen) return;
         }
 
-        const state = JSON.parse(get_state());
+        const state = JSON.parse(_arenaMod.get_state());
         if (state.phase === 'SessionOver') {
           const winner = [...state.players].sort((a, b) => b.chips - a.chips)[0];
           document.getElementById('arena-status').textContent =
@@ -2123,9 +2164,9 @@
 
         // Pause to show hand result, then auto-advance
         await new Promise(r => setTimeout(r, HAND_COMPLETE_MS));
-        if (!arenaRunning) return;
-        next_hand();
-        updateUrlState('arena', JSON.parse(get_state()).hand_number);
+        if (!arenaRunning || arenaGeneration !== myGen) return;
+        _arenaMod.next_hand();
+        updateUrlState('arena', JSON.parse(_arenaMod.get_state()).hand_number);
       }
     }
 
@@ -2139,10 +2180,12 @@
     document.getElementById('arena-start-btn').addEventListener('click', () => {
       arenaRunning = false;  // stop any running loop before restarting
       gameSeed = Date.now();
-      const state = JSON.parse(init_bot_game(gameSeed));
+      const state = JSON.parse(_arenaMod.init_bot_game(gameSeed));
       updateUrlState('arena', 1);
-      renderState(state);
+      renderTableVisuals(state);
       updateArenaStatus(state);
+      document.getElementById('arena-status').textContent =
+        `Hand #${state.hand_number} — Starting…`;
       document.getElementById('arena-start-btn').textContent = 'New Arena';
       runArena();
     });
