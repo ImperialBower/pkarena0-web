@@ -164,6 +164,20 @@ pub fn init_bot_game(rand_seed: f64) -> String {
     build_game_state()
 }
 
+/// Update forced bets between hands. Returns updated GameState JSON.
+#[wasm_bindgen]
+pub fn set_blinds(small_blind: f64, big_blind: f64) -> String {
+    SESSION.with(|s| {
+        if let Some(session) = s.borrow_mut().as_mut() {
+            session.table.forced = ForcedBets::new(
+                small_blind as usize,
+                big_blind as usize,
+            );
+        }
+    });
+    build_game_state()
+}
+
 /// Apply a human action and advance bots until the human's next turn.
 ///
 /// Input is a JSON string: `{ "action": "Bet", "amount": 300 }`.
@@ -481,6 +495,8 @@ struct GameState {
     dealer_seat: u8,
     sb_seat: u8,
     bb_seat: u8,
+    small_blind: usize,
+    big_blind: usize,
     session_over: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
@@ -619,6 +635,8 @@ fn build_game_state() -> String {
                 dealer_seat: 0,
                 sb_seat: 0,
                 bb_seat: 0,
+                small_blind: 0,
+                big_blind: 0,
                 session_over: false,
                 error: None,
                 last_result: None,
@@ -702,6 +720,8 @@ fn build_game_state() -> String {
             dealer_seat,
             sb_seat,
             bb_seat,
+            small_blind: table.forced.small_blind,
+            big_blind: table.forced.big_blind,
             session_over: phase_val == SessionPhase::SessionOver,
             error: last_error,
             last_result,

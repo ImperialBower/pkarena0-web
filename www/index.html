@@ -651,6 +651,7 @@
 
   <div id="score-bar">
     <span>Hand: <strong id="sc-hand">—</strong></span>
+    <span class="play-only">Blinds: <strong id="sc-blinds">—</strong></span>
     <span class="play-only">Chips: <strong id="sc-chips">—</strong></span>
     <span class="play-only">P&amp;L: <strong id="sc-pnl">—</strong></span>
     <button id="settings-btn" title="Settings">⚙</button>
@@ -1148,6 +1149,8 @@
     let gameSeed = 0;            // seed used for the current session (saved to URL)
     let arenaRunning = false;
     let playLoopRunning = false;
+    let arenaBlindLevel = 0;
+    let playBlindLevel  = 0;
     const STARTING_CHIPS = 10_000;
     const BOT_EMOJIS = {
       'gto':               '🤖',
@@ -1247,8 +1250,9 @@
         clearChildren(document.getElementById(p + 'card-0'));
         clearChildren(document.getElementById(p + 'card-1'));
       }
-      document.getElementById('sc-hand').textContent  = '—';
-      document.getElementById('sc-chips').textContent = '—';
+      document.getElementById('sc-hand').textContent   = '—';
+      document.getElementById('sc-blinds').textContent = '—';
+      document.getElementById('sc-chips').textContent  = '—';
       const pnl = document.getElementById('sc-pnl');
       pnl.textContent = '—';
       pnl.className   = '';
@@ -1422,6 +1426,7 @@
       } else {
         // Play: restore same bot lineup; human actions aren't saved so restart from hand 1
         activateTab('play');                                     // UI only — WASM not ready yet
+        playBlindLevel = 0;
         const state = JSON.parse(_playMod.init_game(gameSeed)); // init WASM first
         handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
         renderTableVisuals(state);
@@ -1454,6 +1459,7 @@
       hideBetControls();
       clearAllActions();
       hideHandResult();
+      playBlindLevel = 0;
       gameSeed = Math.random();
       const state = JSON.parse(_playMod.init_game(gameSeed));
       handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
@@ -1498,6 +1504,7 @@
         renderActionButtons(state);
         return;
       }
+      playBlindLevel = syncBlindLevel(_playMod, state.hand_number, playBlindLevel);
       renderTableVisuals(state);
       stepBotsUntilHuman();
     }
@@ -1511,6 +1518,8 @@
       const chips = state.hero?.chips ?? 0;
       const pnl = chips - STARTING_CHIPS;
       document.getElementById('sc-hand').textContent = state.hand_number ?? '—';
+      document.getElementById('sc-blinds').textContent =
+        state.small_blind ? `${state.small_blind}/${state.big_blind}` : '—';
       document.getElementById('sc-chips').textContent = '$' + chips.toLocaleString();
       const pnlEl = document.getElementById('sc-pnl');
       pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toLocaleString();
@@ -1555,9 +1564,9 @@
         enableYamlDownload();
         renderButtons([]);
 
-        // Advance the hand immediately so end_hand() distributes the pot and
-        // last_result (winner info) is available on nextState.
-        const nextState = JSON.parse(_playMod.next_hand());
+        // Advance the hand (syncs blind level, then calls next_hand()).
+        const { state: nextState, blindLevel: newPlayLevel } = advanceHand(_playMod, state.hand_number, playBlindLevel);
+        playBlindLevel = newPlayLevel;
         if (nextState.phase === 'Error') {
           console.error('[pkarena] next_hand() failed:', nextState.error);
         }
@@ -1892,6 +1901,7 @@
             hideBetControls();
             clearAllActions();
             hideHandResult();
+            playBlindLevel = 0;
             gameSeed = Math.random();
             const s = JSON.parse(_playMod.init_game(gameSeed));
             handStartHeroChips = s.hero?.chips ?? STARTING_CHIPS;
@@ -2044,6 +2054,46 @@
       if (e.target === settingsOverlay) settingsOverlay.classList.remove('open');
     });
 
+    const BLIND_LEVELS = [
+      { sb:   50, bb:   100, hands: 10 },
+      { sb:  100, bb:   200, hands: 10 },
+      { sb:  150, bb:   300, hands: 10 },
+      { sb:  200, bb:   400, hands: 10 },
+      { sb:  300, bb:   600, hands: 10 },
+      { sb:  400, bb:   800, hands: 10 },
+      { sb:  500, bb:  1000, hands: 10 },
+      { sb:  750, bb:  1500, hands: 10 },
+      { sb: 1000, bb:  2000, hands: 10 },
+      { sb: 1500, bb:  3000, hands: 10 },
+      { sb: 2000, bb:  4000, hands: 10 },
+      { sb: 3000, bb:  6000, hands: 10 },
+    ];
+
+    function getBlindLevelForHand(handNumber) {
+      let hands = 0;
+      for (let i = 0; i < BLIND_LEVELS.length - 1; i++) {
+        hands += BLIND_LEVELS[i].hands;
+        if (handNumber <= hands) return i;
+      }
+      return BLIND_LEVELS.length - 1;
+    }
+
+    function syncBlindLevel(mod, handNumber, currentLevel) {
+      const newLevel = getBlindLevelForHand(handNumber);
+      if (newLevel !== currentLevel) {
+        const { sb, bb } = BLIND_LEVELS[newLevel];
+        mod.set_blinds(sb, bb);
+      }
+      return newLevel;
+    }
+
+    // Sync blinds for the incoming hand, then start it. Returns the new GameState.
+    function advanceHand(mod, currentHandNumber, blindLevel) {
+      const newLevel = syncBlindLevel(mod, currentHandNumber + 1, blindLevel);
+      const state = JSON.parse(mod.next_hand());
+      return { state, blindLevel: newLevel };
+    }
+
     const SPEED_PRESETS = [
       { label: 'Very Slow (0.25×)', bot: 4000, hand: 20000 },
       { label: 'Slow (0.5×)',       bot: 2000, hand: 10000 },
@@ -2164,8 +2214,10 @@
         // Pause to show hand result, then auto-advance
         await new Promise(r => setTimeout(r, HAND_COMPLETE_MS));
         if (!arenaRunning || arenaGeneration !== myGen) return;
-        _arenaMod.next_hand();
-        updateUrlState('arena', JSON.parse(_arenaMod.get_state()).hand_number);
+        // Advance the hand (syncs blind level, then calls next_hand()).
+        const { state: nextState, blindLevel: newArenaLevel } = advanceHand(_arenaMod, state.hand_number, arenaBlindLevel);
+        arenaBlindLevel = newArenaLevel;
+        updateUrlState('arena', nextState.hand_number);
       }
     }
 
@@ -2173,11 +2225,12 @@
       const active = state.players.filter(p => p.chips > 0);
       const leader = [...state.players].sort((a, b) => b.chips - a.chips)[0];
       document.getElementById('arena-status').textContent =
-        `Hand #${state.hand_number} · ${active.length} players left · Leader: ${leader.name} $${leader.chips.toLocaleString()}`;
+        `Hand #${state.hand_number} · Blinds ${state.small_blind}/${state.big_blind} · ${active.length} players left · Leader: ${leader.name} $${leader.chips.toLocaleString()}`;
     }
 
     document.getElementById('arena-start-btn').addEventListener('click', () => {
       arenaRunning = false;  // stop any running loop before restarting
+      arenaBlindLevel = 0;
       gameSeed = Date.now();
       const state = JSON.parse(_arenaMod.init_bot_game(gameSeed));
       updateUrlState('arena', 1);
