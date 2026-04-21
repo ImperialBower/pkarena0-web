@@ -63,6 +63,11 @@ pub fn main() {
 
 // ── Public WASM exports ───────────────────────────────────────────────────────
 
+#[wasm_bindgen]
+pub fn version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 /// Initialise a new session with 9 players (seat 0 = human, seats 1-8 = bots).
 ///
 /// Seeds the RNG from `rand_seed`, deals the first hand, and advances bots

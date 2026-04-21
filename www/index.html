@@ -33,6 +33,7 @@
       justify-content: center;
     }
     #score-bar strong { color: #f0d060; }
+    #sc-version { color: #aaa; }
     #sc-pnl.positive { color: #44dd66; }
     #sc-pnl.negative { color: #ff6666; }
 
@@ -650,6 +651,7 @@
   <nav id="tab-bar"></nav>
 
   <div id="score-bar">
+    <a id="sc-version" href="https://github.com/ImperialBower/pkarena0-web" target="_blank" rel="noopener"></a>
     <span>Hand: <strong id="sc-hand">—</strong></span>
     <span class="play-only">Blinds: <strong id="sc-blinds">—</strong></span>
     <span class="play-only">Chips: <strong id="sc-chips">—</strong></span>
@@ -1443,6 +1445,7 @@
           import('./pkg/pkarena0_web.js?tab=play').then(async m  => { await m.default(); return m; }),
           import('./pkg/pkarena0_web.js?tab=arena').then(async m => { await m.default(); return m; }),
         ]);
+        document.getElementById('sc-version').textContent = 'v' + _playMod.version();
         const restored = await restoreFromUrl();
         if (!restored) {
           setStatus('Click "New Game" to start.');
