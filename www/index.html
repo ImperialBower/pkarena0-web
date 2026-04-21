@@ -33,6 +33,7 @@
       justify-content: center;
     }
     #score-bar strong { color: #f0d060; }
+    #sc-version { color: #aaa; }
     #sc-pnl.positive { color: #44dd66; }
     #sc-pnl.negative { color: #ff6666; }
 
@@ -251,6 +252,152 @@
       margin: 0;
     }
 
+    /* ── Settings overlay ── */
+    #settings-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #settings-overlay.open { display: flex; }
+    #settings-box {
+      background: #0d0d1a;
+      border: 1px solid #336;
+      border-radius: 8px;
+      padding: 16px;
+      min-width: 300px;
+      max-width: 90vw;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #settings-box header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #99c;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    #settings-close {
+      background: none;
+      border: none;
+      color: #669;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 8px 12px;
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      border-radius: 4px;
+    }
+    #settings-close:hover { color: #99c; }
+    #settings-content {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #settings-content label {
+      color: #aaa;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .speed-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #669;
+      font-size: 12px;
+    }
+    .speed-row input[type=range] {
+      flex: 1;
+      accent-color: #4a90d9;
+    }
+    #speed-label {
+      text-align: center;
+      color: #f0d060;
+      font-size: 12px;
+    }
+    #settings-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: #669;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+    #settings-btn:hover { color: #99c; }
+
+    /* ── Tab bar (top-level nav, sits above the table/controls grid) ── */
+    #tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid #224;
+      width: 100%;
+      background: #111122;
+    }
+    .tab {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      color: #669;
+      padding: 8px 22px;
+      cursor: pointer;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .tab.active {
+      color: #f0d060;
+      border-bottom-color: #f0d060;
+    }
+    .tab:hover:not(.active) { color: #99c; }
+
+    /* ── Arena panel (inside #right-col, shown only in Arena mode) ── */
+    #arena-panel {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      padding: 6px 0;
+    }
+    #arena-status {
+      color: #aaa;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    #arena-start-btn {
+      background: none;
+      border: 1px solid #4a90d9;
+      color: #9ac4f0;
+      padding: 8px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      align-self: flex-start;
+    }
+    #arena-start-btn:hover { background: #1a2e3a; }
+
+    /* ── Tab-based panel visibility ── */
+    body[data-tab="arena"] #action-panel  { display: none; }
+    body[data-tab="arena"] #arena-panel   { display: flex; }
+    body[data-tab="arena"] #hand-log-wrap { display: none; }
+    body[data-tab="arena"] .play-only     { display: none; }
+
     footer {
       margin-top: 12px;
       font-size: 11px;
@@ -386,12 +533,16 @@
         gap: 0;
       }
 
-      /* Score bar spans full width at top */
+      /* Score bar and tab bar span full width at top */
       #score-bar {
         flex: 0 0 100%;
         margin-bottom: 4px;
         gap: 16px;
         padding: 4px 12px;
+      }
+      #tab-bar {
+        flex: 0 0 100%;
+        margin-bottom: 2px;
       }
 
       /* Hide status — active player is visible on the table; saves row space */
@@ -462,6 +613,7 @@
         display: grid;
         grid-template-columns: 1fr 260px;
         grid-template-areas:
+          "tabs     tabs"
           "score    score"
           "table    rightcol"
           "log      log"
@@ -473,6 +625,7 @@
       }
 
       #score-bar   { grid-area: score;    margin-bottom: 0; }
+      #tab-bar     { grid-area: tabs;     margin-bottom: 0; }
       #poker-table { grid-area: table;    width: 100%; max-width: 800px; height: auto; }
       #right-col   { grid-area: rightcol; display: flex; flex-direction: column;
                      align-items: stretch; gap: 6px; width: auto; }
@@ -495,10 +648,15 @@
 </head>
 <body>
 
+  <nav id="tab-bar"></nav>
+
   <div id="score-bar">
+    <a id="sc-version" href="https://github.com/ImperialBower/pkarena0-web" target="_blank" rel="noopener"></a>
     <span>Hand: <strong id="sc-hand">—</strong></span>
-    <span>Chips: <strong id="sc-chips">—</strong></span>
-    <span>P&amp;L: <strong id="sc-pnl">—</strong></span>
+    <span class="play-only">Blinds: <strong id="sc-blinds">—</strong></span>
+    <span class="play-only">Chips: <strong id="sc-chips">—</strong></span>
+    <span class="play-only">P&amp;L: <strong id="sc-pnl">—</strong></span>
+    <button id="settings-btn" title="Settings">⚙</button>
   </div>
 
   <!-- ── Poker table SVG (original design + dynamic IDs) ── -->
@@ -910,11 +1068,12 @@
     </g>
   </svg>
 
-  <!-- ── Right column: status + action panel ── -->
+  <!-- ── Right column: status + active panel ── -->
   <div id="right-col">
+
   <div id="status-msg">Loading WASM…</div>
 
-  <!-- ── Action panel ── -->
+  <!-- ── Action panel (Play mode) ── -->
   <div id="action-panel">
     <div id="hero-cards"></div>
     <div id="board-cards"></div>
@@ -930,6 +1089,13 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Arena controls (Arena mode) ── -->
+  <div id="arena-panel">
+    <button id="arena-start-btn">Start Arena</button>
+    <span id="arena-status">Press Start Arena to watch 9 bots play to the finish.</span>
+  </div>
+
   </div><!-- /#right-col -->
 
   <details id="hand-log-wrap">
@@ -952,18 +1118,41 @@
     </div>
   </div>
 
+  <div id="settings-overlay">
+    <div id="settings-box">
+      <header>
+        <span>Settings</span>
+        <button id="settings-close">✕</button>
+      </header>
+      <div id="settings-content">
+        <label for="speed-slider">Game Speed</label>
+        <div class="speed-row">
+          <span>Slow</span>
+          <input type="range" id="speed-slider" min="1" max="10" value="5">
+          <span>Fast</span>
+        </div>
+        <div id="speed-label">Normal (1×)</div>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <a href="https://github.com/ImperialBower/pkarena0-web">ImperialBower/pkarena0-web</a>
   </footer>
 
   <script type="module">
-    import init, { init_game, human_action, next_hand, get_state, get_session_yaml, step_bot }
-      from './pkg/pkarena0_web.js';
+    let _playMod = null, _arenaMod = null;
+    let arenaGeneration = 0;
 
     // ── Constants ─────────────────────────────────────────────────────────────
     const SVG_NS = 'http://www.w3.org/2000/svg';
-    const BOT_ACTION_MS = 1000;   // pause between each bot action
-    const HAND_COMPLETE_MS = 5000; // pause to show result before starting next hand
+    let BOT_ACTION_MS = 1000;   // pause between each bot action (configurable via settings)
+    let HAND_COMPLETE_MS = 5000; // pause to show result before starting next hand (configurable)
+    let gameSeed = 0;            // seed used for the current session (saved to URL)
+    let arenaRunning = false;
+    let playLoopRunning = false;
+    let arenaBlindLevel = 0;
+    let playBlindLevel  = 0;
     const STARTING_CHIPS = 10_000;
     const BOT_EMOJIS = {
       'gto':               '🤖',
@@ -1031,6 +1220,48 @@
       }
     }
 
+    function clearChildren(el) {
+      while (el && el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    // Resets all SVG table visuals to a blank pre-game state.
+    function clearTable() {
+      for (let i = 0; i < 5; i++) clearChildren(document.getElementById('board-card-' + i));
+      const heroCards  = document.getElementById('hero-cards');
+      const boardCards = document.getElementById('board-cards');
+      if (heroCards)  { heroCards.className = ''; clearChildren(heroCards); }
+      if (boardCards) { boardCards.className = ''; clearChildren(boardCards); }
+      const pot = document.getElementById('pot-amount');
+      if (pot) pot.textContent = 'POT: $0';
+      hideHandResult();
+      clearAllActions();
+      for (let i = 0; i < 9; i++) {
+        const p = 'seat-' + i + '-';
+        const h  = document.getElementById(p + 'highlight');
+        const b  = document.getElementById(p + 'bet');
+        const bx = document.getElementById(p + 'badge');
+        const d  = document.getElementById(p + 'btn-d');
+        const sb = document.getElementById(p + 'btn-sb');
+        const bb = document.getElementById(p + 'btn-bb');
+        if (h)  h.setAttribute('opacity', '0');
+        if (b)  b.setAttribute('visibility', 'hidden');
+        if (bx) bx.setAttribute('visibility', 'hidden');
+        if (d)  d.setAttribute('visibility', 'hidden');
+        if (sb) sb.setAttribute('visibility', 'hidden');
+        if (bb) bb.setAttribute('visibility', 'hidden');
+        clearChildren(document.getElementById(p + 'card-0'));
+        clearChildren(document.getElementById(p + 'card-1'));
+      }
+      document.getElementById('sc-hand').textContent   = '—';
+      document.getElementById('sc-blinds').textContent = '—';
+      document.getElementById('sc-chips').textContent  = '—';
+      const pnl = document.getElementById('sc-pnl');
+      pnl.textContent = '—';
+      pnl.className   = '';
+      setStatus('');
+      hideBetControls();
+    }
+
     // Shows the hand-result overlay above the community cards.
     // isWin: true = green (won), false = red (lost), null = yellow (even).
     function showHandResult(text, isWin) {
@@ -1067,10 +1298,11 @@
     // Calls step_bot() once per second until it's the human's turn or hand ends,
     // showing each bot's action in the status bar and as a graphical callout.
     async function stepBotsUntilHuman() {
-      while (true) {
-        const result = JSON.parse(step_bot());
+      playLoopRunning = true;
+      while (playLoopRunning) {
+        const result = JSON.parse(_playMod.step_bot());
         if (result.done) {
-          const state = JSON.parse(get_state());
+          const state = JSON.parse(_playMod.get_state());
           renderState(state);
           return;
         }
@@ -1078,8 +1310,7 @@
         const botCards = cardsToLogStr(result.hole_cards);
         appendHandLog(`${result.name}${botCards ? ' ' + botCards : ''}: ${result.action_label}`);
         setActionLabel(result.seat, result.action_label);
-        // Re-render table with updated chips/bets but no action buttons.
-        const state = JSON.parse(get_state());
+        const state = JSON.parse(_playMod.get_state());
         renderTableVisuals(state);
         await new Promise(r => setTimeout(r, BOT_ACTION_MS));
       }
@@ -1123,11 +1354,103 @@
     new ResizeObserver(scaleTableText).observe(document.getElementById('poker-table'));
     setTimeout(scaleTableText, 0); // initial pass before first paint
 
+    // ── URL state persistence ──────────────────────────────────────────────────
+
+    function updateUrlState(mode, handNumber) {
+      history.replaceState(null, '', `#mode=${mode}&seed=${gameSeed}&hand=${handNumber}`);
+    }
+
+    function parseUrlHash() {
+      const h = location.hash.slice(1);
+      if (!h) return null;
+      const params = Object.fromEntries(h.split('&').map(p => p.split('=')));
+      const seed = parseFloat(params.seed);
+      const hand = parseInt(params.hand, 10);
+      const mode = params.mode;
+      if (!mode || isNaN(seed) || isNaN(hand) || hand < 1) return null;
+      return { mode, seed, hand };
+    }
+
+    async function fastForwardToHand(targetHand) {
+      const savedBot  = BOT_ACTION_MS;
+      const savedHand = HAND_COMPLETE_MS;
+      BOT_ACTION_MS   = 0;
+      HAND_COMPLETE_MS = 0;
+      arenaRunning = true;
+
+      while (arenaRunning) {
+        while (true) {
+          const result = JSON.parse(_arenaMod.step_bot());
+          if (result.done) break;
+        }
+        const state = JSON.parse(_arenaMod.get_state());
+        renderTableVisuals(state);
+        updateArenaStatus(state);
+
+        if (state.phase === 'SessionOver') {
+          arenaRunning = false;
+          document.getElementById('arena-start-btn').textContent = 'New Arena';
+          BOT_ACTION_MS   = savedBot;
+          HAND_COMPLETE_MS = savedHand;
+          return;
+        }
+        if (state.hand_number >= targetHand) break;
+        _arenaMod.next_hand();
+        // yield to browser between hands so the tab stays responsive
+        await new Promise(r => setTimeout(r, 0));
+      }
+
+      BOT_ACTION_MS   = savedBot;
+      HAND_COMPLETE_MS = savedHand;
+      runArena();
+    }
+
+    async function restoreFromUrl() {
+      const saved = parseUrlHash();
+      if (!saved) return false;
+
+      gameSeed = saved.seed;
+      document.getElementById('btn-new-game').disabled = false;
+
+      if (saved.mode === 'arena') {
+        activateTab('arena');                                         // UI only — WASM not ready yet
+        const state = JSON.parse(_arenaMod.init_bot_game(gameSeed)); // init WASM first
+        renderTableVisuals(state);
+        updateArenaStatus(state);
+        document.getElementById('arena-start-btn').textContent = 'New Arena';
+
+        if (saved.hand > 1) {
+          setStatus(`Restoring arena to hand #${saved.hand}…`);
+          await fastForwardToHand(saved.hand);
+        } else {
+          runArena();
+        }
+      } else {
+        // Play: restore same bot lineup; human actions aren't saved so restart from hand 1
+        activateTab('play');                                     // UI only — WASM not ready yet
+        playBlindLevel = 0;
+        const state = JSON.parse(_playMod.init_game(gameSeed)); // init WASM first
+        handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
+        renderTableVisuals(state);
+        setStatus('Resumed — same opponents, starting from hand 1.');
+        enableCurrentGameButton();
+        stepBotsUntilHuman();
+      }
+      return true;
+    }
+
     async function boot() {
       try {
-        await init();
-        setStatus('Click "New Game" to start.');
-        document.getElementById('btn-new-game').disabled = false;
+        [_playMod, _arenaMod] = await Promise.all([
+          import('./pkg/pkarena0_web.js?tab=play').then(async m  => { await m.default(); return m; }),
+          import('./pkg/pkarena0_web.js?tab=arena').then(async m => { await m.default(); return m; }),
+        ]);
+        document.getElementById('sc-version').textContent = 'v' + _playMod.version();
+        const restored = await restoreFromUrl();
+        if (!restored) {
+          setStatus('Click "New Game" to start.');
+          document.getElementById('btn-new-game').disabled = false;
+        }
       } catch (e) {
         setStatus('Failed to load WASM: ' + e);
       }
@@ -1135,17 +1458,33 @@
     boot();
 
     // ── New game ──────────────────────────────────────────────────────────────
-    document.getElementById('btn-new-game').addEventListener('click', () => {
+    function startNewGame() {
       hideBetControls();
       clearAllActions();
       hideHandResult();
-      const state = JSON.parse(init_game(Math.random()));
+      playBlindLevel = 0;
+      gameSeed = Math.random();
+      const state = JSON.parse(_playMod.init_game(gameSeed));
       handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
+      updateUrlState('play', 1);
       renderTableVisuals(state);
       setStatus('Dealing…');
       enableCurrentGameButton();
       stepBotsUntilHuman();
-    });
+    }
+
+    function showNewGameButton() {
+      const container = document.getElementById('action-buttons');
+      while (container.firstChild) container.removeChild(container.firstChild);
+      const btn = document.createElement('button');
+      btn.id = 'btn-new-game';
+      btn.className = 'primary';
+      btn.textContent = 'New Game';
+      btn.addEventListener('click', startNewGame);
+      container.appendChild(btn);
+    }
+
+    document.getElementById('btn-new-game').addEventListener('click', startNewGame);
 
     // ── Human action ─────────────────────────────────────────────────────────
     function onHumanAction(action, amount, currentState) {
@@ -1157,7 +1496,7 @@
       appendHandLog(`You${heroCards ? ' ' + heroCards : ''}: ${label}`);
       setStatus('…');
       const req = JSON.stringify({ action, amount: amount ?? 0 });
-      const state = JSON.parse(human_action(req));
+      const state = JSON.parse(_playMod.human_action(req));
       // Legacy hard-error path (should not occur after the derive_legal_actions fix).
       if (state.phase === 'Error') { renderState(state); return; }
       // Recoverable error: action was rejected but game is still WaitingForHuman.
@@ -1168,6 +1507,7 @@
         renderActionButtons(state);
         return;
       }
+      playBlindLevel = syncBlindLevel(_playMod, state.hand_number, playBlindLevel);
       renderTableVisuals(state);
       stepBotsUntilHuman();
     }
@@ -1181,6 +1521,8 @@
       const chips = state.hero?.chips ?? 0;
       const pnl = chips - STARTING_CHIPS;
       document.getElementById('sc-hand').textContent = state.hand_number ?? '—';
+      document.getElementById('sc-blinds').textContent =
+        state.small_blind ? `${state.small_blind}/${state.big_blind}` : '—';
       document.getElementById('sc-chips').textContent = '$' + chips.toLocaleString();
       const pnlEl = document.getElementById('sc-pnl');
       pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toLocaleString();
@@ -1225,9 +1567,9 @@
         enableYamlDownload();
         renderButtons([]);
 
-        // Advance the hand immediately so end_hand() distributes the pot and
-        // last_result (winner info) is available on nextState.
-        const nextState = JSON.parse(next_hand());
+        // Advance the hand (syncs blind level, then calls next_hand()).
+        const { state: nextState, blindLevel: newPlayLevel } = advanceHand(_playMod, state.hand_number, playBlindLevel);
+        playBlindLevel = newPlayLevel;
         if (nextState.phase === 'Error') {
           console.error('[pkarena] next_hand() failed:', nextState.error);
         }
@@ -1276,6 +1618,7 @@
         }
 
         setTimeout(() => {
+          if (document.body.dataset.tab !== 'play') return; // tab was switched away
           hideHandResult();
           clearAllActions();
           handStartHeroChips = heroChipsAfter;
@@ -1285,6 +1628,7 @@
             renderButtons([{ label: 'New Game', cls: 'primary', action: 'new-game' }]);
             return;
           }
+          updateUrlState('play', nextState.hand_number);
           renderTableVisuals(nextState);
           stepBotsUntilHuman();
         }, HAND_COMPLETE_MS);
@@ -1560,8 +1904,11 @@
             hideBetControls();
             clearAllActions();
             hideHandResult();
-            const s = JSON.parse(init_game(Math.random()));
+            playBlindLevel = 0;
+            gameSeed = Math.random();
+            const s = JSON.parse(_playMod.init_game(gameSeed));
             handStartHeroChips = s.hero?.chips ?? STARTING_CHIPS;
+            updateUrlState('play', 1);
             renderTableVisuals(s);
             setStatus('Dealing…');
             enableCurrentGameButton();
@@ -1661,7 +2008,8 @@
 
     // ── YAML download ─────────────────────────────────────────────────────────
     document.getElementById('btn-download-yaml').addEventListener('click', () => {
-      const yaml = get_session_yaml();
+      const mod = document.body.dataset.tab === 'arena' ? _arenaMod : _playMod;
+      const yaml = mod.get_session_yaml();
       const blob = new Blob([yaml], { type: 'text/yaml' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1676,7 +2024,8 @@
     const gameStatePre     = document.getElementById('game-state-pre');
 
     document.getElementById('btn-current-game').addEventListener('click', () => {
-      const raw = get_state();
+      const mod = document.body.dataset.tab === 'arena' ? _arenaMod : _playMod;
+      const raw = mod.get_state();
       try {
         gameStatePre.textContent = JSON.stringify(JSON.parse(raw), null, 2);
       } catch {
@@ -1691,6 +2040,209 @@
 
     gameStateOverlay.addEventListener('click', (e) => {
       if (e.target === gameStateOverlay) gameStateOverlay.classList.remove('open');
+    });
+
+    // ── Settings overlay ───────────────────────────────────────────────────────
+    const settingsOverlay = document.getElementById('settings-overlay');
+
+    document.getElementById('settings-btn').addEventListener('click', () => {
+      settingsOverlay.classList.add('open');
+    });
+
+    document.getElementById('settings-close').addEventListener('click', () => {
+      settingsOverlay.classList.remove('open');
+    });
+
+    settingsOverlay.addEventListener('click', (e) => {
+      if (e.target === settingsOverlay) settingsOverlay.classList.remove('open');
+    });
+
+    const BLIND_LEVELS = [
+      { sb:   50, bb:   100, hands: 10 },
+      { sb:  100, bb:   200, hands: 10 },
+      { sb:  150, bb:   300, hands: 10 },
+      { sb:  200, bb:   400, hands: 10 },
+      { sb:  300, bb:   600, hands: 10 },
+      { sb:  400, bb:   800, hands: 10 },
+      { sb:  500, bb:  1000, hands: 10 },
+      { sb:  750, bb:  1500, hands: 10 },
+      { sb: 1000, bb:  2000, hands: 10 },
+      { sb: 1500, bb:  3000, hands: 10 },
+      { sb: 2000, bb:  4000, hands: 10 },
+      { sb: 3000, bb:  6000, hands: 10 },
+    ];
+
+    function getBlindLevelForHand(handNumber) {
+      let hands = 0;
+      for (let i = 0; i < BLIND_LEVELS.length - 1; i++) {
+        hands += BLIND_LEVELS[i].hands;
+        if (handNumber <= hands) return i;
+      }
+      return BLIND_LEVELS.length - 1;
+    }
+
+    function syncBlindLevel(mod, handNumber, currentLevel) {
+      const newLevel = getBlindLevelForHand(handNumber);
+      if (newLevel !== currentLevel) {
+        const { sb, bb } = BLIND_LEVELS[newLevel];
+        mod.set_blinds(sb, bb);
+      }
+      return newLevel;
+    }
+
+    // Sync blinds for the incoming hand, then start it. Returns the new GameState.
+    function advanceHand(mod, currentHandNumber, blindLevel) {
+      const newLevel = syncBlindLevel(mod, currentHandNumber + 1, blindLevel);
+      const state = JSON.parse(mod.next_hand());
+      return { state, blindLevel: newLevel };
+    }
+
+    const SPEED_PRESETS = [
+      { label: 'Very Slow (0.25×)', bot: 4000, hand: 20000 },
+      { label: 'Slow (0.5×)',       bot: 2000, hand: 10000 },
+      { label: 'Slow (0.75×)',      bot: 1500, hand:  7500 },
+      { label: 'Normal (1×)',       bot: 1000, hand:  5000 },
+      { label: 'Fast (1.5×)',       bot:  700, hand:  3500 },
+      { label: 'Fast (2×)',         bot:  500, hand:  2500 },
+      { label: 'Fast (3×)',         bot:  350, hand:  1750 },
+      { label: 'Fast (4×)',         bot:  250, hand:  1250 },
+      { label: 'Very Fast (6×)',    bot:  150, hand:   800 },
+      { label: 'Turbo (10×)',       bot:   75, hand:   400 },
+    ];
+
+    document.getElementById('speed-slider').addEventListener('input', (e) => {
+      const preset = SPEED_PRESETS[e.target.value - 1];
+      BOT_ACTION_MS = preset.bot;
+      HAND_COMPLETE_MS = preset.hand;
+      document.getElementById('speed-label').textContent = preset.label;
+    });
+
+    // ── Game modes — add a new entry here to add a tab ──────────────────────
+    const GAME_MODES = [
+      { id: 'play',  label: 'Play' },
+      { id: 'arena', label: 'Arena' },
+    ];
+
+    // UI-only tab switch — safe to call before WASM is initialized
+    function activateTab(id) {
+      document.querySelectorAll('.tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.tab === id));
+      document.body.dataset.tab = id;
+    }
+
+    function restorePlayTabState() {
+      if (!_playMod) return;
+      let state;
+      try { state = JSON.parse(_playMod.get_state()); } catch { state = null; }
+      if (!state || !state.phase || state.phase === 'Uninitialized') {
+        showNewGameButton();
+        setStatus('Click "New Game" to start.');
+        return;
+      }
+      renderTableVisuals(state);
+      if (state.phase === 'WaitingForHuman') {
+        renderState(state);
+      } else if (state.phase === 'BotsActing') {
+        setStatus('Resuming…');
+        stepBotsUntilHuman();
+      } else {
+        renderState(state);
+      }
+    }
+
+    function restoreArenaTabState() {
+      if (!_arenaMod) return;
+      let state;
+      try { state = JSON.parse(_arenaMod.get_state()); } catch { state = null; }
+      if (!state || !state.phase || state.phase === 'Uninitialized') {
+        document.getElementById('arena-start-btn').textContent = 'Start Arena';
+        document.getElementById('arena-status').textContent =
+          'Press Start Arena to watch 9 bots play to the finish.';
+        return;
+      }
+      renderTableVisuals(state);
+      updateArenaStatus(state);
+      if (state.phase !== 'SessionOver') {
+        runArena(); // resume; arenaGeneration prevents any winding-down loop from conflicting
+      }
+    }
+
+    function switchTab(id) {
+      if (document.body.dataset.tab === id) return;
+      arenaRunning = false;
+      playLoopRunning = false;
+      activateTab(id);
+      if (id === 'play')  restorePlayTabState();
+      if (id === 'arena') restoreArenaTabState();
+    }
+
+    // Build tab bar from GAME_MODES and wire click handlers
+    const tabBar = document.getElementById('tab-bar');
+    GAME_MODES.forEach(mode => {
+      const btn = document.createElement('button');
+      btn.className = 'tab';
+      btn.dataset.tab = mode.id;
+      btn.textContent = mode.label;
+      btn.addEventListener('click', () => switchTab(mode.id));
+      tabBar.appendChild(btn);
+    });
+    activateTab('play'); // default active tab (UI only — WASM initialized later in boot())
+
+    // ── Arena game loop ───────────────────────────────────────────────────────
+    async function runArena() {
+      const myGen = ++arenaGeneration;
+      arenaRunning = true;
+      while (arenaRunning && arenaGeneration === myGen) {
+        // Step all bots through the current hand
+        while (true) {
+          const result = JSON.parse(_arenaMod.step_bot());
+          const state  = JSON.parse(_arenaMod.get_state());
+          renderTableVisuals(state);   // not renderState — avoids triggering play-mode hand flow
+          updateArenaStatus(state);
+          if (result.done) break;
+          await new Promise(r => setTimeout(r, BOT_ACTION_MS));
+          if (!arenaRunning || arenaGeneration !== myGen) return;
+        }
+
+        const state = JSON.parse(_arenaMod.get_state());
+        if (state.phase === 'SessionOver') {
+          const winner = [...state.players].sort((a, b) => b.chips - a.chips)[0];
+          document.getElementById('arena-status').textContent =
+            `Session over! Winner: ${winner.name} — ${state.hand_number} hands played.`;
+          document.getElementById('arena-start-btn').textContent = 'New Arena';
+          arenaRunning = false;
+          return;
+        }
+
+        // Pause to show hand result, then auto-advance
+        await new Promise(r => setTimeout(r, HAND_COMPLETE_MS));
+        if (!arenaRunning || arenaGeneration !== myGen) return;
+        // Advance the hand (syncs blind level, then calls next_hand()).
+        const { state: nextState, blindLevel: newArenaLevel } = advanceHand(_arenaMod, state.hand_number, arenaBlindLevel);
+        arenaBlindLevel = newArenaLevel;
+        updateUrlState('arena', nextState.hand_number);
+      }
+    }
+
+    function updateArenaStatus(state) {
+      const active = state.players.filter(p => p.chips > 0);
+      const leader = [...state.players].sort((a, b) => b.chips - a.chips)[0];
+      document.getElementById('arena-status').textContent =
+        `Hand #${state.hand_number} · Blinds ${state.small_blind}/${state.big_blind} · ${active.length} players left · Leader: ${leader.name} $${leader.chips.toLocaleString()}`;
+    }
+
+    document.getElementById('arena-start-btn').addEventListener('click', () => {
+      arenaRunning = false;  // stop any running loop before restarting
+      arenaBlindLevel = 0;
+      gameSeed = Date.now();
+      const state = JSON.parse(_arenaMod.init_bot_game(gameSeed));
+      updateUrlState('arena', 1);
+      renderTableVisuals(state);
+      updateArenaStatus(state);
+      document.getElementById('arena-status').textContent =
+        `Hand #${state.hand_number} — Starting…`;
+      document.getElementById('arena-start-btn').textContent = 'New Arena';
+      runArena();
     });
 
     // Enable the YAML download button once a hand has completed.

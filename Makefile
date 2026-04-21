@@ -1,4 +1,4 @@
-.PHONY: help build serve build-release clean install-playwright test test-ui test-yaml ayce default
+.PHONY: help build serve kill build-release clean install-playwright test test-ui test-yaml ayce default
 
 # Default target
 default: ayce
@@ -9,6 +9,7 @@ help:
 	@echo "  build               wasm-pack dev build → www/pkg/"
 	@echo "  build-release       wasm-pack release build (optimised)"
 	@echo "  serve               dev build + python3 http.server on :8080"
+	@echo "  kill                kill the http.server on :8080"
 	@echo "  clean               cargo clean + remove www/pkg/"
 	@echo "  install-playwright  npm install + playwright install chromium"
 	@echo "  test                dev build + playwright headless tests"
@@ -21,6 +22,9 @@ build:
 serve: build
 	@echo "Serving at http://localhost:8080"
 	cd www && python3 -m http.server 8080
+
+kill:
+	@lsof -ti :8080 | xargs kill 2>/dev/null || echo "Nothing running on :8080"
 
 build-release:
 	wasm-pack build --release --target web --out-dir www/pkg
