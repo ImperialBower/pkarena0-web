@@ -325,6 +325,43 @@
       color: #f0d060;
       font-size: 12px;
     }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .toggle-row span {
+      color: #aaa;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: #333;
+      border-radius: 22px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: #4a90d9; }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
     #settings-btn {
       margin-left: auto;
       background: none;
@@ -1132,6 +1169,15 @@
           <span>Fast</span>
         </div>
         <div id="speed-label">Normal (1×)</div>
+        <div class="toggle-row">
+          <span>Voice narration</span>
+          <label class="toggle">
+            <input type="checkbox" id="audio-toggle" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <button id="audio-test-btn" style="font-size:11px;padding:6px 10px;background:#1a2a3e;border:1px solid #4a90d9;color:#7ab8f5;border-radius:4px;cursor:pointer;">Test voice</button>
+        <div id="audio-status" style="font-size:11px;color:#669;min-height:14px;"></div>
       </div>
     </div>
   </div>
@@ -1141,6 +1187,9 @@
   </footer>
 
   <script type="module">
+    import { Voice }       from './audio/voice.js';
+    import { LiveAdapter } from './audio/adapters/live.js';
+
     let _playMod = null, _arenaMod = null;
     let arenaGeneration = 0;
 
@@ -1152,6 +1201,10 @@
     let arenaRunning = false;
     let playLoopRunning = false;
     let arenaBlindLevel = 0;
+    let voice        = null;
+    let playAdapter  = null;
+    let arenaAdapter = null;
+    let audioEnabled = localStorage.getItem('audioEnabled') !== 'false';
     let playBlindLevel  = 0;
     const STARTING_CHIPS = 10_000;
     const BOT_EMOJIS = {
@@ -1303,8 +1356,16 @@
         const result = JSON.parse(_playMod.step_bot());
         if (result.done) {
           const state = JSON.parse(_playMod.get_state());
+          playAdapter?.poke();  // pick up showdown / hand_end state changes
           renderState(state);
           return;
+        }
+        // Push bot action directly (pkcore doesn't expose action_log in get_state)
+        if (result.seat != null && result.action_label) {
+          const { verb, amount } = parseBotActionLabel(result.action_label);
+          playAdapter?.pushEvent('action', result.seat, {
+            verb, amount, pot_after: 0, to_call_after: 0,
+          });
         }
         setStatus(`${result.name} ${result.action_label}`);
         const botCards = cardsToLogStr(result.hole_cards);
@@ -1457,8 +1518,109 @@
     }
     boot();
 
+    // ── Audio ─────────────────────────────────────────────────────────────────
+
+    // Must be called inside a user-gesture handler to satisfy AudioContext rules.
+    function ensureVoice() {
+      if (voice) return;
+      voice = new Voice({ basePath: './audio/voice/' });
+      voice.preload().then(({ loaded, missing }) =>
+        console.log(`[audio] ${loaded} clips loaded, ${missing} missing`));
+      window.voice = voice;
+    }
+
+    function activatePlayAudio() {
+      if (!voice || !_playMod) return;
+      arenaAdapter?.stop();
+      arenaAdapter = null;
+      playAdapter?.stop();
+      playAdapter = new LiveAdapter({
+        getState: () => JSON.parse(_playMod.get_state()),
+        onEvent:  handleEvent,
+        intervalMs: 150,
+      });
+      playAdapter.start();
+      window.playAdapter = playAdapter;
+    }
+
+    function activateArenaAudio() {
+      if (!voice || !_arenaMod) return;
+      playAdapter?.stop();
+      playAdapter = null;
+      arenaAdapter?.stop();
+      arenaAdapter = new LiveAdapter({
+        getState: () => JSON.parse(_arenaMod.get_state()),
+        onEvent:  handleEvent,
+        intervalMs: 150,
+      });
+      arenaAdapter.start();
+      window.arenaAdapter = arenaAdapter;
+    }
+
+    // Parse a bot action_label string ("raises $400", "folds", etc.) into
+    // a verb key and numeric amount that voice.js understands.
+    function parseBotActionLabel(label) {
+      const s = (label ?? '').toLowerCase().trim();
+      const amt = m => parseInt((m[1] ?? '0').replace(/,/g, ''), 10) || 0;
+      if (s === 'checks' || s === 'check') return { verb: 'check', amount: 0 };
+      if (s === 'folds'  || s === 'fold')  return { verb: 'fold',  amount: 0 };
+      if (s === 'mucks'  || s === 'muck')  return { verb: 'muck',  amount: 0 };
+      let m;
+      if ((m = s.match(/^calls?\s+\$?([\d,]+)/)))  return { verb: 'call',  amount: amt(m) };
+      if ((m = s.match(/^bets?\s+\$?([\d,]+)/)))   return { verb: 'bet',   amount: amt(m) };
+      if ((m = s.match(/^raises?\s+\$?([\d,]+)/))) return { verb: 'raise', amount: amt(m) };
+      if ((m = s.match(/^all.?in\s+\$?([\d,]+)/)))return { verb: 'allin', amount: amt(m) };
+      if (s.includes('small blind')) return { verb: 'post_sb', amount: 0 };
+      if (s.includes('big blind'))   return { verb: 'post_bb', amount: 0 };
+      return { verb: s, amount: 0 };
+    }
+
+    // Map human action enum ('Fold','Check','Call','Bet','Raise','AllIn') to voice verb.
+    function heroVerbToVoiceVerb(action) {
+      const map = { Fold: 'fold', Check: 'check', Call: 'call',
+                    Bet: 'bet', Raise: 'raise', AllIn: 'allin' };
+      return map[action] ?? action.toLowerCase();
+    }
+
+    function handleEvent(ev) {
+      if (!voice || !audioEnabled) return;
+      console.debug('[audio]', ev.kind, ev.seat ?? '', ev.data);
+      switch (ev.kind) {
+        case 'hand_start':
+          voice.cancel();
+          break;
+        case 'deal':
+          if (ev.data.to === 'hero') voice.say.yourHand(ev.data.cards);
+          break;
+        case 'street':
+          if (ev.data.street === 'flop')       voice.say.flop(ev.data.board);
+          else if (ev.data.street === 'turn')  voice.say.turn(ev.data.board[3]);
+          else if (ev.data.street === 'river') voice.say.river(ev.data.board[4]);
+          break;
+        case 'action':
+          voice.say.seatAction(ev.seat, ev.data.verb, ev.data.amount);
+          break;
+        case 'your_turn':
+          voice.say.yourTurn({ toCall: ev.data.to_call, pot: ev.data.pot, stack: ev.data.stack });
+          break;
+        case 'showdown': {
+          const isChop = ev.data.winners.length > 1;
+          if (isChop) {
+            voice.say.line('result_chop');
+          } else if (ev.data.winners[0]) {
+            const w = ev.data.winners[0];
+            voice.say.showdownWin(w.seat, []).then(() => {
+              voice.say.line(w.seat === 0 ? 'result_you_win' : 'result_you_lose');
+            });
+          }
+          break;
+        }
+      }
+    }
+
     // ── New game ──────────────────────────────────────────────────────────────
     function startNewGame() {
+      ensureVoice();
       hideBetControls();
       clearAllActions();
       hideHandResult();
@@ -1470,6 +1632,7 @@
       renderTableVisuals(state);
       setStatus('Dealing…');
       enableCurrentGameButton();
+      activatePlayAudio();  // creates fresh adapter; first tick fires hand_start + deal events
       stepBotsUntilHuman();
     }
 
@@ -1488,6 +1651,10 @@
 
     // ── Human action ─────────────────────────────────────────────────────────
     function onHumanAction(action, amount, currentState) {
+      playAdapter?.pushEvent('action', 0, {
+        verb: heroVerbToVoiceVerb(action), amount: amount ?? 0,
+        pot_after: 0, to_call_after: 0,
+      });
       hideBetControls();
       renderButtons([], null);   // clear buttons immediately so none appear while bots act
       const label = heroActionLabel(action, amount, currentState);
@@ -2117,6 +2284,29 @@
       document.getElementById('speed-label').textContent = preset.label;
     });
 
+    const audioToggleEl = document.getElementById('audio-toggle');
+    audioToggleEl.checked = audioEnabled;
+    audioToggleEl.addEventListener('change', () => {
+      audioEnabled = audioToggleEl.checked;
+      localStorage.setItem('audioEnabled', audioEnabled);
+      if (!audioEnabled) voice?.cancel();
+    });
+
+    const audioStatusEl = document.getElementById('audio-status');
+    document.getElementById('audio-test-btn').addEventListener('click', () => {
+      audioStatusEl.textContent = 'testing…';
+      // Test 1: raw SpeechSynthesis (no game required)
+      if (!('speechSynthesis' in window)) {
+        audioStatusEl.textContent = 'SpeechSynthesis not supported';
+        return;
+      }
+      const u = new SpeechSynthesisUtterance('audio test');
+      u.onstart = () => { audioStatusEl.textContent = 'TTS speaking ✓'; };
+      u.onend   = () => { audioStatusEl.textContent = 'TTS ok — click New Game for full narration'; };
+      u.onerror = (e) => { audioStatusEl.textContent = 'TTS error: ' + e.error; };
+      speechSynthesis.speak(u);
+    });
+
     // ── Game modes — add a new entry here to add a tab ──────────────────────
     const GAME_MODES = [
       { id: 'play',  label: 'Play' },
@@ -2172,8 +2362,8 @@
       arenaRunning = false;
       playLoopRunning = false;
       activateTab(id);
-      if (id === 'play')  restorePlayTabState();
-      if (id === 'arena') restoreArenaTabState();
+      if (id === 'play')  { restorePlayTabState();  if (voice) activatePlayAudio(); }
+      if (id === 'arena') { restoreArenaTabState(); if (voice) activateArenaAudio(); }
     }
 
     // Build tab bar from GAME_MODES and wire click handlers
@@ -2197,9 +2387,15 @@
         while (true) {
           const result = JSON.parse(_arenaMod.step_bot());
           const state  = JSON.parse(_arenaMod.get_state());
+          if (!result.done && result.seat != null && result.action_label) {
+            const { verb, amount } = parseBotActionLabel(result.action_label);
+            arenaAdapter?.pushEvent('action', result.seat, {
+              verb, amount, pot_after: 0, to_call_after: 0,
+            });
+          }
           renderTableVisuals(state);   // not renderState — avoids triggering play-mode hand flow
           updateArenaStatus(state);
-          if (result.done) break;
+          if (result.done) { arenaAdapter?.poke(); break; }
           await new Promise(r => setTimeout(r, BOT_ACTION_MS));
           if (!arenaRunning || arenaGeneration !== myGen) return;
         }
@@ -2232,6 +2428,7 @@
     }
 
     document.getElementById('arena-start-btn').addEventListener('click', () => {
+      ensureVoice();
       arenaRunning = false;  // stop any running loop before restarting
       arenaBlindLevel = 0;
       gameSeed = Date.now();
@@ -2242,6 +2439,7 @@
       document.getElementById('arena-status').textContent =
         `Hand #${state.hand_number} — Starting…`;
       document.getElementById('arena-start-btn').textContent = 'New Arena';
+      activateArenaAudio();
       runArena();
     });
 
