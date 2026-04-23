@@ -1172,7 +1172,7 @@
         <div class="toggle-row">
           <span>Voice narration</span>
           <label class="toggle">
-            <input type="checkbox" id="audio-toggle" checked>
+            <input type="checkbox" id="audio-toggle">
             <span class="toggle-track"></span>
           </label>
         </div>
@@ -1204,7 +1204,7 @@
     let voice        = null;
     let playAdapter  = null;
     let arenaAdapter = null;
-    let audioEnabled = localStorage.getItem('audioEnabled') !== 'false';
+    let audioEnabled = localStorage.getItem('audioEnabled') === 'true';
     let playBlindLevel  = 0;
     const STARTING_CHIPS = 10_000;
     const BOT_EMOJIS = {
