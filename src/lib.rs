@@ -277,20 +277,21 @@ pub fn next_hand() -> String {
                         .iter()
                         .find(|(s, _)| *s == seat_num)
                         .map_or(0, |(_, c)| *c);
-                    // Hole cards as Unicode strings (e.g. "A♠ K♦") for hand history.
-                    // Record cards for every player who was dealt in, regardless of
-                    // whether they folded.
-                    let hole_str = {
-                        let s: String = seat
-                            .cards
-                            .as_slice()
-                            .iter()
-                            .filter(|c| **c != Card::BLANK)
-                            .map(|c| c.to_string())
-                            .collect::<Vec<_>>()
-                            .join(" ");
-                        if s.is_empty() { None } else { Some(s) }
-                    };
+                    // Use dealt_hole_cards (survives folds) so folders' cards
+                    // appear in the hand history, not just the winner's.
+                    let hole_str = table
+                        .dealt_hole_cards
+                        .get(&seat_num)
+                        .and_then(|bc| {
+                            let s: String = bc
+                                .as_slice()
+                                .iter()
+                                .filter(|c| **c != Card::BLANK)
+                                .map(|c| c.to_string())
+                                .collect::<Vec<_>>()
+                                .join(" ");
+                            if s.is_empty() { None } else { Some(s) }
+                        });
                     Some((seat_num, seat.player.handle.clone(), starting, hole_str))
                 })
                 .collect();
