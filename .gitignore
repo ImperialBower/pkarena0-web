@@ -23,6 +23,5 @@ target
 playwright-report/
 .playwright-mcp/
 node_modules/
-Cargo.lock
 tests/fixtures/
 .claude/
