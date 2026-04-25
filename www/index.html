@@ -3,14 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0d0d1a">
+  <meta name="description" content="Single-player No-Limit Hold'em against 8 AI bots. Plays in any browser, mobile or desktop.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="pkarena0">
   <title>pkarena0 — No-Limit Hold'em</title>
   <style>
     /* ── Reset ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { color-scheme: dark; }
     body {
       background: #0d0d1a;
       color: #ccc;
-      font-family: 'Trebuchet MS', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Trebuchet MS', system-ui, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -462,7 +472,10 @@
       user-select: none;
       line-height: 1.1;
     }
-    .card-display.red { color: #cc1111; }
+    .card-display.suit-s { color: #1a1a1a; }
+    .card-display.suit-h { color: #cc1111; }
+    .card-display.suit-d { color: #1a6bbf; }
+    .card-display.suit-c { color: #0c8a3a; }
     /* Hero hole cards — largest */
     #hero-cards .card-display { width: 54px; height: 76px; }
     #hero-cards .cd-rank { font-size: 24px; }
@@ -500,6 +513,10 @@
       #action-buttons button {
         width: 100%;
         font-size: 15px;
+        padding: 10px 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       #bet-controls {
@@ -544,7 +561,7 @@
         max-height: 90vh;
         padding: 12px;
       }
-      #game-state-pre { font-size: 10px; }
+      #game-state-pre { font-size: 12px; overflow-x: auto; }
     }
 
     /* ── Tablet / wide ── */
@@ -681,6 +698,30 @@
       #hero-cards, #board-cards,
       #hero-cards.has-cards, #board-cards.has-cards { display: none; }
     }
+
+    :focus-visible { outline: 2px solid #7ab8f5; outline-offset: 2px; }
+    button:focus-visible { outline-color: #f0d060; }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      margin-right: 8px;
+      vertical-align: -2px;
+      border: 2px solid rgba(122, 184, 245, 0.25);
+      border-top-color: #7ab8f5;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -697,7 +738,8 @@
   </div>
 
   <!-- ── Poker table SVG (original design + dynamic IDs) ── -->
-  <svg id="poker-table" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <svg id="poker-table" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="poker-table-title">
+    <title id="poker-table-title">Poker table with 9 seats. Hero is at the bottom.</title>
     <defs>
       <radialGradient id="feltGrad" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="#1a6b3c"/>
@@ -852,7 +894,7 @@
     <g id="seat-1-group" transform="translate(280,640)">
       <ellipse id="seat-1-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
       <rect id="seat-1-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <a id="seat-1-name-link" href="#" target="_blank" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
+      <a id="seat-1-name-link" href="#" target="_blank" rel="noopener noreferrer" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
       <text id="seat-1-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text></a>
       <text id="seat-1-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-1-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
@@ -884,7 +926,7 @@
     <g id="seat-2-group" transform="translate(140,480)">
       <ellipse id="seat-2-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
       <rect id="seat-2-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <a id="seat-2-name-link" href="#" target="_blank" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
+      <a id="seat-2-name-link" href="#" target="_blank" rel="noopener noreferrer" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
       <text id="seat-2-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text></a>
       <text id="seat-2-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-2-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
@@ -916,7 +958,7 @@
     <g id="seat-3-group" transform="translate(170,260)">
       <ellipse id="seat-3-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
       <rect id="seat-3-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <a id="seat-3-name-link" href="#" target="_blank" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
+      <a id="seat-3-name-link" href="#" target="_blank" rel="noopener noreferrer" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
       <text id="seat-3-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text></a>
       <text id="seat-3-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-3-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
@@ -948,7 +990,7 @@
     <g id="seat-4-group" transform="translate(340,140)">
       <ellipse id="seat-4-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
       <rect id="seat-4-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <a id="seat-4-name-link" href="#" target="_blank" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
+      <a id="seat-4-name-link" href="#" target="_blank" rel="noopener noreferrer" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
       <text id="seat-4-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text></a>
       <text id="seat-4-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-4-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
@@ -980,7 +1022,7 @@
     <g id="seat-5-group" transform="translate(600,108)">
       <ellipse id="seat-5-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
       <rect id="seat-5-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <a id="seat-5-name-link" href="#" target="_blank" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
+      <a id="seat-5-name-link" href="#" target="_blank" rel="noopener noreferrer" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
       <text id="seat-5-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text></a>
       <text id="seat-5-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-5-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
@@ -1012,7 +1054,7 @@
     <g id="seat-6-group" transform="translate(860,140)">
       <ellipse id="seat-6-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
       <rect id="seat-6-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <a id="seat-6-name-link" href="#" target="_blank" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
+      <a id="seat-6-name-link" href="#" target="_blank" rel="noopener noreferrer" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
       <text id="seat-6-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text></a>
       <text id="seat-6-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-6-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
@@ -1044,7 +1086,7 @@
     <g id="seat-7-group" transform="translate(1030,260)">
       <ellipse id="seat-7-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
       <rect id="seat-7-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <a id="seat-7-name-link" href="#" target="_blank" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
+      <a id="seat-7-name-link" href="#" target="_blank" rel="noopener noreferrer" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
       <text id="seat-7-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text></a>
       <text id="seat-7-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-7-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
@@ -1076,7 +1118,7 @@
     <g id="seat-8-group" transform="translate(920,640)">
       <ellipse id="seat-8-highlight" cx="0" cy="-10" rx="78" ry="40" fill="#44dd66" opacity="0"/>
       <rect id="seat-8-plate" x="-72" y="-28" width="144" height="44" rx="14" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
-      <a id="seat-8-name-link" href="#" target="_blank" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
+      <a id="seat-8-name-link" href="#" target="_blank" rel="noopener noreferrer" style="cursor:pointer;text-decoration:none"><title>click to see config</title>
       <text id="seat-8-name" x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="14" fill="#7ab8f5" font-weight="bold">—</text></a>
       <text id="seat-8-chips" x="0" y="6" text-anchor="middle" font-family="'Trebuchet MS',sans-serif" font-size="12" fill="#aaa">$—</text>
       <g id="seat-8-card-0" transform="translate(-28,-85)" filter="url(#cardShadow)"></g>
@@ -1108,7 +1150,7 @@
   <!-- ── Right column: status + active panel ── -->
   <div id="right-col">
 
-  <div id="status-msg">Loading WASM…</div>
+  <div id="status-msg" aria-live="polite"><span class="loading-spinner" aria-hidden="true"></span>Loading WASM…</div>
 
   <!-- ── Action panel (Play mode) ── -->
   <div id="action-panel">
@@ -1119,9 +1161,9 @@
     </div>
     <div id="bet-controls">
       <label for="bet-slider">Bet: $</label>
-      <input type="range" id="bet-slider" min="0" max="10000" step="50" value="0">
+      <input type="range" id="bet-slider" min="0" max="10000" step="50" value="0" aria-label="Bet amount">
       <div class="bet-row">
-        <input type="number" id="bet-input" min="0" max="10000" value="0">
+        <input type="number" id="bet-input" min="0" max="10000" value="0" aria-label="Bet amount in chips">
         <button id="bet-confirm">Confirm</button>
       </div>
     </div>
@@ -1924,9 +1966,8 @@
       const rank = cardStr.slice(0, -1);
       const rankLabel = rank === 'T' ? '10' : rank;
       const suitChar = { s: '\u2660', h: '\u2665', d: '\u2666', c: '\u2663' }[suit] ?? '?';
-      const isRed = suit === 'h' || suit === 'd';
       const div = document.createElement('div');
-      div.className = 'card-display' + (isRed ? ' red' : '');
+      div.className = 'card-display suit-' + suit;
       const rankSpan = document.createElement('span');
       rankSpan.className = 'cd-rank';
       rankSpan.textContent = rankLabel;
@@ -1986,7 +2027,7 @@
       const suitChar = cardStr[1];
       const rankLabel = rankChar === 'T' ? '10' : rankChar;
       const suitId = { s: 'spade', h: 'heart', d: 'diamond', c: 'club' }[suitChar] ?? 'spade';
-      const fill = (suitChar === 'h' || suitChar === 'd') ? '#cc1111' : '#222';
+      const fill = { s: '#1a1a1a', h: '#cc1111', d: '#1a6bbf', c: '#0c8a3a' }[suitChar] ?? '#1a1a1a';
 
       const rect = document.createElementNS(SVG_NS, 'rect');
       rect.setAttribute('width', '44');
@@ -2106,7 +2147,7 @@
       const input = document.getElementById('bet-input');
       slider.min = minBet;
       slider.max = maxBet;
-      slider.step = Math.max(1, Math.floor((maxBet - minBet) / 100));
+      slider.step = Math.max(10, Math.floor((maxBet - minBet) / 50));
       slider.value = minBet;
       input.min = minBet;
       input.max = maxBet;
