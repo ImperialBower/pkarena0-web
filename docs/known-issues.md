@@ -63,32 +63,80 @@ Confirming evidence:
 - The PWA manifest (`www/manifest.json`) does not change this — adding
   a manifest does not exempt a page from tab eviction.
 
-### Fix direction
+### State surface
 
-Two complementary pieces, both straightforward:
+For anyone working on the fix, the live state is held in nine
+`thread_local!` cells declared at `src/lib.rs:40–55`:
 
-1. **Snapshot on backgrounding.** Add a `visibilitychange` handler that
-   calls the existing `get_session_yaml()` export when the document
-   becomes hidden, and writes the result to `localStorage` (or
-   IndexedDB if it's too large for the 5 MB localStorage budget).
-   `pagehide` is the safer mobile-Safari choice — `visibilitychange`
-   doesn't always fire before iOS evicts a tab.
+| Cell | Type | What it holds |
+|---|---|---|
+| `SESSION` | `Option<PokerSession>` | The live game (table, players, current hand, street, betting) |
+| `BOTS` | `Vec<BotProfile>` | The 8 bot profiles drawn at session start |
+| `RNG` | `SmallRng` | Seeded RNG used for shuffling and bot decisions |
+| `PHASE` | `SessionPhase` | One of `Uninitialized` / `BotsActing` / `WaitingForHuman` / `HandComplete` / `SessionOver` |
+| `HAND_START_CHIPS` | `Vec<(u8, usize)>` | Chip counts before blinds for the current hand |
+| `COLLECTION` | `HandCollection` | Completed hand histories — exported by `get_session_yaml` |
+| `LAST_ERROR` | `Option<String>` | One-shot error message for the UI |
+| `LAST_HAND_RESULT` | `Option<Vec<PotResult>>` | One-shot showdown summary |
+| `IS_ALL_BOT` | `bool` | Arena-mode flag |
 
-2. **Restore on init.** Add a Rust export — call it
-   `restore_from_yaml(yaml: &str) -> Result<String, JsValue>` — that
-   parses a previously-exported session YAML and rehydrates the
-   `thread_local!` state. On page load, before calling `init_game`,
-   check `localStorage` for a snapshot; if present and the schema
-   version matches, restore from it instead of starting a new game.
+**Important:** `get_session_yaml()` (`src/lib.rs:461-467`) serializes
+*only* `COLLECTION` — i.e. the completed hand histories. It does **not**
+capture `SESSION`, `BOTS`, `RNG`, `PHASE`, or any in-progress hand. So
+the existing YAML export is not a snapshot of the live game; it's the
+post-hand history file. Any fix that wants to preserve the live game
+needs new serialization machinery.
 
-Half the serialization plumbing already exists (`get_session_yaml` is
-the YAML export feature). The new work is the inverse parser on the
-Rust side and the lifecycle wiring on the JS side.
+`PokerSession`, `BotProfile`, and `HandCollection` come from the
+external `pkcore` crate. Whether they implement
+`serde::Serialize`/`Deserialize` is an open question — answering it is
+the first step of any implementation effort here.
 
-The BFCache path (`pageshow` event with `event.persisted === true`)
-needs no work — when the browser keeps the page in memory and restores
-it cheaply, the WASM module's state is preserved automatically. The
-defect only matters for the full-reload-after-eviction path.
+### Open question: scope of the fix
+
+The fix shape depends on what the player should see when they return.
+Three candidate scopes, in increasing fidelity:
+
+**A. Continue the exact in-progress hand.** Same board, same bot
+actions so far, same hole cards, same turn order. Highest fidelity.
+Requires full `PokerSession` snapshot+restore — almost certainly
+requires upstream changes to `pkcore` so that `PokerSession`,
+`BotProfile`, and the bot RNG state implement `Serialize` /
+`Deserialize`. Schema versioning becomes a real concern because the
+snapshot becomes tightly coupled to internal pkcore types.
+
+**B. Restore the session, deal a fresh hand.** Persist chip stacks,
+bot lineup (names + profile selection), cumulative PnL, hand count, and
+the completed hand history (`COLLECTION`). On restore, rebuild the
+table with the saved stacks and start a new hand. The player loses the
+mid-flight hand but keeps everything else. Implementable inside this
+repo without upstream pkcore changes — define a new
+`SessionSnapshot` type in `src/lib.rs` that holds only the
+serializable fields, expose `get_snapshot_json()` and
+`restore_from_snapshot(json: &str)` exports.
+
+**C. Same as B, with a "Welcome back" toast** acknowledging that the
+in-progress hand was lost. Smallest UX delta from B.
+
+Independent of which scope is chosen, the lifecycle wiring is the
+same:
+
+- **Snapshot trigger.** `pagehide` is the safer mobile-Safari choice
+  than `visibilitychange` — `visibilitychange` doesn't always fire
+  before iOS evicts a tab. Belt-and-suspenders: also snapshot after
+  every completed hand, so eviction without a clean backgrounding
+  signal still recovers the last finished state.
+- **Storage.** `localStorage` is fine for B (a `SessionSnapshot` JSON
+  blob fits comfortably in the 5 MB budget). For A, the snapshot may
+  grow with hand history and want IndexedDB.
+- **Restore on init.** On page load, before calling `init_game`, check
+  storage for a snapshot. If present and the schema version matches,
+  restore. Otherwise fall through to the existing fresh-start path.
+- **BFCache.** The BFCache path (`pageshow` event with
+  `event.persisted === true`) needs no work — when the browser keeps
+  the page in memory and restores it cheaply, the WASM module's state
+  is preserved automatically. The defect only matters for the
+  full-reload-after-eviction path.
 
 ### Severity
 
@@ -100,3 +148,18 @@ defect only matters for the full-reload-after-eviction path.
   is mostly only reachable via manual reload.
 - **No data corruption.** The reset is clean — there's no inconsistent
   state, just lost progress.
+
+### Status
+
+**Deferred 2026-04-25.** Owner's preference is option A (full
+in-progress hand preservation), but this is parked for a later
+session — likely depends on upstream `pkcore` changes that aren't
+in scope right now.
+
+Before picking this back up, the first concrete step is to check
+whether `pkcore::casino::session::PokerSession` and
+`pkcore::bot::profile::BotProfile` already implement
+`serde::Serialize`/`Deserialize` (or could be made to without
+significant work). The answer determines whether option A is a
+reasonable single-repo project or a multi-repo coordination effort,
+and that in turn decides whether to commit to A or fall back to B/C.
