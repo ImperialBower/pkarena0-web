@@ -1,4 +1,4 @@
-.PHONY: help build serve kill build-release clean install-playwright test test-ui test-yaml ayce default
+.PHONY: help build serve kill build-release clean install-playwright test test-ui ayce default
 
 # Default target
 default: ayce
@@ -14,7 +14,6 @@ help:
 	@echo "  install-playwright  npm install + playwright install chromium"
 	@echo "  test                dev build + playwright headless tests"
 	@echo "  test-ui             dev build + playwright interactive UI"
-	@echo "  test-yaml           browser download test + pkcore YAML validation"
 
 build:
 	wasm-pack build --target web --out-dir www/pkg
@@ -42,10 +41,6 @@ test: build
 
 test-ui: build
 	npx playwright test --ui
-
-test-yaml: build
-	npx playwright test tests/yaml-download.spec.ts
-	cargo run --bin validate-yaml -- tests/fixtures/session.yaml
 
 # All You Can Eat - clean, build, and test
 ayce: clean build test

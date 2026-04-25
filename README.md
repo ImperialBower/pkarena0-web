@@ -27,7 +27,7 @@ JSON back — no state is passed back to Rust from the browser.
 
 ## Prerequisites
 
-- [Rust](https://rustup.rs/) (stable, ≥ 1.91.0) with the `wasm32-unknown-unknown` target:
+- [Rust](https://rustup.rs/) (stable, ≥ 1.94.1) with the `wasm32-unknown-unknown` target:
 
   ```
   rustup target add wasm32-unknown-unknown
@@ -95,6 +95,17 @@ npx playwright test --ui
 - The session ends when fewer than two players have chips.
 - Use the **Export YAML** button to download a hand history of the entire
   session.
+
+---
+
+## Audio (experimental)
+
+A Phase 1 audio layer ships in `www/audio/` that narrates each game action.
+The voice toggle in the settings panel falls back to the browser's
+`SpeechSynthesis` engine — pre-recorded clips under `www/audio/voice/` are
+not yet bundled. See [`docs/audio-integration.md`](docs/audio-integration.md)
+and [`docs/voice-script.md`](docs/voice-script.md) for the design and the
+clip script.
 
 ---
 
