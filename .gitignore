@@ -25,3 +25,4 @@ playwright-report/
 node_modules/
 Cargo.lock
 tests/fixtures/
+.claude/

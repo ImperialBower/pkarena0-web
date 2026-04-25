@@ -10,10 +10,6 @@ license = "GPL-3.0-or-later"
 [lib]
 crate-type = ["cdylib"]
 
-[[bin]]
-name = "validate-yaml"
-path = "src/bin/validate_yaml.rs"
-
 [dependencies]
 pkcore = { version = "0.0.50", features = ["bot-profiles", "hand-histories"] }
 wasm-bindgen = "0.2"
