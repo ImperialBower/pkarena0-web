@@ -7,21 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-### Fixed
-- `cargo check`/`cargo build` no longer fail on a missing `validate-yaml`
-  binary stanza in `Cargo.toml`. The corresponding `make test-yaml` target
-  has been removed until the validator is reinstated.
-- README now lists the same minimum Rust toolchain as `Cargo.toml`
-  (`1.94.1`).
-
-### Added
-- `CHANGELOG.md` (this file).
-- README "Audio (experimental)" section pointing at the Phase 1 docs.
-
-## [0.1.0] — TBD
+## [0.1.0] — 2026-04-25
 
 First tagged 0.1.x release. Summarizes everything shipped during the 0.0.x
-prototype phase.
+prototype phase, plus the cleanup that unblocked the bump.
 
 ### Added
 - Single-player No-Limit Hold'em against eight bots, served as a static
@@ -40,6 +29,10 @@ prototype phase.
 - YAML hand-history export via the **Export YAML** button.
 - Playwright end-to-end test suite (game, UI, YAML download) running on
   every PR via GitHub Actions.
+- `CHANGELOG.md` (this file).
+- README "Audio (experimental)" section pointing at the Phase 1 docs.
+- `Cargo.lock` is now tracked, pinning the dependency graph for reproducible
+  release builds and stable CI cache keys.
 
 ### Changed
 - Bot pool upgraded for stronger play (#6).
@@ -56,3 +49,8 @@ prototype phase.
 - Blinds wiring during the human Play loop.
 - Chrome `SpeechSynthesis.cancel()` regression: removed the cancel call
   from `voice.cancel()` and the test handler; added a 50 ms TTS debounce.
+- `cargo check`/`cargo build` no longer fail on a missing `validate-yaml`
+  binary stanza in `Cargo.toml`. The corresponding `make test-yaml` target
+  has been removed until the validator is reinstated.
+- README now lists the same minimum Rust toolchain as `Cargo.toml`
+  (`1.94.1`).
