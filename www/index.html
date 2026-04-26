@@ -44,6 +44,8 @@
     }
     #score-bar strong { color: #f0d060; }
     #sc-version { color: #aaa; }
+    #sc-pnl.positive { color: #44dd66; }
+    #sc-pnl.negative { color: #ff6666; }
 
     /* ── Status message ── */
     #status-msg {
@@ -728,9 +730,9 @@
 
   <div id="score-bar">
     <a id="sc-version" href="https://github.com/ImperialBower/pkarena0-web" target="_blank" rel="noopener"></a>
-    <span>Hand: <strong id="sc-hand">—</strong></span>
-    <span class="play-only">Blinds: <strong id="sc-blinds">—</strong></span>
+    <span>Hand: <strong id="sc-hand">—</strong> <span class="play-only">(<strong id="sc-blinds">—</strong>)</span></span>
     <span class="play-only">Chips: <strong id="sc-chips">—</strong></span>
+    <span class="play-only">P&amp;L: <strong id="sc-pnl">+$0</strong></span>
     <button id="settings-btn" title="Settings">⚙</button>
   </div>
 
@@ -1217,6 +1219,9 @@
         </div>
         <button id="audio-test-btn" style="font-size:11px;padding:6px 10px;background:#1a2a3e;border:1px solid #4a90d9;color:#7ab8f5;border-radius:4px;cursor:pointer;">Test voice</button>
         <div id="audio-status" style="font-size:11px;color:#669;min-height:14px;"></div>
+        <div style="margin-top:12px;border-top:1px solid #333;padding-top:12px;">
+          <button id="reset-pnl-btn" style="font-size:11px;padding:6px 10px;background:#3e1a1a;border:1px solid #d94a4a;color:#f57a7a;border-radius:4px;cursor:pointer;">Reset lifetime P&amp;L</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1269,6 +1274,34 @@
     // restore them after WASM state refreshes wipe out prior SVG updates.
     const lastActions = {};
     let betState = null;          // game state captured when bet controls open
+
+    // ── Lifetime P&L ──────────────────────────────────────────────────────────
+    const STARTING_CHIPS = 10_000;
+    let lifetimePnl = parseInt(localStorage.getItem('lifetimePnl') ?? '0', 10) || 0;
+    let currentGameChips = STARTING_CHIPS;
+    let pendingGameCommitted = false;
+
+    function commitCurrentGameToLifetime(chipsAtCommit = currentGameChips) {
+      if (pendingGameCommitted) return;
+      lifetimePnl += chipsAtCommit - STARTING_CHIPS;
+      localStorage.setItem('lifetimePnl', String(lifetimePnl));
+      pendingGameCommitted = true;
+    }
+
+    function beginNewGame() {
+      commitCurrentGameToLifetime();
+      pendingGameCommitted = false;
+      currentGameChips = STARTING_CHIPS;
+    }
+
+    function renderPnlSlot(chipsForCalc = currentGameChips) {
+      const liveDelta = pendingGameCommitted ? 0 : (chipsForCalc - STARTING_CHIPS);
+      const total = lifetimePnl + liveDelta;
+      const el = document.getElementById('sc-pnl');
+      el.textContent = (total >= 0 ? '+' : '') + '$' + total.toLocaleString();
+      el.className = total > 0 ? 'positive' : total < 0 ? 'negative' : '';
+    }
+    renderPnlSlot(STARTING_CHIPS);
 
     // ── Action callout helpers ────────────────────────────────────────────────
 
@@ -1345,6 +1378,7 @@
       document.getElementById('sc-hand').textContent   = '—';
       document.getElementById('sc-blinds').textContent = '—';
       document.getElementById('sc-chips').textContent  = '—';
+      renderPnlSlot(STARTING_CHIPS);
       setStatus('');
       hideBetControls();
     }
@@ -1653,6 +1687,7 @@
 
     // ── New game ──────────────────────────────────────────────────────────────
     function startNewGame() {
+      beginNewGame();
       ensureVoice();
       hideBetControls();
       clearAllActions();
@@ -1718,10 +1753,12 @@
       if (!state || state.phase === 'Error') return;
 
       const chips = state.hero?.chips ?? 0;
+      currentGameChips = chips;
       document.getElementById('sc-hand').textContent = state.hand_number ?? '—';
       document.getElementById('sc-blinds').textContent =
         state.small_blind ? `${state.small_blind}/${state.big_blind}` : '—';
       document.getElementById('sc-chips').textContent = '$' + chips.toLocaleString();
+      renderPnlSlot();
 
       document.getElementById('pot-amount').textContent =
         'POT: $' + (state.pot ?? 0).toLocaleString();
@@ -1750,6 +1787,8 @@
       const chips = state.hero?.chips ?? 0;
 
       if (state.phase === 'SessionOver') {
+        commitCurrentGameToLifetime(chips);
+        renderPnlSlot();
         setStatus('Session over! Final chips: $' + chips.toLocaleString());
         renderButtons([{ label: 'New Game', cls: 'primary', action: 'new-game' }]);
         appendHandLog('Session ended. Final chips: $' + chips.toLocaleString());
@@ -1774,6 +1813,8 @@
         // rather than $0 when the hero was all-in when the hand ended.
         {
           document.getElementById('sc-chips').textContent = '$' + heroChipsAfter.toLocaleString();
+          currentGameChips = heroChipsAfter;
+          renderPnlSlot();
           setText('seat-0-chips', '$' + heroChipsAfter.toLocaleString());
           for (const p of nextState.players ?? []) {
             setText('seat-' + p.seat + '-chips', '$' + (p.chips ?? 0).toLocaleString());
@@ -2090,6 +2131,7 @@
 
         if (b.action === 'new-game') {
           btn.addEventListener('click', () => {
+            beginNewGame();
             hideBetControls();
             clearAllActions();
             hideHandResult();
@@ -2311,6 +2353,13 @@
       audioEnabled = audioToggleEl.checked;
       localStorage.setItem('audioEnabled', audioEnabled);
       if (!audioEnabled) voice?.cancel();
+    });
+
+    document.getElementById('reset-pnl-btn').addEventListener('click', () => {
+      if (!confirm('Reset lifetime P&L to $0? This cannot be undone.')) return;
+      lifetimePnl = 0;
+      localStorage.setItem('lifetimePnl', '0');
+      renderPnlSlot();
     });
 
     const audioStatusEl = document.getElementById('audio-status');
