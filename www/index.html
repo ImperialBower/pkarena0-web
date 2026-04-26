@@ -46,6 +46,19 @@
     #sc-version { color: #aaa; }
     #sc-pnl.positive { color: #44dd66; }
     #sc-pnl.negative { color: #ff6666; }
+    #new-table-btn {
+      align-self: flex-start;
+      font-size: 11px;
+      line-height: 1.2;
+      padding: 2px 10px;
+      background: #1a2a3e;
+      border: 1px solid #4a7bb9;
+      color: #aad4ff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #new-table-btn:hover:not(:disabled) { background: #243954; }
+    #new-table-btn:disabled { opacity: 0.35; cursor: default; }
 
     /* ── Status message ── */
     #status-msg {
@@ -373,17 +386,18 @@
     }
     .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
     #settings-btn {
+      align-self: flex-start;
       margin-left: auto;
       background: none;
       border: none;
       color: #669;
-      font-size: 18px;
+      font-size: 16px;
+      line-height: 1;
       cursor: pointer;
-      padding: 4px 8px;
+      padding: 0 8px;
       min-width: 44px;
-      min-height: 44px;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       border-radius: 4px;
     }
@@ -733,6 +747,7 @@
     <span>Hand: <strong id="sc-hand">—</strong> <span class="play-only">(<strong id="sc-blinds">—</strong>)</span></span>
     <span class="play-only">Chips: <strong id="sc-chips">—</strong></span>
     <span class="play-only">P&amp;L: <strong id="sc-pnl">+$0</strong></span>
+    <button id="new-table-btn" class="play-only" title="Walk away to a new table with new bots" disabled>New Table</button>
     <button id="settings-btn" title="Settings">⚙</button>
   </div>
 
@@ -1303,6 +1318,28 @@
     }
     renderPnlSlot(STARTING_CHIPS);
 
+    // States that mean the player is NOT actively contesting the current hand.
+    // Mirrors the Rust `is_in_hand()` helper (src/lib.rs:860) inverted.
+    const HERO_NOT_IN_HAND_STATES = new Set(['Fold', 'Ready', 'Out']);
+
+    // Enables the New Table button when it's safe to walk away — i.e. the
+    // player is not actively in a hand. Called everywhere renderPnlSlot is.
+    function updateNewTableButton(state) {
+      const btn = document.getElementById('new-table-btn');
+      if (!btn) return;
+      const phase = state?.phase;
+      const heroState = state?.hero?.state;
+      const heroNotInHand = !heroState || HERO_NOT_IN_HAND_STATES.has(heroState);
+      // Phase override: HandComplete = hand resolved (cards revealed, pots paid),
+      // safe even if hero.state is still 'Showdown'. Uninitialized/SessionOver/Error
+      // = no live hand to abandon.
+      const phaseAllows = phase === 'Uninitialized'
+                       || phase === 'HandComplete'
+                       || phase === 'SessionOver'
+                       || phase === 'Error';
+      btn.disabled = !(heroNotInHand || phaseAllows);
+    }
+
     // ── Action callout helpers ────────────────────────────────────────────────
 
     // Returns background fill + text color for a given action label string.
@@ -1379,6 +1416,7 @@
       document.getElementById('sc-blinds').textContent = '—';
       document.getElementById('sc-chips').textContent  = '—';
       renderPnlSlot(STARTING_CHIPS);
+      updateNewTableButton(null);
       setStatus('');
       hideBetControls();
     }
@@ -1759,6 +1797,7 @@
         state.small_blind ? `${state.small_blind}/${state.big_blind}` : '—';
       document.getElementById('sc-chips').textContent = '$' + chips.toLocaleString();
       renderPnlSlot();
+      updateNewTableButton(state);
 
       document.getElementById('pot-amount').textContent =
         'POT: $' + (state.pot ?? 0).toLocaleString();
@@ -1780,6 +1819,7 @@
     function renderState(state) {
       if (!state || state.phase === 'Error') {
         setStatus('Error: ' + (state?.error ?? 'unknown'));
+        updateNewTableButton(state);
         return;
       }
 
@@ -1789,6 +1829,7 @@
       if (state.phase === 'SessionOver') {
         commitCurrentGameToLifetime(chips);
         renderPnlSlot();
+        updateNewTableButton(state);
         setStatus('Session over! Final chips: $' + chips.toLocaleString());
         renderButtons([{ label: 'New Game', cls: 'primary', action: 'new-game' }]);
         appendHandLog('Session ended. Final chips: $' + chips.toLocaleString());
@@ -1815,6 +1856,9 @@
           document.getElementById('sc-chips').textContent = '$' + heroChipsAfter.toLocaleString();
           currentGameChips = heroChipsAfter;
           renderPnlSlot();
+          // The user perceives this moment as "between hands" — keep button enabled
+          // even though WASM has internally advanced phase to BotsActing.
+          updateNewTableButton({ phase: 'HandComplete' });
           setText('seat-0-chips', '$' + heroChipsAfter.toLocaleString());
           for (const p of nextState.players ?? []) {
             setText('seat-' + p.seat + '-chips', '$' + (p.chips ?? 0).toLocaleString());
@@ -2360,6 +2404,27 @@
       lifetimePnl = 0;
       localStorage.setItem('lifetimePnl', '0');
       renderPnlSlot();
+    });
+
+    document.getElementById('new-table-btn').addEventListener('click', () => {
+      const chips = currentGameChips;
+      if (chips > STARTING_CHIPS) {
+        const profit = chips - STARTING_CHIPS;
+        if (!confirm('Walk away with $' + profit.toLocaleString() + ' profit? Your chips will be banked to lifetime P&L.')) return;
+      }
+      // Mirrors the inline 'new-game' action handler in renderButtons().
+      beginNewGame();
+      hideBetControls();
+      clearAllActions();
+      hideHandResult();
+      playBlindLevel = 0;
+      gameSeed = Math.random();
+      const s = JSON.parse(_playMod.init_game(gameSeed));
+      updateUrlState('play', 1);
+      renderTableVisuals(s);
+      setStatus('New table — fresh bots dealing in…');
+      enableCurrentGameButton();
+      stepBotsUntilHuman();
     });
 
     const audioStatusEl = document.getElementById('audio-status');
