@@ -44,8 +44,6 @@
     }
     #score-bar strong { color: #f0d060; }
     #sc-version { color: #aaa; }
-    #sc-pnl.positive { color: #44dd66; }
-    #sc-pnl.negative { color: #ff6666; }
 
     /* ── Status message ── */
     #status-msg {
@@ -733,7 +731,6 @@
     <span>Hand: <strong id="sc-hand">—</strong></span>
     <span class="play-only">Blinds: <strong id="sc-blinds">—</strong></span>
     <span class="play-only">Chips: <strong id="sc-chips">—</strong></span>
-    <span class="play-only">P&amp;L: <strong id="sc-pnl">—</strong></span>
     <button id="settings-btn" title="Settings">⚙</button>
   </div>
 
@@ -1248,7 +1245,6 @@
     let arenaAdapter = null;
     let audioEnabled = localStorage.getItem('audioEnabled') === 'true';
     let playBlindLevel  = 0;
-    const STARTING_CHIPS = 10_000;
     const BOT_EMOJIS = {
       'gto':               '🤖',
       'tight_passive':     '🐢',
@@ -1273,7 +1269,6 @@
     // restore them after WASM state refreshes wipe out prior SVG updates.
     const lastActions = {};
     let betState = null;          // game state captured when bet controls open
-    let handStartHeroChips = STARTING_CHIPS; // hero's chips at the start of the current hand
 
     // ── Action callout helpers ────────────────────────────────────────────────
 
@@ -1350,9 +1345,6 @@
       document.getElementById('sc-hand').textContent   = '—';
       document.getElementById('sc-blinds').textContent = '—';
       document.getElementById('sc-chips').textContent  = '—';
-      const pnl = document.getElementById('sc-pnl');
-      pnl.textContent = '—';
-      pnl.className   = '';
       setStatus('');
       hideBetControls();
     }
@@ -1533,7 +1525,6 @@
         activateTab('play');                                     // UI only — WASM not ready yet
         playBlindLevel = 0;
         const state = JSON.parse(_playMod.init_game(gameSeed)); // init WASM first
-        handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
         renderTableVisuals(state);
         setStatus('Resumed — same opponents, starting from hand 1.');
         enableCurrentGameButton();
@@ -1669,7 +1660,6 @@
       playBlindLevel = 0;
       gameSeed = Math.random();
       const state = JSON.parse(_playMod.init_game(gameSeed));
-      handStartHeroChips = state.hero?.chips ?? STARTING_CHIPS;
       updateUrlState('play', 1);
       renderTableVisuals(state);
       setStatus('Dealing…');
@@ -1728,14 +1718,10 @@
       if (!state || state.phase === 'Error') return;
 
       const chips = state.hero?.chips ?? 0;
-      const pnl = chips - STARTING_CHIPS;
       document.getElementById('sc-hand').textContent = state.hand_number ?? '—';
       document.getElementById('sc-blinds').textContent =
         state.small_blind ? `${state.small_blind}/${state.big_blind}` : '—';
       document.getElementById('sc-chips').textContent = '$' + chips.toLocaleString();
-      const pnlEl = document.getElementById('sc-pnl');
-      pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toLocaleString();
-      pnlEl.className = pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : '';
 
       document.getElementById('pot-amount').textContent =
         'POT: $' + (state.pot ?? 0).toLocaleString();
@@ -1787,11 +1773,7 @@
         // Immediately refresh chip labels so the score bar shows settled winnings
         // rather than $0 when the hero was all-in when the hand ended.
         {
-          const pnl = heroChipsAfter - STARTING_CHIPS;
           document.getElementById('sc-chips').textContent = '$' + heroChipsAfter.toLocaleString();
-          const pnlEl = document.getElementById('sc-pnl');
-          pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toLocaleString();
-          pnlEl.className = pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : '';
           setText('seat-0-chips', '$' + heroChipsAfter.toLocaleString());
           for (const p of nextState.players ?? []) {
             setText('seat-' + p.seat + '-chips', '$' + (p.chips ?? 0).toLocaleString());
@@ -1830,7 +1812,6 @@
           if (document.body.dataset.tab !== 'play') return; // tab was switched away
           hideHandResult();
           clearAllActions();
-          handStartHeroChips = heroChipsAfter;
           if (nextState.phase === 'SessionOver') { renderState(nextState); return; }
           if (nextState.phase === 'Error') {
             setStatus('Engine error: ' + (nextState.error ?? 'unknown'));
@@ -2115,7 +2096,6 @@
             playBlindLevel = 0;
             gameSeed = Math.random();
             const s = JSON.parse(_playMod.init_game(gameSeed));
-            handStartHeroChips = s.hero?.chips ?? STARTING_CHIPS;
             updateUrlState('play', 1);
             renderTableVisuals(s);
             setStatus('Dealing…');

@@ -24,15 +24,14 @@ pressure (e.g. after browsing other apps in between).
 
 1. Open <https://imperialbower.github.io/pkarena0-web/> on an iPhone or
    Android device.
-2. Play through a few hands so the score bar shows non-zero PnL and the
-   hand log has entries.
+2. Play through a few hands so the score bar shows a non-zero hand
+   count and the hand log has entries.
 3. Switch to another app (or several) and use them for a minute or two
    to put the browser tab under memory pressure. Locking the screen and
    waiting also works.
 4. Return to the browser and the pkarena0 tab.
-5. Observe: the page has reloaded from scratch. PnL is `$0`, hand count
-   is `0`, the table is freshly seated, and any in-progress hand is
-   lost.
+5. Observe: the page has reloaded from scratch. Hand count is `0`, the
+   table is freshly seated, and any in-progress hand is lost.
 
 Desktop browsers reproduce this only rarely — they generally keep
 focused tabs in memory. Forcing a full reload (Cmd-R) on desktop also
@@ -106,8 +105,8 @@ requires upstream changes to `pkcore` so that `PokerSession`,
 snapshot becomes tightly coupled to internal pkcore types.
 
 **B. Restore the session, deal a fresh hand.** Persist chip stacks,
-bot lineup (names + profile selection), cumulative PnL, hand count, and
-the completed hand history (`COLLECTION`). On restore, rebuild the
+bot lineup (names + profile selection), hand count, and the completed
+hand history (`COLLECTION`). On restore, rebuild the
 table with the saved stacks and start a new hand. The player loses the
 mid-flight hand but keeps everything else. Implementable inside this
 repo without upstream pkcore changes — define a new

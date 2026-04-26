@@ -61,8 +61,8 @@ unforgettable," it doesn't yet have a visual point of view.
    explicit `color-scheme: dark`, semantic `<details>` for the hand log.
 
 5. **Coherent palette.** Three-hue system (deep navy `#0d0d1a`, blue
-   accent `#4a90d9`, warm gold `#c8a84e` / `#f0d060`) with status
-   semantics for PnL. No inconsistencies, no random one-off colors.
+   accent `#4a90d9`, warm gold `#c8a84e` / `#f0d060`). No
+   inconsistencies, no random one-off colors.
 
 ## What doesn't — the AI-default tells
 
