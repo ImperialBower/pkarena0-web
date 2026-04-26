@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- Lifetime P&L tracker in the Play-tab score bar. Persists across reloads
+  via `localStorage`; commits each completed game's net delta on
+  `SessionOver` or **New Game**. Reset button in Settings (with
+  confirmation). Designed in `docs/FEATURE_pnl.md`.
+- Score bar now shows hand and blinds together as `Hand: N (sb/bb)`,
+  reclaiming horizontal space for the new P&L slot.
+
 ### Removed
 - Score-bar P&L indicator (Play mode). It duplicated information already
   visible in the chip count and had no role in a single-session,
