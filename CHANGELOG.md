@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Removed
+- Score-bar P&L indicator (Play mode). It duplicated information already
+  visible in the chip count and had no role in a single-session,
+  no-stakes app.
+
 ## [0.1.0] — 2026-04-25
 
 First tagged 0.1.x release. Summarizes everything shipped during the 0.0.x
