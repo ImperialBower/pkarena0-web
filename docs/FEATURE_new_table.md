@@ -16,18 +16,21 @@ A new button appears in the score bar, after the P&L slot:
 Hand: 4 (50/100)   Chips: $10,500   P&L: +$300   [ New Table ]   ⚙
 ```
 
-The button is **disabled (greyed out) whenever the player is actively in the current hand** — meaning they're contesting a pot they haven't folded out of yet. Concretely, disabled whenever `hero.state` is one of: `YetToAct`, `Check`, `Call`, `Blind`, `Bet`, `Raise`, `ReRaise`, `AllIn`, or `Showdown` mid-hand.
+The button is **disabled (greyed out) whenever the player is actively in the current hand with chips still on their stack** — meaning they're contesting a pot they haven't folded out of yet *and* they still have money to defend. Concretely, disabled whenever `hero.state` is one of `YetToAct`, `Check`, `Call`, `Blind`, `Bet`, `Raise`, `ReRaise`, or `Showdown` mid-hand, **and** `hero.chips > 0`.
 
-It becomes **enabled** the moment the player is no longer contesting a hand: after they fold, between hands (`HandComplete`), at session end (`SessionOver`), or before the first hand has been dealt.
+It becomes **enabled** the moment any of these is true: the player is no longer contesting a hand (`Fold`, `HandComplete`, `SessionOver`, `Uninitialized`), **or the player has zero chips left on their stack** (all-in or busted).
 
-| `hero.state` / `phase` | Button |
+| `hero.state` / `phase` / `hero.chips` | Button |
 |---|---|
-| `phase = WaitingForHuman` (player's turn) | Disabled |
-| `phase = BotsActing`, `hero.state = Call`/`Bet`/`AllIn`/etc. | Disabled |
+| `phase = WaitingForHuman`, `chips > 0` | Disabled |
+| `phase = BotsActing`, `hero.state = Call`/`Bet`/etc., `chips > 0` | Disabled |
 | `phase = BotsActing`, `hero.state = Fold` (folded earlier) | Enabled |
+| `phase = BotsActing`, `hero.state = AllIn` (`chips = 0`) | Enabled (escape hatch) |
 | `phase = HandComplete` (cards revealed, results shown) | Enabled |
 | `phase = SessionOver` | Enabled |
 | `phase = Uninitialized` (cold start) | Enabled |
+
+**Trade-off when walking away while all-in**: clicking New Table commits the *current* `hero.chips` to lifetime P&L. While all-in, that value is `$0` (chips are committed to the pot, not on the stack), so the player banks a full-stack loss for that table even if they would have won the showdown. This is by design — the button's contract is "walk away now with whatever chips you have on the felt," not "wait for the pot to settle." Players who want to see the all-in resolve should let it play out and use New Table at `HandComplete`.
 
 ## Design decisions
 

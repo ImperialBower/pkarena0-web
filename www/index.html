@@ -1337,7 +1337,12 @@
                        || phase === 'HandComplete'
                        || phase === 'SessionOver'
                        || phase === 'Error';
-      btn.disabled = !(heroNotInHand || phaseAllows);
+      // Stack-zero escape hatch: if the player has no chips left (all-in or
+      // busted), let them walk away immediately rather than waiting for the
+      // hand to resolve. Trade-off: walking away while all-in forfeits any
+      // potential pot winnings — the banked stack is whatever shows now ($0).
+      const heroOutOfMoney = (state?.hero?.chips ?? null) === 0;
+      btn.disabled = !(heroNotInHand || phaseAllows || heroOutOfMoney);
     }
 
     // ── Action callout helpers ────────────────────────────────────────────────
