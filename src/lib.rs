@@ -169,15 +169,18 @@ pub fn init_bot_game(rand_seed: f64) -> String {
     build_game_state()
 }
 
-/// Update forced bets between hands. Returns updated GameState JSON.
+/// Update forced bets. If a hand is in progress the change is deferred until
+/// the hand ends — this keeps mid-hand `min_raise()` validation stable and
+/// guarantees the recorded `stakes` match the actual posts in hand history.
+/// Returns updated GameState JSON.
 #[wasm_bindgen]
 pub fn set_blinds(small_blind: f64, big_blind: f64) -> String {
     SESSION.with(|s| {
         if let Some(session) = s.borrow_mut().as_mut() {
-            session.table.forced = ForcedBets::new(
+            session.set_blinds(ForcedBets::new(
                 small_blind as usize,
                 big_blind as usize,
-            );
+            ));
         }
     });
     build_game_state()
@@ -299,7 +302,7 @@ pub fn next_hand() -> String {
             PreEnd {
                 hand_num: session.hand_number as usize,
                 button: table.button,
-                forced: table.forced,
+                forced: session.forced_at_hand_start(),
                 board_str: table
                     .board
                     .iter()
