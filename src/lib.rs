@@ -15,8 +15,13 @@ use pkcore::analysis::name::HandRankName;
 use pkcore::casino::table::winnings::Winnings;
 use pkcore::casino::table_no_cell::{PlayerNoCell, SeatNoCell, SeatsNoCell, TableNoCell};
 use pkcore::card::Card;
-use pkcore::hand_history::{HandCollection, HandHistory};
+use pkcore::cards::Cards;
+use pkcore::games::GamePhase;
+use pkcore::hand_history::{
+    Action as HhAction, ActionType, HandCollection, HandHistory, Outcome,
+};
 use pkcore::suit::Suit;
+use std::str::FromStr;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -421,6 +426,26 @@ pub fn next_hand() -> String {
         if let Some(session) = s.borrow_mut().as_mut() {
             session.eliminate_busted();
             session.table.button_up();
+            // pkcore's TableNoCell::button_up() increments by 1 mod the full
+            // seat array (9), not the next occupied seat.  After busts leave
+            // gaps, determine_small_blind() resolves the button to the first
+            // occupied seat at-or-after that index, so a head-up pair on
+            // seats 0 and 7 ends up with seat 7 paying SB on 7 of every 9
+            // button positions.  Walk the button forward until it lands on
+            // an occupied seat to restore fair blind alternation.
+            let total = session.table.seats.0.len();
+            for _ in 0..total {
+                let idx = session.table.button;
+                let occupied = session
+                    .table
+                    .seats
+                    .get_seat(idx)
+                    .is_some_and(|seat| !seat.is_empty());
+                if occupied {
+                    break;
+                }
+                session.table.button_up();
+            }
         }
     });
 
@@ -467,6 +492,439 @@ pub fn get_session_yaml() -> String {
             .to_yaml()
             .unwrap_or_else(|_| "error: yaml serialization failed\n".to_string())
     })
+}
+
+/// Parse a YAML string (HandCollection or single HandHistory) and return a JSON
+/// summary of each hand suitable for populating the replay viewer's hand picker.
+///
+/// On parse error, returns an `error_state` JSON with the error message.
+#[wasm_bindgen]
+pub fn parse_hand_collection(yaml: &str) -> String {
+    let coll = match parse_collection_or_single(yaml) {
+        Ok(c) => c,
+        Err(e) => return error_state(&format!("YAML parse error: {e}")),
+    };
+    let hands: Vec<HandSummary> = coll
+        .hands
+        .iter()
+        .enumerate()
+        .map(|(idx, h)| {
+            let total_steps = compute_total_steps(h);
+            let button = h.table.button.unwrap_or(0);
+            let hand_id = h.hand.id.clone();
+            let description = format_hand_summary(h);
+            HandSummary {
+                index: idx,
+                hand_id,
+                total_steps,
+                button_seat: button,
+                description,
+            }
+        })
+        .collect();
+    serde_json::to_string(&CollectionSummary { hands })
+        .unwrap_or_else(|_| r#"{"error":"serialize failed"}"#.to_string())
+}
+
+/// Compute a snapshot of the given hand at the given step, returned as JSON.
+///
+/// `step` is clamped into `[0, total_steps - 1]`.  Step 0 is the state right
+/// after blinds are posted; subsequent steps apply each voluntary action and
+/// each street deal in sequence.
+#[wasm_bindgen]
+pub fn replay_snapshot(yaml: &str, hand_index: usize, step: usize) -> String {
+    let coll = match parse_collection_or_single(yaml) {
+        Ok(c) => c,
+        Err(e) => return error_state(&format!("YAML parse error: {e}")),
+    };
+    let Some(hh) = coll.hands.get(hand_index) else {
+        return error_state(&format!("hand index {hand_index} out of range"));
+    };
+    match build_replay_snapshot(hh, step) {
+        Ok(snap) => serde_json::to_string(&snap)
+            .unwrap_or_else(|_| r#"{"error":"serialize failed"}"#.to_string()),
+        Err(e) => error_state(&format!("Replay error: {e}")),
+    }
+}
+
+fn parse_collection_or_single(yaml: &str) -> Result<HandCollection, String> {
+    if let Ok(c) = HandCollection::from_yaml(yaml) {
+        return Ok(c);
+    }
+    match HandHistory::from_yaml(yaml) {
+        Ok(h) => {
+            let mut c = HandCollection::new();
+            c.hands.push(h);
+            Ok(c)
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+fn format_hand_summary(hh: &HandHistory) -> String {
+    let player_count = hh.players.len();
+    let button = hh.table.button.unwrap_or(0);
+    let mut desc = format!("BTN Seat {button}, {player_count} handed");
+
+    let Some(results) = hh.results.as_deref() else { return desc; };
+    let winner = results
+        .iter()
+        .filter(|r| matches!(r.outcome, Outcome::Win | Outcome::Tie))
+        .max_by(|a, b| {
+            a.pot_won
+                .unwrap_or(0.0)
+                .partial_cmp(&b.pot_won.unwrap_or(0.0))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    let Some(w) = winner else { return desc; };
+
+    let winner_name = hh
+        .players
+        .iter()
+        .find(|p| p.seat == w.seat)
+        .map(|p| p.name.clone())
+        .unwrap_or_else(|| format!("Seat {}", w.seat));
+    let verb = if winner_name == "You" { "win" } else { "wins" };
+    let cards = winner_cards_pretty(hh, w.seat);
+    if cards.is_empty() {
+        desc.push_str(&format!(", {winner_name} {verb}"));
+    } else {
+        desc.push_str(&format!(", {winner_name} {verb} with {cards}"));
+    }
+    desc
+}
+
+fn winner_cards_pretty(hh: &HandHistory, seat: u8) -> String {
+    let hole = hh
+        .players
+        .iter()
+        .find(|p| p.seat == seat)
+        .and_then(|p| p.hole_cards.as_deref())
+        .unwrap_or("");
+    let board = hh.board.as_deref().unwrap_or("");
+
+    let combined = match (hole.is_empty(), board.is_empty()) {
+        (true, true) => return String::new(),
+        (false, true) => hole.to_string(),
+        (true, false) => board.to_string(),
+        (false, false) => format!("{hole} {board}"),
+    };
+
+    combined
+        .split_whitespace()
+        .map(card_token_to_unicode)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn card_token_to_unicode(token: &str) -> String {
+    let mut chars = token.chars();
+    let Some(rank) = chars.next() else { return String::new(); };
+    let suit_char = chars.next().unwrap_or(' ');
+    let rank_str = if rank == 'T' { "10".to_string() } else { rank.to_string() };
+    let suit = match suit_char {
+        's' | 'S' | '\u{2660}' => "\u{2660}",
+        'h' | 'H' | '\u{2665}' => "\u{2665}",
+        'd' | 'D' | '\u{2666}' => "\u{2666}",
+        'c' | 'C' | '\u{2663}' => "\u{2663}",
+        _ => "",
+    };
+    format!("{rank_str}{suit}")
+}
+
+fn compute_total_steps(hh: &HandHistory) -> usize {
+    let mut steps = 1; // step 0 = initial state after blinds posted
+    let Some(streets) = &hh.streets else { return steps; };
+    if let Some(pre) = &streets.preflop {
+        steps += pre
+            .actions
+            .iter()
+            .filter(|a| !matches!(a.action, ActionType::Post))
+            .count();
+    }
+    if let Some(flop) = &streets.flop {
+        steps += 1 + flop.actions.len();
+    }
+    if let Some(turn) = &streets.turn {
+        steps += 1 + turn.actions.len();
+    }
+    if let Some(river) = &streets.river {
+        steps += 1 + river.actions.len();
+    }
+    steps
+}
+
+enum ReplayEvent {
+    Action {
+        seat: u8,
+        action: PlayerAction,
+        label: String,
+    },
+    DealFlop(String),
+    DealTurn(String),
+    DealRiver(String),
+}
+
+fn build_event_list(hh: &HandHistory) -> Vec<ReplayEvent> {
+    let mut events = Vec::new();
+    let Some(streets) = &hh.streets else { return events; };
+
+    let push_actions = |events: &mut Vec<ReplayEvent>, actions: &[HhAction]| {
+        for a in actions {
+            if let Some(pa) = action_to_player_action(a) {
+                events.push(ReplayEvent::Action {
+                    seat: a.seat,
+                    action: pa,
+                    label: format_action_label(hh, a),
+                });
+            }
+        }
+    };
+
+    if let Some(pre) = &streets.preflop {
+        push_actions(&mut events, &pre.actions);
+    }
+    if let Some(flop) = &streets.flop {
+        events.push(ReplayEvent::DealFlop(flop.cards.clone()));
+        push_actions(&mut events, &flop.actions);
+    }
+    if let Some(turn) = &streets.turn {
+        events.push(ReplayEvent::DealTurn(turn.card.clone()));
+        push_actions(&mut events, &turn.actions);
+    }
+    if let Some(river) = &streets.river {
+        events.push(ReplayEvent::DealRiver(river.card.clone()));
+        push_actions(&mut events, &river.actions);
+    }
+    events
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn action_to_player_action(a: &HhAction) -> Option<PlayerAction> {
+    match a.action {
+        ActionType::Fold => Some(PlayerAction::Fold),
+        ActionType::Check => Some(PlayerAction::Check),
+        ActionType::Call => Some(PlayerAction::Call),
+        ActionType::Bet => a.amount.map(|n| PlayerAction::Bet(n as usize)),
+        ActionType::Raise => a.amount.map(|n| PlayerAction::Raise(n as usize)),
+        ActionType::AllIn => Some(PlayerAction::AllIn),
+        ActionType::Post => None,
+    }
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn format_action_label(hh: &HandHistory, a: &HhAction) -> String {
+    let name = hh
+        .players
+        .iter()
+        .find(|p| p.seat == a.seat)
+        .map(|p| p.name.clone())
+        .unwrap_or_else(|| format!("Seat {}", a.seat));
+    let amt = a.amount.unwrap_or(0.0) as usize;
+    match a.action {
+        ActionType::Fold => format!("{name} folds"),
+        ActionType::Check => format!("{name} checks"),
+        ActionType::Call => format!("{name} calls ${amt}"),
+        ActionType::Bet => format!("{name} bets ${amt}"),
+        ActionType::Raise => format!("{name} raises to ${amt}"),
+        ActionType::AllIn => format!("{name} goes all-in"),
+        ActionType::Post => format!("{name} posts ${amt}"),
+    }
+}
+
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation
+)]
+fn build_replay_snapshot(hh: &HandHistory, target_step: usize) -> Result<ReplaySnapshot, String> {
+    let sb = hh.table.stakes.small_blind as usize;
+    let bb = hh.table.stakes.big_blind as usize;
+    let button = hh.table.button.unwrap_or(0);
+
+    let max_seat = hh.players.iter().map(|p| p.seat as usize).max().unwrap_or(0);
+    let table_size = max_seat.max(button as usize) + 1;
+    let mut seats_vec: Vec<SeatNoCell> = (0..table_size)
+        .map(|_| SeatNoCell::new(PlayerNoCell::default()))
+        .collect();
+    for p in &hh.players {
+        seats_vec[p.seat as usize] =
+            SeatNoCell::new(PlayerNoCell::new_with_chips(p.name.clone(), p.stack as usize));
+    }
+    let seats = SeatsNoCell::new(seats_vec);
+    let mut table = TableNoCell::nlh_from_seats(seats, ForcedBets::new(sb, bb));
+    table.button = button;
+
+    table.act_forced_bets().map_err(|e| e.to_string())?;
+
+    let hole_entries: Vec<(u8, String)> = hh
+        .players
+        .iter()
+        .filter_map(|p| p.hole_cards.as_ref().map(|h| (p.seat, h.clone())))
+        .collect();
+    let hole_refs: Vec<(u8, &str)> = hole_entries
+        .iter()
+        .map(|(s, h)| (*s, h.as_str()))
+        .collect();
+    table.inject_hole_cards(&hole_refs).map_err(|e| e.to_string())?;
+
+    let events = build_event_list(hh);
+    let total_steps = events.len() + 1;
+    let target = target_step.min(events.len());
+
+    let mut last_label = "Hand begins".to_string();
+    let mut current_seat: Option<u8> = None;
+
+    for event in events.iter().take(target) {
+        match event {
+            ReplayEvent::Action { seat, action, label } => {
+                table
+                    .apply_action(*seat, action.clone())
+                    .map_err(|e| e.to_string())?;
+                last_label = label.clone();
+                current_seat = Some(*seat);
+            }
+            ReplayEvent::DealFlop(cards) => {
+                table.bring_it_in().map_err(|e| e.to_string())?;
+                table.board = Cards::from_str(cards).map_err(|e| e.to_string())?;
+                table.phase = GamePhase::DealFlop;
+                last_label = format!("Flop dealt: {cards}");
+                current_seat = None;
+            }
+            ReplayEvent::DealTurn(card) => {
+                table.bring_it_in().map_err(|e| e.to_string())?;
+                let c = Card::from_str(card).map_err(|e| e.to_string())?;
+                table.board.insert(c);
+                table.phase = GamePhase::DealTurn;
+                last_label = format!("Turn dealt: {card}");
+                current_seat = None;
+            }
+            ReplayEvent::DealRiver(card) => {
+                table.bring_it_in().map_err(|e| e.to_string())?;
+                let c = Card::from_str(card).map_err(|e| e.to_string())?;
+                table.board.insert(c);
+                table.phase = GamePhase::DealRiver;
+                last_label = format!("River dealt: {card}");
+                current_seat = None;
+            }
+        }
+    }
+
+    let dealer_seat = table.button;
+    let sb_seat = table.determine_small_blind();
+    let bb_seat = table.determine_big_blind();
+    let board: Vec<String> = table.board.iter().map(card_to_str).collect();
+    let pot_committed: usize = table
+        .seats
+        .0
+        .iter()
+        .map(|s| s.player.bet)
+        .sum::<usize>()
+        + table.pot;
+    let street = street_from_board(table.board.len(), SessionPhase::BotsActing);
+
+    let replay_seats: Vec<ReplaySeat> = table
+        .seats
+        .0
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            let seat = i as u8;
+            if s.is_empty() {
+                return ReplaySeat {
+                    seat,
+                    name: String::new(),
+                    chips: 0,
+                    bet: 0,
+                    state: "Out".to_string(),
+                    hole_cards: None,
+                    is_dealer: false,
+                    is_sb: false,
+                    is_bb: false,
+                };
+            }
+            let cards: Vec<String> = s
+                .cards
+                .as_slice()
+                .iter()
+                .filter(|c| **c != Card::BLANK)
+                .map(card_to_str)
+                .collect();
+            ReplaySeat {
+                seat,
+                name: s.player.handle.clone(),
+                chips: s.player.chips,
+                bet: s.player.bet,
+                state: state_to_str(&s.player.state),
+                hole_cards: if cards.is_empty() { None } else { Some(cards) },
+                is_dealer: seat == dealer_seat,
+                is_sb: seat == sb_seat,
+                is_bb: seat == bb_seat,
+            }
+        })
+        .collect();
+
+    Ok(ReplaySnapshot {
+        step: target,
+        total_steps,
+        action_label: last_label,
+        current_seat,
+        pot: pot_committed,
+        board,
+        dealer_seat,
+        sb_seat,
+        bb_seat,
+        small_blind: sb,
+        big_blind: bb,
+        street,
+        seats: replay_seats,
+    })
+}
+
+#[derive(Serialize)]
+struct HandSummary {
+    index: usize,
+    hand_id: String,
+    total_steps: usize,
+    button_seat: u8,
+    description: String,
+}
+
+#[derive(Serialize)]
+struct CollectionSummary {
+    hands: Vec<HandSummary>,
+}
+
+#[derive(Serialize)]
+struct ReplaySeat {
+    seat: u8,
+    name: String,
+    chips: usize,
+    bet: usize,
+    state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hole_cards: Option<Vec<String>>,
+    is_dealer: bool,
+    is_sb: bool,
+    is_bb: bool,
+}
+
+#[derive(Serialize)]
+struct ReplaySnapshot {
+    step: usize,
+    total_steps: usize,
+    action_label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current_seat: Option<u8>,
+    pot: usize,
+    board: Vec<String>,
+    dealer_seat: u8,
+    sb_seat: u8,
+    bb_seat: u8,
+    small_blind: usize,
+    big_blind: usize,
+    street: String,
+    seats: Vec<ReplaySeat>,
 }
 
 // ── Internal types ────────────────────────────────────────────────────────────
