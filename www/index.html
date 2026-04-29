@@ -403,6 +403,141 @@
     }
     #settings-btn:hover { color: #99c; }
 
+    /* ── Replay overlay ── */
+    #replay-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #replay-overlay.open { display: flex; }
+    #replay-box {
+      background: #0d0d1a;
+      border: 1px solid #336;
+      border-radius: 8px;
+      padding: 14px;
+      width: min(92vw, 900px);
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #replay-box header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #99c;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    #replay-close {
+      background: none;
+      border: none;
+      color: #669;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 6px 12px;
+      min-width: 36px;
+      min-height: 36px;
+      line-height: 1;
+      border-radius: 4px;
+    }
+    #replay-close:hover { color: #99c; }
+    #replay-source-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 12px;
+    }
+    #replay-source-row select,
+    #replay-source-row button,
+    .replay-file-btn {
+      background: #1a1a2e;
+      border: 1px solid #4a90d9;
+      color: #aad4ff;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    #replay-source-row select { flex: 1 1 240px; min-width: 160px; }
+    #replay-source-row button:hover,
+    .replay-file-btn:hover { background: #1a2a3e; }
+    #replay-source-row select:disabled { opacity: 0.4; cursor: default; }
+    #replay-table-wrapper {
+      background: #0a0a18;
+      border: 1px solid #224;
+      border-radius: 6px;
+      padding: 4px;
+      display: flex;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #replay-table-wrapper svg {
+      width: 100%;
+      max-width: 760px;
+      height: auto;
+      display: block;
+    }
+    #replay-action-label {
+      text-align: center;
+      color: #f0d060;
+      font-size: 13px;
+      min-height: 18px;
+      font-weight: bold;
+    }
+    #replay-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #replay-controls button {
+      background: #1a2a3e;
+      border: 1px solid #4a90d9;
+      color: #aad4ff;
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      min-width: 64px;
+    }
+    #replay-controls button:hover:not(:disabled) { background: #243954; }
+    #replay-controls button:disabled { opacity: 0.35; cursor: default; }
+    #replay-slider {
+      flex: 1;
+      accent-color: #4a90d9;
+    }
+    #replay-step-counter {
+      color: #88aacc;
+      font-size: 12px;
+      min-width: 70px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    #btn-replay {
+      background: none;
+      border: 1px solid #4a90d9;
+      color: #7ab8f5;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      min-height: 32px;
+    }
+    #btn-replay:hover:not(:disabled) { background: #1a1a2e; color: #99c; }
+    #btn-replay:disabled { opacity: 0.35; cursor: default; }
+    @media (max-width: 480px) {
+      #replay-source-row { flex-direction: column; align-items: stretch; }
+      #replay-source-row select { flex: 1 1 auto; }
+      #replay-controls { flex-wrap: wrap; }
+      #replay-controls button { flex: 1; }
+      #replay-slider { flex: 1 0 100%; order: 99; }
+    }
+
     /* ── Tab bar (top-level nav, sits above the table/controls grid) ── */
     #tab-bar {
       display: flex;
@@ -1199,6 +1334,7 @@
   <div id="yaml-bar">
     <button id="btn-download-yaml" disabled>Download game history (YAML)</button>
     <button id="btn-current-game" disabled>Current game</button>
+    <button id="btn-replay">Replay hand</button>
   </div>
 
   <div id="game-state-overlay">
@@ -1237,6 +1373,31 @@
         <div style="margin-top:12px;border-top:1px solid #333;padding-top:12px;">
           <button id="reset-pnl-btn" style="font-size:11px;padding:6px 10px;background:#3e1a1a;border:1px solid #d94a4a;color:#f57a7a;border-radius:4px;cursor:pointer;">Reset lifetime P&amp;L</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="replay-overlay">
+    <div id="replay-box">
+      <header>
+        <span>Hand replay</span>
+        <button id="replay-close">✕</button>
+      </header>
+      <div id="replay-source-row">
+        <select id="replay-hand-picker" disabled>
+          <option value="">No hands loaded</option>
+        </select>
+        <button id="replay-load-session" type="button">Load session</button>
+        <label class="replay-file-btn" for="replay-file-input">Upload YAML…</label>
+        <input type="file" id="replay-file-input" accept=".yaml,.yml" hidden>
+      </div>
+      <div id="replay-table-wrapper"><!-- cloned SVG injected here --></div>
+      <div id="replay-action-label">Load a session or upload a YAML to begin.</div>
+      <div id="replay-controls">
+        <button id="replay-prev" type="button" disabled>◀ Prev</button>
+        <input type="range" id="replay-slider" min="0" max="0" value="0" disabled>
+        <button id="replay-next" type="button" disabled>Next ▶</button>
+        <span id="replay-step-counter">0 / 0</span>
       </div>
     </div>
   </div>
@@ -2334,6 +2495,287 @@
 
     settingsOverlay.addEventListener('click', (e) => {
       if (e.target === settingsOverlay) settingsOverlay.classList.remove('open');
+    });
+
+    // ── Replay viewer ─────────────────────────────────────────────────────────
+    const replay = {
+      yamlText: null,
+      hands: [],
+      handIndex: 0,
+      step: 0,
+      totalSteps: 0,
+      cloned: false,
+    };
+    const REPLAY_PREFIX = 'replay-';
+    const replayOverlay = document.getElementById('replay-overlay');
+
+    function activeWasmMod() {
+      return document.body.dataset.tab === 'arena' ? _arenaMod : _playMod;
+    }
+
+    function ensureReplaySvgClone() {
+      if (replay.cloned) return;
+      const original = document.getElementById('poker-table');
+      const wrapper  = document.getElementById('replay-table-wrapper');
+      if (!original || !wrapper) return;
+      const clone = original.cloneNode(true);
+      // Walk every element and add the prefix to every `id`.
+      // Internal `<use href="#…">` and `url(#…)` refs are left untouched so they
+      // resolve against the original SVG's <defs> already in the document — that
+      // way we don't need to duplicate symbols/gradients/filters in the clone.
+      const walk = (node) => {
+        if (node.nodeType !== 1) return;
+        const id = node.getAttribute && node.getAttribute('id');
+        if (id) node.setAttribute('id', REPLAY_PREFIX + id);
+        for (const child of node.children) walk(child);
+      };
+      walk(clone);
+      // Strip aria/title relationships that would point at duplicated ids.
+      clone.removeAttribute('aria-labelledby');
+      // Drop bot-config name links (the <a> wrappers); replay doesn't need them.
+      clone.querySelectorAll('a').forEach(a => {
+        const parent = a.parentNode;
+        while (a.firstChild) parent.insertBefore(a.firstChild, a);
+        parent.removeChild(a);
+      });
+      wrapper.appendChild(clone);
+      replay.cloned = true;
+    }
+
+    function setReplayText(idSuffix, text) {
+      const el = document.getElementById(REPLAY_PREFIX + idSuffix);
+      if (el) el.textContent = text;
+    }
+    function setReplayVis(idSuffix, visible) {
+      const el = document.getElementById(REPLAY_PREFIX + idSuffix);
+      if (el) el.setAttribute('visibility', visible ? 'visible' : 'hidden');
+    }
+
+    function renderReplaySeat(seatIdx, p, currentSeat) {
+      const grp = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-group');
+      if (!grp) return;
+      if (!p || !p.name) {
+        grp.setAttribute('opacity', '0.25');
+        clearReplayCards(seatIdx);
+        return;
+      }
+      grp.setAttribute('opacity', p.state === 'Fold' ? '0.45' : '1');
+
+      setReplayText('seat-' + seatIdx + '-name', p.name);
+      setReplayText('seat-' + seatIdx + '-chips', '$' + (p.chips ?? 0).toLocaleString());
+
+      const cards = p.hole_cards ?? [];
+      renderCard(REPLAY_PREFIX + 'seat-' + seatIdx + '-card-0', cards[0] ?? null, false);
+      renderCard(REPLAY_PREFIX + 'seat-' + seatIdx + '-card-1', cards[1] ?? null, false);
+
+      const betEl = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-bet');
+      if (betEl) {
+        if (p.bet > 0) {
+          betEl.textContent = '$' + p.bet.toLocaleString();
+          betEl.setAttribute('visibility', 'visible');
+        } else {
+          betEl.setAttribute('visibility', 'hidden');
+        }
+      }
+
+      const badgeGrp  = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-badge');
+      const badgeText = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-badge-text');
+      const badgeRect = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-badge-rect');
+      if (badgeGrp && badgeText && badgeRect) {
+        if (p.state === 'Fold') {
+          badgeGrp.setAttribute('visibility', 'visible');
+          badgeText.textContent = 'FOLD';
+          badgeText.setAttribute('fill', '#ff8888');
+          badgeRect.setAttribute('fill', '#882222');
+          badgeRect.setAttribute('opacity', '0.7');
+        } else if (p.state === 'AllIn') {
+          badgeGrp.setAttribute('visibility', 'visible');
+          badgeText.textContent = 'ALL-IN';
+          badgeText.setAttribute('fill', '#ffffff');
+          badgeRect.setAttribute('fill', '#cc8800');
+          badgeRect.setAttribute('opacity', '0.8');
+        } else {
+          badgeGrp.setAttribute('visibility', 'hidden');
+        }
+      }
+
+      setReplayVis('seat-' + seatIdx + '-btn-d',  !!p.is_dealer);
+      setReplayVis('seat-' + seatIdx + '-btn-sb', !!p.is_sb);
+      setReplayVis('seat-' + seatIdx + '-btn-bb', !!p.is_bb);
+
+      const hlEl = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-highlight');
+      if (hlEl) hlEl.setAttribute('opacity', currentSeat === seatIdx ? '0.18' : '0');
+
+      // Replay never shows the per-seat action callout — the <div id="replay-action-label">
+      // beneath the table tells the story instead.
+      const actionGrp = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-action');
+      if (actionGrp) actionGrp.setAttribute('visibility', 'hidden');
+    }
+
+    function clearReplayCards(seatIdx) {
+      for (const sfx of ['-card-0', '-card-1']) {
+        const g = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + sfx);
+        if (g) while (g.firstChild) g.removeChild(g.firstChild);
+      }
+    }
+
+    function renderReplayTable(snap) {
+      ensureReplaySvgClone();
+      const potEl = document.getElementById(REPLAY_PREFIX + 'pot-amount');
+      if (potEl) potEl.textContent = 'POT: $' + (snap.pot ?? 0).toLocaleString();
+
+      for (let i = 0; i < 5; i++) {
+        renderCard(REPLAY_PREFIX + 'board-card-' + i, snap.board?.[i] ?? null, true);
+      }
+
+      const seatsBySeat = new Map();
+      for (const s of snap.seats ?? []) seatsBySeat.set(s.seat, s);
+      for (let i = 0; i < 9; i++) {
+        renderReplaySeat(i, seatsBySeat.get(i) ?? null, snap.current_seat);
+      }
+
+      const handResultGroup = document.getElementById(REPLAY_PREFIX + 'hand-result-group');
+      if (handResultGroup) handResultGroup.setAttribute('visibility', 'hidden');
+
+      document.getElementById('replay-action-label').textContent = snap.action_label ?? '—';
+      document.getElementById('replay-step-counter').textContent =
+        (snap.step + 1) + ' / ' + snap.total_steps;
+
+      const slider = document.getElementById('replay-slider');
+      slider.max = Math.max(0, (snap.total_steps ?? 1) - 1);
+      slider.value = snap.step ?? 0;
+      slider.disabled = (snap.total_steps ?? 0) <= 1;
+      document.getElementById('replay-prev').disabled = (snap.step ?? 0) <= 0;
+      document.getElementById('replay-next').disabled =
+        (snap.step ?? 0) >= (snap.total_steps - 1);
+    }
+
+    function showReplayError(msg) {
+      document.getElementById('replay-action-label').textContent = msg;
+      document.getElementById('replay-step-counter').textContent = '0 / 0';
+      const slider = document.getElementById('replay-slider');
+      slider.max = 0; slider.value = 0; slider.disabled = true;
+      document.getElementById('replay-prev').disabled = true;
+      document.getElementById('replay-next').disabled = true;
+    }
+
+    function loadReplayCollection(yamlText, sourceLabel) {
+      const mod = activeWasmMod();
+      if (!mod) { showReplayError('No game module loaded yet.'); return; }
+      let summary;
+      try {
+        summary = JSON.parse(mod.parse_hand_collection(yamlText));
+      } catch (e) {
+        showReplayError('Failed to parse YAML: ' + e.message);
+        return;
+      }
+      if (summary.error) { showReplayError(summary.error); return; }
+      const hands = summary.hands ?? [];
+      replay.yamlText = yamlText;
+      replay.hands    = hands;
+      replay.handIndex = 0;
+      replay.step      = 0;
+      replay.totalSteps = 0;
+
+      const picker = document.getElementById('replay-hand-picker');
+      while (picker.firstChild) picker.removeChild(picker.firstChild);
+      if (hands.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = ''; opt.textContent = sourceLabel + ' has no hands yet';
+        picker.appendChild(opt);
+        picker.disabled = true;
+        showReplayError('No hands available to replay.');
+        return;
+      }
+      for (const h of hands) {
+        const opt = document.createElement('option');
+        opt.value = String(h.index);
+        opt.textContent = h.description;
+        picker.appendChild(opt);
+      }
+      picker.disabled = false;
+      picker.value = '0';
+      selectReplayHand(0);
+    }
+
+    function selectReplayHand(handIndex) {
+      replay.handIndex = handIndex;
+      replay.step = 0;
+      renderReplayStep(0);
+    }
+
+    function renderReplayStep(step) {
+      const mod = activeWasmMod();
+      if (!mod || replay.yamlText == null) return;
+      let snap;
+      try {
+        snap = JSON.parse(mod.replay_snapshot(replay.yamlText, replay.handIndex, step));
+      } catch (e) {
+        showReplayError('Replay error: ' + e.message);
+        return;
+      }
+      if (snap.error) { showReplayError(snap.error); return; }
+      replay.step = snap.step;
+      replay.totalSteps = snap.total_steps;
+      renderReplayTable(snap);
+    }
+
+    document.getElementById('btn-replay').addEventListener('click', () => {
+      ensureReplaySvgClone();
+      replayOverlay.classList.add('open');
+      // Auto-load session hands the first time, if the picker is empty.
+      if (replay.yamlText == null) {
+        const mod = activeWasmMod();
+        if (mod) {
+          const yaml = mod.get_session_yaml();
+          loadReplayCollection(yaml, 'Session');
+        }
+      }
+    });
+
+    document.getElementById('replay-close').addEventListener('click', () => {
+      replayOverlay.classList.remove('open');
+    });
+
+    replayOverlay.addEventListener('click', (e) => {
+      if (e.target === replayOverlay) replayOverlay.classList.remove('open');
+    });
+
+    document.getElementById('replay-load-session').addEventListener('click', () => {
+      const mod = activeWasmMod();
+      if (!mod) { showReplayError('No game module loaded yet.'); return; }
+      const yaml = mod.get_session_yaml();
+      loadReplayCollection(yaml, 'Session');
+    });
+
+    document.getElementById('replay-file-input').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => loadReplayCollection(String(reader.result), file.name);
+      reader.onerror = () => showReplayError('Failed to read file.');
+      reader.readAsText(file);
+      // Reset so picking the same file again re-fires `change`.
+      e.target.value = '';
+    });
+
+    document.getElementById('replay-hand-picker').addEventListener('change', (e) => {
+      const idx = parseInt(e.target.value, 10);
+      if (!Number.isFinite(idx)) return;
+      selectReplayHand(idx);
+    });
+
+    document.getElementById('replay-prev').addEventListener('click', () => {
+      if (replay.step > 0) renderReplayStep(replay.step - 1);
+    });
+
+    document.getElementById('replay-next').addEventListener('click', () => {
+      if (replay.step < replay.totalSteps - 1) renderReplayStep(replay.step + 1);
+    });
+
+    document.getElementById('replay-slider').addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      if (Number.isFinite(val) && val !== replay.step) renderReplayStep(val);
     });
 
     const BLIND_LEVELS = [
