@@ -426,6 +426,26 @@ pub fn next_hand() -> String {
         if let Some(session) = s.borrow_mut().as_mut() {
             session.eliminate_busted();
             session.table.button_up();
+            // pkcore's TableNoCell::button_up() increments by 1 mod the full
+            // seat array (9), not the next occupied seat.  After busts leave
+            // gaps, determine_small_blind() resolves the button to the first
+            // occupied seat at-or-after that index, so a head-up pair on
+            // seats 0 and 7 ends up with seat 7 paying SB on 7 of every 9
+            // button positions.  Walk the button forward until it lands on
+            // an occupied seat to restore fair blind alternation.
+            let total = session.table.seats.0.len();
+            for _ in 0..total {
+                let idx = session.table.button;
+                let occupied = session
+                    .table
+                    .seats
+                    .get_seat(idx)
+                    .is_some_and(|seat| !seat.is_empty());
+                if occupied {
+                    break;
+                }
+                session.table.button_up();
+            }
         }
     });
 
