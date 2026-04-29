@@ -1334,7 +1334,7 @@
   <div id="yaml-bar">
     <button id="btn-download-yaml" disabled>Download game history (YAML)</button>
     <button id="btn-current-game" disabled>Current game</button>
-    <button id="btn-replay">Replay hand</button>
+    <button id="btn-replay" disabled>Replay hand</button>
   </div>
 
   <div id="game-state-overlay">
@@ -1468,6 +1468,7 @@
       commitCurrentGameToLifetime();
       pendingGameCommitted = false;
       currentGameChips = STARTING_CHIPS;
+      resetHandsCompleted('play');
     }
 
     function renderPnlSlot(chipsForCalc = currentGameChips) {
@@ -1728,6 +1729,7 @@
           return;
         }
         if (state.hand_number >= targetHand) break;
+        noteHandCompleted('arena');
         _arenaMod.next_hand();
         // yield to browser between hands so the tab stays responsive
         await new Promise(r => setTimeout(r, 0));
@@ -2006,6 +2008,7 @@
         const street = state.street ?? '';
         appendHandLog('Hand #' + state.hand_number + ' complete — ' + street);
         enableYamlDownload();
+        noteHandCompleted('play');
         renderButtons([]);
 
         // Advance the hand (syncs blind level, then calls next_hand()).
@@ -2505,9 +2508,30 @@
       step: 0,
       totalSteps: 0,
       cloned: false,
+      source: null, // 'session' | 'upload' | null
     };
     const REPLAY_PREFIX = 'replay-';
     const replayOverlay = document.getElementById('replay-overlay');
+
+    // Per-tab tally of completed hands; the replay button is enabled when the
+    // currently-active tab has at least one completed hand to replay.
+    const handsCompleted = { play: 0, arena: 0 };
+
+    function updateReplayButtonState() {
+      const tab = document.body.dataset.tab;
+      const count = handsCompleted[tab] ?? 0;
+      document.getElementById('btn-replay').disabled = count === 0;
+    }
+
+    function noteHandCompleted(tab) {
+      handsCompleted[tab] = (handsCompleted[tab] ?? 0) + 1;
+      updateReplayButtonState();
+    }
+
+    function resetHandsCompleted(tab) {
+      handsCompleted[tab] = 0;
+      updateReplayButtonState();
+    }
 
     function activeWasmMod() {
       return document.body.dataset.tab === 'arena' ? _arenaMod : _playMod;
@@ -2676,6 +2700,7 @@
       replay.handIndex = 0;
       replay.step      = 0;
       replay.totalSteps = 0;
+      replay.source    = sourceLabel === 'Session' ? 'session' : 'upload';
 
       const picker = document.getElementById('replay-hand-picker');
       while (picker.firstChild) picker.removeChild(picker.firstChild);
@@ -2723,8 +2748,8 @@
     document.getElementById('btn-replay').addEventListener('click', () => {
       ensureReplaySvgClone();
       replayOverlay.classList.add('open');
-      // Auto-load session hands the first time, if the picker is empty.
-      if (replay.yamlText == null) {
+      // Refresh session data on every open, but leave a user-uploaded YAML intact.
+      if (replay.source !== 'upload') {
         const mod = activeWasmMod();
         if (mod) {
           const yaml = mod.get_session_yaml();
@@ -2900,6 +2925,7 @@
       document.querySelectorAll('.tab').forEach(t =>
         t.classList.toggle('active', t.dataset.tab === id));
       document.body.dataset.tab = id;
+      updateReplayButtonState();
     }
 
     function restorePlayTabState() {
@@ -2995,6 +3021,7 @@
         // Pause to show hand result, then auto-advance
         await new Promise(r => setTimeout(r, HAND_COMPLETE_MS));
         if (!arenaRunning || arenaGeneration !== myGen) return;
+        noteHandCompleted('arena');
         // Advance the hand (syncs blind level, then calls next_hand()).
         const { state: nextState, blindLevel: newArenaLevel } = advanceHand(_arenaMod, state.hand_number, arenaBlindLevel);
         arenaBlindLevel = newArenaLevel;
@@ -3014,6 +3041,7 @@
       arenaRunning = false;  // stop any running loop before restarting
       arenaBlindLevel = 0;
       gameSeed = Date.now();
+      resetHandsCompleted('arena');
       const state = JSON.parse(_arenaMod.init_bot_game(gameSeed));
       updateUrlState('arena', 1);
       renderTableVisuals(state);
