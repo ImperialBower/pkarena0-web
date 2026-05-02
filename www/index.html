@@ -1456,6 +1456,9 @@
     let lifetimePnl = parseInt(localStorage.getItem('lifetimePnl') ?? '0', 10) || 0;
     let currentGameChips = STARTING_CHIPS;
     let pendingGameCommitted = false;
+    // Tracks the all-in amount per seat across streets (bet resets to 0 on flop+).
+    let allInAmounts = new Map(); // seatIdx → chips committed when going all-in
+    let allInHandNumber = -1;     // hand number when allInAmounts was populated
 
     function commitCurrentGameToLifetime(chipsAtCommit = currentGameChips) {
       if (pendingGameCommitted) return;
@@ -2099,7 +2102,6 @@
       // Name + chips
       const emoji = seatIdx !== 0 ? (BOT_EMOJIS[player.name] ?? '') : '';
       setText('seat-' + seatIdx + '-name', emoji ? emoji + ' ' + player.name : player.name || '—');
-      setText('seat-' + seatIdx + '-chips', '$' + (player.chips ?? 0).toLocaleString());
 
       // Bot name link
       if (seatIdx !== 0) {
@@ -2112,10 +2114,32 @@
       renderCard('seat-' + seatIdx + '-card-0', cards[0] ?? null, false);
       renderCard('seat-' + seatIdx + '-card-1', cards[1] ?? null, false);
 
-      // Current bet
+      // All-in amount tracking: persist across streets (bet resets to 0 on flop+).
+      if (state.hand_number !== allInHandNumber) {
+        allInAmounts.clear();
+        allInHandNumber = state.hand_number;
+      }
+      if (player.state === 'AllIn') {
+        if (player.bet > 0) allInAmounts.set(seatIdx, player.bet);
+      } else {
+        allInAmounts.delete(seatIdx);
+      }
+      const savedAllIn = allInAmounts.get(seatIdx);
+
+      // Chips label: show all-in amount (amber) when all-in, normal stack otherwise.
+      const chipsEl = document.getElementById('seat-' + seatIdx + '-chips');
+      if (player.state === 'AllIn' && savedAllIn != null) {
+        setText('seat-' + seatIdx + '-chips', '$' + savedAllIn.toLocaleString());
+        if (chipsEl) chipsEl.setAttribute('fill', '#e09000');
+      } else {
+        setText('seat-' + seatIdx + '-chips', '$' + (player.chips ?? 0).toLocaleString());
+        if (chipsEl) chipsEl.setAttribute('fill', '#aaa');
+      }
+
+      // Current bet — hide when all-in (amount is already in the chips slot).
       const betEl = document.getElementById('seat-' + seatIdx + '-bet');
       if (betEl) {
-        if (player.bet > 0) {
+        if (player.bet > 0 && player.state !== 'AllIn') {
           betEl.textContent = '$' + player.bet.toLocaleString();
           betEl.setAttribute('visibility', 'visible');
         } else {
@@ -2134,14 +2158,20 @@
           badgeText.setAttribute('fill', '#ff8888');
           badgeRect.setAttribute('fill', '#882222');
           badgeRect.setAttribute('opacity', '0.7');
+          badgeRect.setAttribute('x', '-30');
+          badgeRect.setAttribute('width', '60');
         } else if (player.state === 'AllIn') {
           badgeGrp.setAttribute('visibility', 'visible');
           badgeText.textContent = 'ALL-IN';
           badgeText.setAttribute('fill', '#ffffff');
           badgeRect.setAttribute('fill', '#cc8800');
           badgeRect.setAttribute('opacity', '0.8');
+          badgeRect.setAttribute('x', '-30');
+          badgeRect.setAttribute('width', '60');
         } else {
           badgeGrp.setAttribute('visibility', 'hidden');
+          badgeRect.setAttribute('x', '-30');
+          badgeRect.setAttribute('width', '60');
         }
       }
 
@@ -2586,15 +2616,25 @@
       grp.setAttribute('opacity', p.state === 'Fold' ? '0.45' : '1');
 
       setReplayText('seat-' + seatIdx + '-name', p.name);
-      setReplayText('seat-' + seatIdx + '-chips', '$' + (p.chips ?? 0).toLocaleString());
 
       const cards = p.hole_cards ?? [];
       renderCard(REPLAY_PREFIX + 'seat-' + seatIdx + '-card-0', cards[0] ?? null, false);
       renderCard(REPLAY_PREFIX + 'seat-' + seatIdx + '-card-1', cards[1] ?? null, false);
 
+      // Chips label: show the all-in amount (from bet) when all-in, normal stack otherwise.
+      const replayChipsEl = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-chips');
+      if (p.state === 'AllIn' && p.bet > 0) {
+        setReplayText('seat-' + seatIdx + '-chips', '$' + p.bet.toLocaleString());
+        if (replayChipsEl) replayChipsEl.setAttribute('fill', '#e09000');
+      } else {
+        setReplayText('seat-' + seatIdx + '-chips', '$' + (p.chips ?? 0).toLocaleString());
+        if (replayChipsEl) replayChipsEl.setAttribute('fill', p.state === 'AllIn' ? '#e09000' : '#aaa');
+      }
+
+      // Bet label — hide when all-in (amount is shown in the chips slot).
       const betEl = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-bet');
       if (betEl) {
-        if (p.bet > 0) {
+        if (p.bet > 0 && p.state !== 'AllIn') {
           betEl.textContent = '$' + p.bet.toLocaleString();
           betEl.setAttribute('visibility', 'visible');
         } else {
@@ -2612,14 +2652,20 @@
           badgeText.setAttribute('fill', '#ff8888');
           badgeRect.setAttribute('fill', '#882222');
           badgeRect.setAttribute('opacity', '0.7');
+          badgeRect.setAttribute('x', '-30');
+          badgeRect.setAttribute('width', '60');
         } else if (p.state === 'AllIn') {
           badgeGrp.setAttribute('visibility', 'visible');
           badgeText.textContent = 'ALL-IN';
           badgeText.setAttribute('fill', '#ffffff');
           badgeRect.setAttribute('fill', '#cc8800');
           badgeRect.setAttribute('opacity', '0.8');
+          badgeRect.setAttribute('x', '-30');
+          badgeRect.setAttribute('width', '60');
         } else {
           badgeGrp.setAttribute('visibility', 'hidden');
+          badgeRect.setAttribute('x', '-30');
+          badgeRect.setAttribute('width', '60');
         }
       }
 
