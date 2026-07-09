@@ -10,10 +10,10 @@ use pkcore::casino::action::PlayerAction;
 use pkcore::casino::game::ForcedBets;
 use pkcore::casino::session::PokerSession;
 use pkcore::casino::state::PlayerState;
-use pkcore::casino::table::event::TableAction;
+use pkcore::casino::action::TableAction;
 use pkcore::analysis::name::HandRankName;
-use pkcore::casino::table::winnings::Winnings;
-use pkcore::casino::table_no_cell::{PlayerNoCell, SeatNoCell, SeatsNoCell, TableNoCell};
+use pkcore::casino::winnings::Winnings;
+use pkcore::casino::table::{Player, Seat, Seats, Table};
 use pkcore::card::Card;
 use pkcore::cards::Cards;
 use pkcore::games::GamePhase;
@@ -91,12 +91,12 @@ pub fn init_game(rand_seed: f64) -> String {
     let bots: Vec<BotProfile> = profile_pool.into_iter().take(8).collect();
     let bot_names: Vec<String> = bots.iter().map(|b| b.name.clone()).collect();
 
-    let mut seats_vec = vec![SeatNoCell::new(PlayerNoCell::new_with_chips(
+    let mut seats_vec = vec![Seat::new(Player::new_with_chips(
         "You".to_string(),
         10_000,
     ))];
     for name in &bot_names {
-        seats_vec.push(SeatNoCell::new(PlayerNoCell::new_with_chips(
+        seats_vec.push(Seat::new(Player::new_with_chips(
             name.clone(),
             10_000,
         )));
@@ -111,8 +111,8 @@ pub fn init_game(rand_seed: f64) -> String {
     HAND_START_CHIPS.with(|h| *h.borrow_mut() = start_chips);
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
 
-    let table = TableNoCell::nlh_from_seats(
-        SeatsNoCell::new(seats_vec),
+    let table = Table::nlh_from_seats(
+        Seats::new(seats_vec),
         ForcedBets::new(50, 100),
     );
 
@@ -144,9 +144,9 @@ pub fn init_bot_game(rand_seed: f64) -> String {
     let bots: Vec<BotProfile> = profile_pool.into_iter().take(9).collect();
     let bot_names: Vec<String> = bots.iter().map(|b| b.name.clone()).collect();
 
-    let seats_vec: Vec<SeatNoCell> = bot_names
+    let seats_vec: Vec<Seat> = bot_names
         .iter()
-        .map(|name| SeatNoCell::new(PlayerNoCell::new_with_chips(name.clone(), 10_000)))
+        .map(|name| Seat::new(Player::new_with_chips(name.clone(), 10_000)))
         .collect();
 
     let start_chips: Vec<(u8, usize)> = seats_vec
@@ -157,8 +157,8 @@ pub fn init_bot_game(rand_seed: f64) -> String {
     HAND_START_CHIPS.with(|h| *h.borrow_mut() = start_chips);
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
 
-    let table = TableNoCell::nlh_from_seats(
-        SeatsNoCell::new(seats_vec),
+    let table = Table::nlh_from_seats(
+        Seats::new(seats_vec),
         ForcedBets::new(50, 100),
     );
 
@@ -413,7 +413,7 @@ pub fn next_hand() -> String {
         });
     }
 
-    // pkcore's TableNoCell::reset() does not clear event_log, so it accumulates
+    // pkcore's Table::reset() does not clear event_log, so it accumulates
     // across every hand.  Clear it here, after the hand history snapshot has
     // been recorded, so each new hand starts with a clean log.
     SESSION.with(|s| {
@@ -426,7 +426,7 @@ pub fn next_hand() -> String {
         if let Some(session) = s.borrow_mut().as_mut() {
             session.eliminate_busted();
             session.table.button_up();
-            // pkcore's TableNoCell::button_up() increments by 1 mod the full
+            // pkcore's Table::button_up() increments by 1 mod the full
             // seat array (9), not the next occupied seat.  After busts leave
             // gaps, determine_small_blind() resolves the button to the first
             // occupied seat at-or-after that index, so a head-up pair on
@@ -709,6 +709,7 @@ fn action_to_player_action(a: &HhAction) -> Option<PlayerAction> {
         ActionType::Raise => a.amount.map(|n| PlayerAction::Raise(n as usize)),
         ActionType::AllIn => Some(PlayerAction::AllIn),
         ActionType::Post => None,
+        _ => None,
     }
 }
 
@@ -729,6 +730,7 @@ fn format_action_label(hh: &HandHistory, a: &HhAction) -> String {
         ActionType::Raise => format!("{name} raises to ${amt}"),
         ActionType::AllIn => format!("{name} goes all-in"),
         ActionType::Post => format!("{name} posts ${amt}"),
+        _ => format!("{name} acts"),
     }
 }
 
@@ -744,15 +746,15 @@ fn build_replay_snapshot(hh: &HandHistory, target_step: usize) -> Result<ReplayS
 
     let max_seat = hh.players.iter().map(|p| p.seat as usize).max().unwrap_or(0);
     let table_size = max_seat.max(button as usize) + 1;
-    let mut seats_vec: Vec<SeatNoCell> = (0..table_size)
-        .map(|_| SeatNoCell::new(PlayerNoCell::default()))
+    let mut seats_vec: Vec<Seat> = (0..table_size)
+        .map(|_| Seat::new(Player::default()))
         .collect();
     for p in &hh.players {
         seats_vec[p.seat as usize] =
-            SeatNoCell::new(PlayerNoCell::new_with_chips(p.name.clone(), p.stack as usize));
+            Seat::new(Player::new_with_chips(p.name.clone(), p.stack as usize));
     }
-    let seats = SeatsNoCell::new(seats_vec);
-    let mut table = TableNoCell::nlh_from_seats(seats, ForcedBets::new(sb, bb));
+    let seats = Seats::new(seats_vec);
+    let mut table = Table::nlh_from_seats(seats, ForcedBets::new(sb, bb));
     table.button = button;
 
     table.act_forced_bets().map_err(|e| e.to_string())?;
@@ -1200,7 +1202,7 @@ fn build_game_state() -> String {
 }
 
 fn seat_to_player_view(
-    table: &TableNoCell,
+    table: &Table,
     seat: u8,
     dealer_seat: u8,
     sb_seat: u8,
@@ -1357,6 +1359,7 @@ fn hand_rank_name_to_str(name: HandRankName) -> Option<String> {
         HandRankName::TwoPair        => Some("Two Pair".to_string()),
         HandRankName::Pair           => Some("Pair".to_string()),
         HandRankName::HighCard       => Some("High Card".to_string()),
+        HandRankName::RazzLow        => Some("Razz Low".to_string()),
         HandRankName::Invalid        => None,
     }
 }
