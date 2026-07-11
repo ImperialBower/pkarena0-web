@@ -1,0 +1,120 @@
+/* design2.0 table component — geometry from docs/design2.0/README.md §Layout. */
+.table-inner { position: absolute; inset: 0; }
+.felt {
+  position: absolute; left: 6%; right: 6%; top: 8%; bottom: 11%;
+  border-radius: var(--felt-radius); background: var(--felt-bg);
+  border: var(--felt-border); box-shadow: var(--felt-shadow);
+}
+.felt-ring {
+  position: absolute; left: 6%; right: 6%; top: 8%; bottom: 11%;
+  border-radius: var(--felt-radius); pointer-events: none;
+}
+.felt-ring-inner {
+  position: absolute; inset: var(--felt-inset);
+  border-radius: var(--felt-radius); border: var(--felt-inner-border);
+}
+.table-center {
+  position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.pot {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .05em; padding: 5px 16px; color: var(--pot-col);
+  background: var(--pot-bg); border: var(--pot-border); border-radius: var(--pot-radius);
+}
+.board { display: flex; gap: 8px; }
+.board-slot {
+  width: 36px; height: 50px; border-radius: var(--slot-radius);
+  border: var(--slot-border); background: var(--slot-bg);
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 3px;
+}
+.board-slot:has(.card) { border: none; background: transparent; padding: 0; align-items: stretch; }
+.slot-label {
+  font-family: var(--font-mono); font-size: 6.5px; letter-spacing: .08em;
+  color: var(--slot-text);
+}
+.table-label {
+  font-family: var(--font-mono); font-size: 8px; letter-spacing: .28em;
+  color: var(--tlabel-col); white-space: nowrap;
+}
+.seat {
+  position: absolute; left: var(--x); top: var(--y);
+  transform: translate(-50%, -50%); z-index: 1;
+}
+.seat-fold { opacity: .42; }
+.seat-empty { opacity: .25; }
+.seat-stack-col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.seat-cards { display: flex; gap: 3px; min-height: 0; }
+.seat-ring { position: relative; border-radius: var(--ring-radius); }
+.seat-ring.hero-ring {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 24px var(--glow);
+}
+.seat-ring.to-act .seat-plate { border-color: var(--accent); }
+.seat-plate {
+  background: var(--plate-bg); border: var(--plate-border);
+  border-radius: var(--plate-radius); box-shadow: var(--plate-shadow);
+  padding: var(--plate-pad); min-width: 120px; text-align: left;
+}
+.seat-row1 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.seat-name {
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  color: var(--text); text-decoration: none;
+}
+.seat-name[href]:hover { text-decoration: underline; }
+.seat-tag { font-family: var(--font-mono); font-size: 8.5px; color: var(--tag-col); }
+.seat-row2 { display: flex; gap: 5px; align-items: baseline; }
+.seat-stack { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--stack-col); }
+.seat-stack.allin { color: var(--bet); }
+.seat-bb { font-size: 8.5px; color: var(--bb-col); }
+.seat-hud {
+  font-family: var(--font-mono); font-size: 8px; color: var(--hud-col);
+  white-space: nowrap;
+}
+.seat-badge {
+  position: absolute; top: -8px; right: -9px; min-width: 18px; height: 18px;
+  padding: 0 3px; border-radius: 50%; background: var(--badge-bg);
+  color: var(--badge-col); font-family: var(--font-mono); font-size: 7.5px;
+  font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.seat-pill {
+  font-family: var(--font-mono); font-size: 8.5px; font-weight: 600;
+  letter-spacing: .08em; padding: 3px 11px; border-radius: var(--pill-radius);
+  white-space: nowrap; visibility: hidden; text-transform: uppercase;
+  background: var(--pill-blind-bg); color: var(--pill-blind-col);
+}
+.pill-fold  { background: var(--pill-fold-bg);  color: var(--pill-fold-col); }
+.pill-raise { background: var(--pill-raise-bg); color: var(--pill-raise-col); }
+.pill-blind { background: var(--pill-blind-bg); color: var(--pill-blind-col); }
+.pill-hero  { background: var(--pill-hero-bg);  color: var(--pill-hero-col); }
+.seat-pill .act-short { display: none; }
+.seat-chipamt {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  color: var(--chipamt-col); background: var(--chipamt-bg);
+  border: var(--chipamt-border); padding: 2px 9px;
+  border-radius: var(--pill-radius); visibility: hidden;
+}
+
+/* Cards */
+.card {
+  background: var(--card-bg); border-radius: var(--card-radius);
+  border: var(--card-border); box-shadow: var(--card-shadow);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-weight: 700;
+}
+.card-board { width: 36px; height: 50px; }
+.card-board .card-rank { font-size: 14px; line-height: 1; }
+.card-board .card-suit { font-size: 11px; line-height: 1.2; }
+.card-hero { width: 48px; height: 66px; }
+.card-hero .card-rank { font-size: 19px; line-height: 1; }
+.card-hero .card-suit { font-size: 15px; line-height: 1.2; }
+.card-mini { width: 24px; height: 34px; }
+.card-mini .card-rank { font-size: 10px; line-height: 1; }
+.card-mini .card-suit { font-size: 8px; line-height: 1.2; }
+.card-down {
+  background: repeating-linear-gradient(45deg, #35507e 0 3px, #2b4067 3px 6px);
+  border: 1px solid rgba(255,255,255,.25);
+}
+.suit-s { color: var(--pip-black); }
+.suit-h { color: var(--pip-red); }
+.suit-d { color: var(--pip-diamond); }
+.suit-c { color: var(--pip-club); }
