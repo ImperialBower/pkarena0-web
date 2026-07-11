@@ -2,6 +2,7 @@
     import { LiveAdapter } from '../audio/adapters/live.js';
     import { createTable } from './table.js';
     import { makeCard }    from './cards.js';
+    import { initReplay }  from './replay.js';
 
     // The live design2.0 table instance (felt + 9 seats + center). Built once;
     // driven by table.update(buildTableView(state)) on every render.
@@ -835,29 +836,16 @@
       if (e.target === settingsOverlay) settingsOverlay.classList.remove('open');
     });
 
-    // ── Replay viewer ─────────────────────────────────────────────────────────
-    const replay = {
-      yamlText: null,
-      hands: [],
-      handIndex: 0,
-      step: 0,
-      totalSteps: 0,
-      cloned: false,
-      source: null, // 'session' | 'upload' | null
-    };
-    const REPLAY_PREFIX = 'replay-';
-    const replayOverlay = document.getElementById('replay-overlay');
+    // ── Replay button tally (overlay state + listeners live in replay.js) ─────
 
     // Per-tab tally of completed hands; the replay button is enabled when the
     // currently-active tab has at least one completed hand to replay.
     const handsCompleted = { play: 0, arena: 0 };
 
     function updateReplayButtonState() {
-      // TODO(Task 5): remove — replay is rebuilt on createTable in the next commit.
-      const btn = document.getElementById('btn-replay');
-      btn.disabled = true;
-      btn.title = 'Replay is being rebuilt — back in the next commit';
-      return;
+      const tab = document.body.dataset.tab;
+      const count = handsCompleted[tab] ?? 0;
+      document.getElementById('btn-replay').disabled = count === 0;
     }
 
     function noteHandCompleted(tab) {
@@ -874,287 +862,9 @@
       return document.body.dataset.tab === 'arena' ? _arenaMod : _playMod;
     }
 
-    function ensureReplaySvgClone() {
-      if (replay.cloned) return;
-      const original = document.getElementById('poker-table');
-      const wrapper  = document.getElementById('replay-table-wrapper');
-      if (!original || !wrapper) return;
-      const clone = original.cloneNode(true);
-      // Walk every element and add the prefix to every `id`.
-      // Internal `<use href="#…">` and `url(#…)` refs are left untouched so they
-      // resolve against the original SVG's <defs> already in the document — that
-      // way we don't need to duplicate symbols/gradients/filters in the clone.
-      const walk = (node) => {
-        if (node.nodeType !== 1) return;
-        const id = node.getAttribute && node.getAttribute('id');
-        if (id) node.setAttribute('id', REPLAY_PREFIX + id);
-        for (const child of node.children) walk(child);
-      };
-      walk(clone);
-      // Strip aria/title relationships that would point at duplicated ids.
-      clone.removeAttribute('aria-labelledby');
-      // Drop bot-config name links (the <a> wrappers); replay doesn't need them.
-      clone.querySelectorAll('a').forEach(a => {
-        const parent = a.parentNode;
-        while (a.firstChild) parent.insertBefore(a.firstChild, a);
-        parent.removeChild(a);
-      });
-      wrapper.appendChild(clone);
-      replay.cloned = true;
-    }
-
-    function setReplayText(idSuffix, text) {
-      const el = document.getElementById(REPLAY_PREFIX + idSuffix);
-      if (el) el.textContent = text;
-    }
-    function setReplayVis(idSuffix, visible) {
-      const el = document.getElementById(REPLAY_PREFIX + idSuffix);
-      if (el) el.setAttribute('visibility', visible ? 'visible' : 'hidden');
-    }
-
-    function renderReplaySeat(seatIdx, p, currentSeat) {
-      const grp = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-group');
-      if (!grp) return;
-      if (!p || !p.name) {
-        grp.setAttribute('opacity', '0.25');
-        clearReplayCards(seatIdx);
-        return;
-      }
-      grp.setAttribute('opacity', p.state === 'Fold' ? '0.45' : '1');
-
-      setReplayText('seat-' + seatIdx + '-name', p.name);
-
-      const cards = p.hole_cards ?? [];
-      renderCard(REPLAY_PREFIX + 'seat-' + seatIdx + '-card-0', cards[0] ?? null, false);
-      renderCard(REPLAY_PREFIX + 'seat-' + seatIdx + '-card-1', cards[1] ?? null, false);
-
-      // Chips label: show the all-in amount (from bet) when all-in, normal stack otherwise.
-      const replayChipsEl = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-chips');
-      if (p.state === 'AllIn' && p.bet > 0) {
-        setReplayText('seat-' + seatIdx + '-chips', '$' + p.bet.toLocaleString());
-        if (replayChipsEl) replayChipsEl.setAttribute('fill', '#e09000');
-      } else {
-        setReplayText('seat-' + seatIdx + '-chips', '$' + (p.chips ?? 0).toLocaleString());
-        if (replayChipsEl) replayChipsEl.setAttribute('fill', p.state === 'AllIn' ? '#e09000' : '#aaa');
-      }
-
-      // Bet label — hide when all-in (amount is shown in the chips slot).
-      const betEl = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-bet');
-      if (betEl) {
-        if (p.bet > 0 && p.state !== 'AllIn') {
-          betEl.textContent = '$' + p.bet.toLocaleString();
-          betEl.setAttribute('visibility', 'visible');
-        } else {
-          betEl.setAttribute('visibility', 'hidden');
-        }
-      }
-
-      const badgeGrp  = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-badge');
-      const badgeText = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-badge-text');
-      const badgeRect = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-badge-rect');
-      if (badgeGrp && badgeText && badgeRect) {
-        if (p.state === 'Fold') {
-          badgeGrp.setAttribute('visibility', 'visible');
-          badgeText.textContent = 'FOLD';
-          badgeText.setAttribute('fill', '#ff8888');
-          badgeRect.setAttribute('fill', '#882222');
-          badgeRect.setAttribute('opacity', '0.7');
-          badgeRect.setAttribute('x', '-30');
-          badgeRect.setAttribute('width', '60');
-        } else if (p.state === 'AllIn') {
-          badgeGrp.setAttribute('visibility', 'visible');
-          badgeText.textContent = 'ALL-IN';
-          badgeText.setAttribute('fill', '#ffffff');
-          badgeRect.setAttribute('fill', '#cc8800');
-          badgeRect.setAttribute('opacity', '0.8');
-          badgeRect.setAttribute('x', '-30');
-          badgeRect.setAttribute('width', '60');
-        } else {
-          badgeGrp.setAttribute('visibility', 'hidden');
-          badgeRect.setAttribute('x', '-30');
-          badgeRect.setAttribute('width', '60');
-        }
-      }
-
-      setReplayVis('seat-' + seatIdx + '-btn-d',  !!p.is_dealer);
-      setReplayVis('seat-' + seatIdx + '-btn-sb', !!p.is_sb);
-      setReplayVis('seat-' + seatIdx + '-btn-bb', !!p.is_bb);
-
-      const hlEl = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-highlight');
-      if (hlEl) hlEl.setAttribute('opacity', currentSeat === seatIdx ? '0.18' : '0');
-
-      // Replay never shows the per-seat action callout — the <div id="replay-action-label">
-      // beneath the table tells the story instead.
-      const actionGrp = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + '-action');
-      if (actionGrp) actionGrp.setAttribute('visibility', 'hidden');
-    }
-
-    function clearReplayCards(seatIdx) {
-      for (const sfx of ['-card-0', '-card-1']) {
-        const g = document.getElementById(REPLAY_PREFIX + 'seat-' + seatIdx + sfx);
-        if (g) while (g.firstChild) g.removeChild(g.firstChild);
-      }
-    }
-
-    function renderReplayTable(snap) {
-      ensureReplaySvgClone();
-      const potEl = document.getElementById(REPLAY_PREFIX + 'pot-amount');
-      if (potEl) potEl.textContent = 'POT: $' + (snap.pot ?? 0).toLocaleString();
-
-      for (let i = 0; i < 5; i++) {
-        renderCard(REPLAY_PREFIX + 'board-card-' + i, snap.board?.[i] ?? null, true);
-      }
-
-      const seatsBySeat = new Map();
-      for (const s of snap.seats ?? []) seatsBySeat.set(s.seat, s);
-      for (let i = 0; i < 9; i++) {
-        renderReplaySeat(i, seatsBySeat.get(i) ?? null, snap.current_seat);
-      }
-
-      const handResultGroup = document.getElementById(REPLAY_PREFIX + 'hand-result-group');
-      if (handResultGroup) handResultGroup.setAttribute('visibility', 'hidden');
-
-      document.getElementById('replay-action-label').textContent = snap.action_label ?? '—';
-      document.getElementById('replay-step-counter').textContent =
-        (snap.step + 1) + ' / ' + snap.total_steps;
-
-      const slider = document.getElementById('replay-slider');
-      slider.max = Math.max(0, (snap.total_steps ?? 1) - 1);
-      slider.value = snap.step ?? 0;
-      slider.disabled = (snap.total_steps ?? 0) <= 1;
-      document.getElementById('replay-prev').disabled = (snap.step ?? 0) <= 0;
-      document.getElementById('replay-next').disabled =
-        (snap.step ?? 0) >= (snap.total_steps - 1);
-    }
-
-    function showReplayError(msg) {
-      document.getElementById('replay-action-label').textContent = msg;
-      document.getElementById('replay-step-counter').textContent = '0 / 0';
-      const slider = document.getElementById('replay-slider');
-      slider.max = 0; slider.value = 0; slider.disabled = true;
-      document.getElementById('replay-prev').disabled = true;
-      document.getElementById('replay-next').disabled = true;
-    }
-
-    function loadReplayCollection(yamlText, sourceLabel) {
-      const mod = activeWasmMod();
-      if (!mod) { showReplayError('No game module loaded yet.'); return; }
-      let summary;
-      try {
-        summary = JSON.parse(mod.parse_hand_collection(yamlText));
-      } catch (e) {
-        showReplayError('Failed to parse YAML: ' + e.message);
-        return;
-      }
-      if (summary.error) { showReplayError(summary.error); return; }
-      const hands = summary.hands ?? [];
-      replay.yamlText = yamlText;
-      replay.hands    = hands;
-      replay.handIndex = 0;
-      replay.step      = 0;
-      replay.totalSteps = 0;
-      replay.source    = sourceLabel === 'Session' ? 'session' : 'upload';
-
-      const picker = document.getElementById('replay-hand-picker');
-      while (picker.firstChild) picker.removeChild(picker.firstChild);
-      if (hands.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = ''; opt.textContent = sourceLabel + ' has no hands yet';
-        picker.appendChild(opt);
-        picker.disabled = true;
-        showReplayError('No hands available to replay.');
-        return;
-      }
-      for (const h of hands) {
-        const opt = document.createElement('option');
-        opt.value = String(h.index);
-        opt.textContent = h.description;
-        picker.appendChild(opt);
-      }
-      picker.disabled = false;
-      picker.value = '0';
-      selectReplayHand(0);
-    }
-
-    function selectReplayHand(handIndex) {
-      replay.handIndex = handIndex;
-      replay.step = 0;
-      renderReplayStep(0);
-    }
-
-    function renderReplayStep(step) {
-      const mod = activeWasmMod();
-      if (!mod || replay.yamlText == null) return;
-      let snap;
-      try {
-        snap = JSON.parse(mod.replay_snapshot(replay.yamlText, replay.handIndex, step));
-      } catch (e) {
-        showReplayError('Replay error: ' + e.message);
-        return;
-      }
-      if (snap.error) { showReplayError(snap.error); return; }
-      replay.step = snap.step;
-      replay.totalSteps = snap.total_steps;
-      renderReplayTable(snap);
-    }
-
-    document.getElementById('btn-replay').addEventListener('click', () => {
-      ensureReplaySvgClone();
-      replayOverlay.classList.add('open');
-      // Refresh session data on every open, but leave a user-uploaded YAML intact.
-      if (replay.source !== 'upload') {
-        const mod = activeWasmMod();
-        if (mod) {
-          const yaml = mod.get_session_yaml();
-          loadReplayCollection(yaml, 'Session');
-        }
-      }
-    });
-
-    document.getElementById('replay-close').addEventListener('click', () => {
-      replayOverlay.classList.remove('open');
-    });
-
-    replayOverlay.addEventListener('click', (e) => {
-      if (e.target === replayOverlay) replayOverlay.classList.remove('open');
-    });
-
-    document.getElementById('replay-load-session').addEventListener('click', () => {
-      const mod = activeWasmMod();
-      if (!mod) { showReplayError('No game module loaded yet.'); return; }
-      const yaml = mod.get_session_yaml();
-      loadReplayCollection(yaml, 'Session');
-    });
-
-    document.getElementById('replay-file-input').addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => loadReplayCollection(String(reader.result), file.name);
-      reader.onerror = () => showReplayError('Failed to read file.');
-      reader.readAsText(file);
-      // Reset so picking the same file again re-fires `change`.
-      e.target.value = '';
-    });
-
-    document.getElementById('replay-hand-picker').addEventListener('change', (e) => {
-      const idx = parseInt(e.target.value, 10);
-      if (!Number.isFinite(idx)) return;
-      selectReplayHand(idx);
-    });
-
-    document.getElementById('replay-prev').addEventListener('click', () => {
-      if (replay.step > 0) renderReplayStep(replay.step - 1);
-    });
-
-    document.getElementById('replay-next').addEventListener('click', () => {
-      if (replay.step < replay.totalSteps - 1) renderReplayStep(replay.step + 1);
-    });
-
-    document.getElementById('replay-slider').addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      if (Number.isFinite(val) && val !== replay.step) renderReplayStep(val);
-    });
+    // Replay overlay: state, snapshot rendering and all #replay-* listeners
+    // live in replay.js; it renders through its own createTable instance.
+    initReplay({ getMod: activeWasmMod });
 
     const BLIND_LEVELS = [
       { sb:   50, bb:   100, hands: 10 },
