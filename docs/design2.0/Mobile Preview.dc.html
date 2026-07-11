@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+body{margin:0;background:#141517}
+a{color:#2FD98F}a:hover{color:#4BE6A4}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:28px;padding:36px 24px 48px;font-family:system-ui,sans-serif">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+    <div style="color:#E9ECEF;font-size:15px;font-weight:600;letter-spacing:.04em">pkarena — mobile preview</div>
+    <div style="color:#7C8189;font-size:11.5px">Both seat treatments at iPhone size. Everything is live — tap LOG, Raise…, or the LIST/TABLE toggle. Change the theme in Tweaks.</div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:44px;justify-content:center;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ statusDark }}" hint-size="390px,844px">
+        <dc-import name="Poker Table" force-mobile="{{ true }}" mobile-seats="table" theme="{{ theme }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import>
+      </x-import>
+      <div style="color:#7C8189;font-size:11px;font-family:ui-monospace,Menlo,monospace">A · mini table</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ statusDark }}" hint-size="390px,844px">
+        <dc-import name="Poker Table" force-mobile="{{ true }}" mobile-seats="list" theme="{{ theme }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import>
+      </x-import>
+      <div style="color:#7C8189;font-size:11px;font-family:ui-monospace,Menlo,monospace">B · seat list</div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;midnight&quot;,&quot;options&quot;:[&quot;midnight&quot;,&quot;terminal&quot;,&quot;luxe&quot;,&quot;organic&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'midnight';
+    return {
+      theme,
+      statusDark: theme === 'midnight' || theme === 'luxe'
+    };
+  }
+}
+</script>
+</body>
+</html>
