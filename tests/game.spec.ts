@@ -16,12 +16,7 @@ test.describe('Game initialisation', () => {
   test('Hero cards are visible after New Game', async ({ page }) => {
     await startGame(page);
     await waitForHumanTurn(page);
-
-    // Hero seat should have two card groups with SVG children (face-up cards)
-    const card0Children = await page.locator('#seat-0-card-0 > *').count();
-    const card1Children = await page.locator('#seat-0-card-1 > *').count();
-    expect(card0Children).toBeGreaterThan(0);
-    expect(card1Children).toBeGreaterThan(0);
+    await expect(page.locator('#hero-cards .card')).toHaveCount(2);
   });
 
   test('Status indicates human turn', async ({ page }) => {

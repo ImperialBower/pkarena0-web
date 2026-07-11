@@ -1,11 +1,16 @@
     import { Voice }       from '../audio/voice.js';
     import { LiveAdapter } from '../audio/adapters/live.js';
+    import { createTable } from './table.js';
+    import { makeCard }    from './cards.js';
+
+    // The live design2.0 table instance (felt + 9 seats + center). Built once;
+    // driven by table.update(buildTableView(state)) on every render.
+    const table = createTable(document.getElementById('table-zone'));
 
     let _playMod = null, _arenaMod = null;
     let arenaGeneration = 0;
 
     // ── Constants ─────────────────────────────────────────────────────────────
-    const SVG_NS = 'http://www.w3.org/2000/svg';
     let BOT_ACTION_MS = 1000;   // pause between each bot action (configurable via settings)
     let HAND_COMPLETE_MS = 5000; // pause to show result before starting next hand (configurable)
     let gameSeed = 0;            // seed used for the current session (saved to URL)
@@ -103,76 +108,27 @@
 
     // ── Action callout helpers ────────────────────────────────────────────────
 
-    // Returns background fill + text color for a given action label string.
-    function actionColors(label) {
-      const l = (label ?? '').toLowerCase();
-      if (l.startsWith('fold'))                     return { fill: '#882222', color: '#ff8888' };
-      if (l.startsWith('check'))                    return { fill: '#1a5c2e', color: '#55dd88' };
-      if (l.startsWith('call'))                     return { fill: '#1a3a6e', color: '#66aaff' };
-      if (l.startsWith('bet') || l.startsWith('raise')) return { fill: '#5c4400', color: '#ffcc44' };
-      if (l.startsWith('all'))                      return { fill: '#884400', color: '#ff9922' };
-      return { fill: '#333', color: '#fff' };
-    }
-
-    // Shows (or hides) the action callout badge for a seat and persists the label.
+    // Shows (or hides) the action pill for a seat and persists the label. The
+    // pill variant/colour mapping now lives in table.js (pillVariant).
     function setActionLabel(seat, label) {
       lastActions[seat] = label ?? null;
-      const actionGrp = document.getElementById('seat-' + seat + '-action');
-      const actionBg  = document.getElementById('seat-' + seat + '-action-bg');
-      const actionTxt = document.getElementById('seat-' + seat + '-action-text');
-      if (!actionGrp || !actionBg || !actionTxt) return;
-      if (!label) {
-        actionGrp.setAttribute('visibility', 'hidden');
-        return;
-      }
-      const { fill, color } = actionColors(label);
-      actionBg.setAttribute('fill', fill);
-      actionTxt.setAttribute('fill', color);
-      actionTxt.textContent = label;
-      actionGrp.setAttribute('visibility', 'visible');
+      table.setActionLabel(seat, label ?? null);
     }
 
-    // Clears all action callouts — called at the start of each new hand.
+    // Clears all action pills — called at the start of each new hand.
     function clearAllActions() {
       for (let i = 0; i < 9; i++) {
         lastActions[i] = null;
-        const g = document.getElementById('seat-' + i + '-action');
-        if (g) g.setAttribute('visibility', 'hidden');
+        table.setActionLabel(i, null);
       }
     }
 
-    function clearChildren(el) {
-      while (el && el.firstChild) el.removeChild(el.firstChild);
-    }
-
-    // Resets all SVG table visuals to a blank pre-game state.
+    // Resets the table visuals + score bar to a blank pre-game state.
     function clearTable() {
-      for (let i = 0; i < 5; i++) clearChildren(document.getElementById('board-card-' + i));
-      const heroCards  = document.getElementById('hero-cards');
-      const boardCards = document.getElementById('board-cards');
-      if (heroCards)  { heroCards.className = ''; clearChildren(heroCards); }
-      if (boardCards) { boardCards.className = ''; clearChildren(boardCards); }
-      const pot = document.getElementById('pot-amount');
-      if (pot) pot.textContent = 'POT: $0';
-      hideHandResult();
+      table.clear();
       clearAllActions();
-      for (let i = 0; i < 9; i++) {
-        const p = 'seat-' + i + '-';
-        const h  = document.getElementById(p + 'highlight');
-        const b  = document.getElementById(p + 'bet');
-        const bx = document.getElementById(p + 'badge');
-        const d  = document.getElementById(p + 'btn-d');
-        const sb = document.getElementById(p + 'btn-sb');
-        const bb = document.getElementById(p + 'btn-bb');
-        if (h)  h.setAttribute('opacity', '0');
-        if (b)  b.setAttribute('visibility', 'hidden');
-        if (bx) bx.setAttribute('visibility', 'hidden');
-        if (d)  d.setAttribute('visibility', 'hidden');
-        if (sb) sb.setAttribute('visibility', 'hidden');
-        if (bb) bb.setAttribute('visibility', 'hidden');
-        clearChildren(document.getElementById(p + 'card-0'));
-        clearChildren(document.getElementById(p + 'card-1'));
-      }
+      hideHandResult();
+      document.getElementById('hero-cards').replaceChildren();
       document.getElementById('sc-hand').textContent   = '—';
       document.getElementById('sc-blinds').textContent = '—';
       document.getElementById('sc-chips').textContent  = '—';
@@ -182,23 +138,19 @@
       hideBetControls();
     }
 
-    // Shows the hand-result overlay above the community cards.
-    // isWin: true = green (won), false = red (lost), null = yellow (even).
+    // Shows the hand-result banner above the board.
+    // isWin: true = won (accent), false/null = neutral.
     function showHandResult(text, isWin) {
-      const grp = document.getElementById('hand-result-group');
-      const bg  = document.getElementById('hand-result-bg');
-      const txt = document.getElementById('hand-result-text');
-      if (!grp || !txt) return;
-      txt.textContent = text;
-      if (isWin === true)       { txt.setAttribute('fill', '#44ff88'); bg?.setAttribute('fill', '#0a3318'); }
-      else if (isWin === false) { txt.setAttribute('fill', '#ff6666'); bg?.setAttribute('fill', '#330a0a'); }
-      else                      { txt.setAttribute('fill', '#ffdd66'); bg?.setAttribute('fill', '#1a1a08'); }
-      grp.setAttribute('visibility', 'visible');
+      const el = document.getElementById('hand-result-overlay');
+      if (!el) return;
+      el.textContent = text;
+      el.classList.toggle('win', !!isWin);
+      el.hidden = false;
     }
 
     function hideHandResult() {
-      const grp = document.getElementById('hand-result-group');
-      if (grp) grp.setAttribute('visibility', 'hidden');
+      const el = document.getElementById('hand-result-overlay');
+      if (el) el.hidden = true;
     }
 
     // Builds a readable action label for the hero's action.
@@ -245,42 +197,6 @@
     }
 
     // ── Boot ──────────────────────────────────────────────────────────────────
-    // ── Adaptive table-text scaling ───────────────────────────────────────────
-    // Computes the SVG's current pixel scale and bumps font-size attributes so
-    // seat labels remain legible when the table shrinks on mobile/landscape.
-    function scaleTableText() {
-      const svg = document.getElementById('poker-table');
-      const w = svg.getBoundingClientRect().width;
-      if (!w) return;
-      const scale = w / 1200; // rendered px / viewBox width
-
-      // Target minimum legible sizes in CSS px; capped to avoid plate overflow.
-      // Plate is 44 viewBox units tall with name at y=-12, chips at y=6.
-      const nameSize   = Math.min(26, Math.max(14, Math.round(10 / scale)));
-      const chipsSize  = Math.min(21, Math.max(12, Math.round( 8 / scale)));
-      const actionSize = Math.min(21, Math.max(13, Math.round(10 / scale)));
-      const badgeSize  = Math.min(15, Math.max( 9, Math.round( 7 / scale)));
-      const potSize    = Math.min(23, Math.max(14, Math.round(10 / scale)));
-      // Push chips label down a touch when name font is enlarged to avoid overlap
-      const chipsY = nameSize > 16 ? 10 : 6;
-
-      for (let i = 0; i <= 8; i++) {
-        const name   = document.getElementById('seat-' + i + '-name');
-        const chips  = document.getElementById('seat-' + i + '-chips');
-        const action = document.getElementById('seat-' + i + '-action-text');
-        const badge  = document.getElementById('seat-' + i + '-badge-text');
-        if (name)   name  .setAttribute('font-size', nameSize);
-        if (chips)  { chips.setAttribute('font-size', chipsSize); chips.setAttribute('y', chipsY); }
-        if (action) action.setAttribute('font-size', actionSize);
-        if (badge)  badge .setAttribute('font-size', badgeSize);
-      }
-      const potEl = document.getElementById('pot-amount');
-      if (potEl) potEl.setAttribute('font-size', potSize);
-    }
-    // Fire once on load and again whenever the SVG element changes size
-    // (covers orientation flip, window resize, or layout column reflow).
-    new ResizeObserver(scaleTableText).observe(document.getElementById('poker-table'));
-    setTimeout(scaleTableText, 0); // initial pass before first paint
 
     // ── URL state persistence ──────────────────────────────────────────────────
 
@@ -548,7 +464,26 @@
 
     // ── Render ────────────────────────────────────────────────────────────────
 
-    // Updates all SVG visuals and score bar; does NOT touch status or action buttons.
+    // Maps the WASM GameState JSON onto the shape table.update() expects.
+    function buildTableView(state) {
+      return {
+        pot: state.pot ?? 0,
+        board: state.board ?? [],
+        smallBlind: state.small_blind ?? 0,
+        bigBlind: state.big_blind ?? 0,
+        seats: [state.hero, ...(state.players ?? [])].filter(Boolean),
+        dealerSeat: state.dealer_seat ?? null,
+        currentSeat: null,
+        heroSeat: 0,
+        heroTurn: state.phase === 'WaitingForHuman',
+        allInAmounts,
+        showHud: false,
+        nameHref: botConfigUrl,
+        emoji: name => BOT_EMOJIS[name] ?? '',
+      };
+    }
+
+    // Updates the table + score bar; does NOT touch status or action buttons.
     function renderTableVisuals(state) {
       if (!state || state.phase === 'Error') return;
 
@@ -561,20 +496,21 @@
       renderPnlSlot();
       updateNewTableButton(state);
 
-      document.getElementById('pot-amount').textContent =
-        'POT: $' + (state.pot ?? 0).toLocaleString();
-
-      for (let i = 0; i < 5; i++) {
-        renderCard('board-card-' + i, state.board?.[i] ?? null, true);
+      // All-in amount tracking: persists across streets (bet resets to 0 postflop).
+      if (state.hand_number !== allInHandNumber) {
+        allInAmounts.clear();
+        allInHandNumber = state.hand_number;
+      }
+      for (const p of [state.hero, ...(state.players ?? [])].filter(Boolean)) {
+        if (p.state === 'AllIn') {
+          if (p.bet > 0) allInAmounts.set(p.seat, p.bet);
+        } else {
+          allInAmounts.delete(p.seat);
+        }
       }
 
-      updateSeat(0, state.hero, state);
-      for (const p of state.players ?? []) {
-        updateSeat(p.seat, p, state);
-      }
-
+      table.update(buildTableView(state));
       updateHeroCardsDisplay(state.hero);
-      updateBoardCardsDisplay(state.board);
     }
 
     // Full render: visuals + phase-appropriate status and action buttons.
@@ -679,240 +615,14 @@
       renderActionButtons(state);
     }
 
-    function updateSeat(seatIdx, player, state) {
-      const grp = document.getElementById('seat-' + seatIdx + '-group');
-      if (!grp) return;
-
-      if (!player || player.state === 'Out') {
-        grp.setAttribute('opacity', '0.25');
-        clearCards(seatIdx);
-        return;
-      }
-      grp.setAttribute('opacity', '1');
-
-      // Name + chips
-      const emoji = seatIdx !== 0 ? (BOT_EMOJIS[player.name] ?? '') : '';
-      setText('seat-' + seatIdx + '-name', emoji ? emoji + ' ' + player.name : player.name || '—');
-
-      // Bot name link
-      if (seatIdx !== 0) {
-        const linkEl = document.getElementById('seat-' + seatIdx + '-name-link');
-        if (linkEl) linkEl.setAttribute('href', botConfigUrl(player.name));
-      }
-
-      // Hole cards
-      const cards = player.hole_cards ?? [];
-      renderCard('seat-' + seatIdx + '-card-0', cards[0] ?? null, false);
-      renderCard('seat-' + seatIdx + '-card-1', cards[1] ?? null, false);
-
-      // All-in amount tracking: persist across streets (bet resets to 0 on flop+).
-      if (state.hand_number !== allInHandNumber) {
-        allInAmounts.clear();
-        allInHandNumber = state.hand_number;
-      }
-      if (player.state === 'AllIn') {
-        if (player.bet > 0) allInAmounts.set(seatIdx, player.bet);
-      } else {
-        allInAmounts.delete(seatIdx);
-      }
-      const savedAllIn = allInAmounts.get(seatIdx);
-
-      // Chips label: show all-in amount (amber) when all-in, normal stack otherwise.
-      const chipsEl = document.getElementById('seat-' + seatIdx + '-chips');
-      if (player.state === 'AllIn' && savedAllIn != null) {
-        setText('seat-' + seatIdx + '-chips', '$' + savedAllIn.toLocaleString());
-        if (chipsEl) chipsEl.setAttribute('fill', '#e09000');
-      } else {
-        setText('seat-' + seatIdx + '-chips', '$' + (player.chips ?? 0).toLocaleString());
-        if (chipsEl) chipsEl.setAttribute('fill', '#aaa');
-      }
-
-      // Current bet — hide when all-in (amount is already in the chips slot).
-      const betEl = document.getElementById('seat-' + seatIdx + '-bet');
-      if (betEl) {
-        if (player.bet > 0 && player.state !== 'AllIn') {
-          betEl.textContent = '$' + player.bet.toLocaleString();
-          betEl.setAttribute('visibility', 'visible');
-        } else {
-          betEl.setAttribute('visibility', 'hidden');
-        }
-      }
-
-      // Status badge
-      const badgeGrp = document.getElementById('seat-' + seatIdx + '-badge');
-      const badgeText = document.getElementById('seat-' + seatIdx + '-badge-text');
-      const badgeRect = document.getElementById('seat-' + seatIdx + '-badge-rect');
-      if (badgeGrp && badgeText && badgeRect) {
-        if (player.state === 'Fold') {
-          badgeGrp.setAttribute('visibility', 'visible');
-          badgeText.textContent = 'FOLD';
-          badgeText.setAttribute('fill', '#ff8888');
-          badgeRect.setAttribute('fill', '#882222');
-          badgeRect.setAttribute('opacity', '0.7');
-          badgeRect.setAttribute('x', '-30');
-          badgeRect.setAttribute('width', '60');
-        } else if (player.state === 'AllIn') {
-          badgeGrp.setAttribute('visibility', 'visible');
-          badgeText.textContent = 'ALL-IN';
-          badgeText.setAttribute('fill', '#ffffff');
-          badgeRect.setAttribute('fill', '#cc8800');
-          badgeRect.setAttribute('opacity', '0.8');
-          badgeRect.setAttribute('x', '-30');
-          badgeRect.setAttribute('width', '60');
-        } else {
-          badgeGrp.setAttribute('visibility', 'hidden');
-          badgeRect.setAttribute('x', '-30');
-          badgeRect.setAttribute('width', '60');
-        }
-      }
-
-      // Position markers (D / SB / BB)
-      setVisibility('seat-' + seatIdx + '-btn-d',  player.is_dealer ? 'visible' : 'hidden');
-      setVisibility('seat-' + seatIdx + '-btn-sb', player.is_sb    ? 'visible' : 'hidden');
-      setVisibility('seat-' + seatIdx + '-btn-bb', player.is_bb    ? 'visible' : 'hidden');
-
-      // Active highlight (hero seat glow when it's our turn)
-      const hlEl = document.getElementById('seat-' + seatIdx + '-highlight');
-      if (hlEl) {
-        const isHeroTurn = seatIdx === 0 && state.phase === 'WaitingForHuman';
-        hlEl.setAttribute('opacity', isHeroTurn ? '0.10' : '0');
-      }
-
-      // Name plate border colour: hero = gold, folded = dim, active = bright
-      const plateEl = document.getElementById('seat-' + seatIdx + '-plate');
-      if (plateEl) {
-        if (seatIdx === 0) {
-          plateEl.setAttribute('stroke', '#c8a84e');
-        } else if (player.state === 'Fold' || player.state === 'Out') {
-          plateEl.setAttribute('stroke', '#333');
-        } else {
-          plateEl.setAttribute('stroke', '#4a90d9');
-        }
-      }
-
-      // Action callout — restore persisted label so renderTableVisuals doesn't wipe it
-      const actionGrp = document.getElementById('seat-' + seatIdx + '-action');
-      const actionBg  = document.getElementById('seat-' + seatIdx + '-action-bg');
-      const actionTxt = document.getElementById('seat-' + seatIdx + '-action-text');
-      if (actionGrp && actionBg && actionTxt) {
-        const label = lastActions[seatIdx];
-        if (label) {
-          const { fill, color } = actionColors(label);
-          actionBg.setAttribute('fill', fill);
-          actionTxt.setAttribute('fill', color);
-          actionTxt.textContent = label;
-          actionGrp.setAttribute('visibility', 'visible');
-        } else {
-          actionGrp.setAttribute('visibility', 'hidden');
-        }
-      }
-    }
-
-    function clearCards(seatIdx) {
-      const c0 = document.getElementById('seat-' + seatIdx + '-card-0');
-      const c1 = document.getElementById('seat-' + seatIdx + '-card-1');
-      if (c0) while (c0.firstChild) c0.removeChild(c0.firstChild);
-      if (c1) while (c1.firstChild) c1.removeChild(c1.firstChild);
-    }
-
-    // ── HTML card displays (large, readable outside the SVG) ─────────────────
-    function makeCardEl(cardStr) {
-      if (!cardStr || cardStr === '__') return null;
-      const suit = cardStr[cardStr.length - 1];
-      const rank = cardStr.slice(0, -1);
-      const rankLabel = rank === 'T' ? '10' : rank;
-      const suitChar = { s: '\u2660', h: '\u2665', d: '\u2666', c: '\u2663' }[suit] ?? '?';
-      const div = document.createElement('div');
-      div.className = 'card-display suit-' + suit;
-      const rankSpan = document.createElement('span');
-      rankSpan.className = 'cd-rank';
-      rankSpan.textContent = rankLabel;
-      const suitSpan = document.createElement('span');
-      suitSpan.className = 'cd-suit';
-      suitSpan.textContent = suitChar;
-      div.appendChild(rankSpan);
-      div.appendChild(suitSpan);
-      return div;
-    }
-
+    // ── Hero hole cards (large, in the dock) ──────────────────────────────────
     function updateHeroCardsDisplay(hero) {
       const el = document.getElementById('hero-cards');
       if (!el) return;
+      el.replaceChildren();
       const cards = hero?.hole_cards;
-      el.className = '';
-      while (el.firstChild) el.removeChild(el.firstChild);
       if (!cards || cards.length < 2 || !cards[0]) return;
-      cards.forEach(c => { const node = makeCardEl(c); if (node) el.appendChild(node); });
-      el.className = 'has-cards';
-    }
-
-    function updateBoardCardsDisplay(board) {
-      const el = document.getElementById('board-cards');
-      if (!el) return;
-      while (el.firstChild) el.removeChild(el.firstChild);
-      if (!board || board.length === 0) { el.className = ''; return; }
-      board.forEach(c => { const node = makeCardEl(c); if (node) el.appendChild(node); });
-      el.className = 'has-cards';
-    }
-
-    // ── Card rendering (SVG DOM, no innerHTML) ────────────────────────────────
-    function renderCard(groupId, cardStr, isBoardSlot) {
-      const g = document.getElementById(groupId);
-      if (!g) return;
-      while (g.firstChild) g.removeChild(g.firstChild);
-
-      if (!cardStr) {
-        if (!isBoardSlot) {
-          // Seat card: no card dealt yet — show nothing.
-        }
-        return;
-      }
-
-      if (cardStr === '__') {
-        // Face-down card
-        const u = document.createElementNS(SVG_NS, 'use');
-        u.setAttribute('href', '#cardDown');
-        u.setAttribute('width', '44');
-        u.setAttribute('height', '62');
-        g.appendChild(u);
-        return;
-      }
-
-      // Face-up card: two-char ASCII "As", "Kh", etc.
-      const rankChar = cardStr[0];
-      const suitChar = cardStr[1];
-      const rankLabel = rankChar === 'T' ? '10' : rankChar;
-      const suitId = { s: 'spade', h: 'heart', d: 'diamond', c: 'club' }[suitChar] ?? 'spade';
-      const fill = { s: '#1a1a1a', h: '#cc1111', d: '#1a6bbf', c: '#0c8a3a' }[suitChar] ?? '#1a1a1a';
-
-      const rect = document.createElementNS(SVG_NS, 'rect');
-      rect.setAttribute('width', '44');
-      rect.setAttribute('height', '62');
-      rect.setAttribute('rx', '4');
-      rect.setAttribute('fill', '#fff');
-      rect.setAttribute('stroke', '#ccc');
-      rect.setAttribute('stroke-width', '0.5');
-
-      const rankText = document.createElementNS(SVG_NS, 'text');
-      rankText.setAttribute('x', '3');
-      rankText.setAttribute('y', '16');
-      rankText.setAttribute('font-family', 'Georgia,serif');
-      rankText.setAttribute('font-size', rankLabel === '10' ? '12' : '14');
-      rankText.setAttribute('font-weight', 'bold');
-      rankText.setAttribute('fill', fill);
-      rankText.textContent = rankLabel;
-
-      const suitUse = document.createElementNS(SVG_NS, 'use');
-      suitUse.setAttribute('href', '#' + suitId);
-      suitUse.setAttribute('x', '12');
-      suitUse.setAttribute('y', '24');
-      suitUse.setAttribute('width', '20');
-      suitUse.setAttribute('height', '20');
-      suitUse.setAttribute('color', fill);
-
-      g.appendChild(rect);
-      g.appendChild(rankText);
-      g.appendChild(suitUse);
+      cards.forEach(c => { const node = makeCard(c, 'hero'); if (node) el.appendChild(node); });
     }
 
     // ── Action buttons ────────────────────────────────────────────────────────
@@ -1033,11 +743,6 @@
       if (el) el.textContent = value;
     }
 
-    function setVisibility(id, vis) {
-      const el = document.getElementById(id);
-      if (el) el.setAttribute('visibility', vis);
-    }
-
     function setStatus(msg) {
       document.getElementById('status-msg').textContent = msg;
     }
@@ -1106,6 +811,15 @@
       if (e.target === gameStateOverlay) gameStateOverlay.classList.remove('open');
     });
 
+    // ── Hand-log aside ─────────────────────────────────────────────────────────
+    const logAside = document.getElementById('log-aside');
+    document.getElementById('log-toggle').addEventListener('click', () => {
+      logAside.hidden = !logAside.hidden;
+    });
+    document.getElementById('log-close').addEventListener('click', () => {
+      logAside.hidden = true;
+    });
+
     // ── Settings overlay ───────────────────────────────────────────────────────
     const settingsOverlay = document.getElementById('settings-overlay');
 
@@ -1139,9 +853,11 @@
     const handsCompleted = { play: 0, arena: 0 };
 
     function updateReplayButtonState() {
-      const tab = document.body.dataset.tab;
-      const count = handsCompleted[tab] ?? 0;
-      document.getElementById('btn-replay').disabled = count === 0;
+      // TODO(Task 5): remove — replay is rebuilt on createTable in the next commit.
+      const btn = document.getElementById('btn-replay');
+      btn.disabled = true;
+      btn.title = 'Replay is being rebuilt — back in the next commit';
+      return;
     }
 
     function noteHandCompleted(tab) {
