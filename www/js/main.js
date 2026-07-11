@@ -847,6 +847,18 @@
       gameStateOverlay.classList.add('open');
     });
 
+    // Settings → "View game state (JSON)": populate + open the debug overlay.
+    document.getElementById('settings-view-state').addEventListener('click', () => {
+      const mod = document.body.dataset.tab === 'arena' ? _arenaMod : _playMod;
+      if (mod) {
+        const raw = mod.get_state();
+        try { gameStatePre.textContent = JSON.stringify(JSON.parse(raw), null, 2); }
+        catch { gameStatePre.textContent = raw; }
+      }
+      settingsOverlay.classList.remove('open');
+      gameStateOverlay.classList.add('open');
+    });
+
     document.getElementById('game-state-close').addEventListener('click', () => {
       gameStateOverlay.classList.remove('open');
     });
