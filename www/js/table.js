@@ -109,6 +109,37 @@ export function createTable(rootEl, { replay = false } = {}) {
   }
   rootEl.append(zone);
 
+  // Mobile seat-list + board-strip. Hidden on desktop and in table-mode via CSS;
+  // populated from the same view on every update().
+  const listWrap = el('div', 'seat-list-wrap');
+  const strip = el('div', 'board-strip');
+  const stripPot = el('span', 'strip-pot', 'POT $0');
+  const stripBoard = el('div', 'strip-board');
+  const stripSlots = SLOT_LABELS.map(() => {
+    const s = el('div', 'strip-slot');
+    stripBoard.append(s);
+    return s;
+  });
+  const stripBlinds = el('span', 'strip-blinds', '');
+  strip.append(stripPot, stripBoard, stripBlinds);
+  const list = el('div', 'seat-list');
+  const listRows = [];
+  for (let i = 0; i < 9; i++) {
+    const row = el('div', 'list-row');
+    row.dataset.listSeat = String(i);
+    const tag = el('span', 'list-tag');
+    const mid = el('div', 'list-mid');
+    mid.append(el('span', 'list-name', '—'), el('span', 'list-hud'));
+    const right = el('div', 'list-right');
+    right.append(el('span', 'list-stack'), el('span', 'list-bb'));
+    const pill = el('span', 'list-pill');
+    row.append(tag, mid, right, pill);
+    list.append(row);
+    listRows.push(row);
+  }
+  listWrap.append(strip, list);
+  rootEl.append(listWrap);
+
   const q = (i, sel) => seats[i].querySelector(sel);
   const actionLabels = new Array(9).fill(null);
 
@@ -190,6 +221,42 @@ export function createTable(rootEl, { replay = false } = {}) {
     }
   }
 
+  // Mobile seat-list row — same data as renderSeat, laid out as a flat row.
+  function renderListRow(i, p, view) {
+    const row = listRows[i];
+    const q2 = sel => row.querySelector(sel);
+    if (!p || p.state === 'Out' || !p.name) {
+      row.className = 'list-row list-empty';
+      q2('.list-tag').textContent = '';
+      q2('.list-name').textContent = '—';
+      q2('.list-hud').textContent = '';
+      q2('.list-stack').textContent = '';
+      q2('.list-bb').textContent = '';
+      q2('.list-pill').className = 'list-pill';
+      q2('.list-pill').textContent = '';
+      return;
+    }
+    row.className = 'list-row'
+      + (i === view.heroSeat ? ' list-hero' : '')
+      + (p.state === 'Fold' ? ' list-fold' : '');
+    q2('.list-tag').textContent = positionTag(i, view.dealerSeat);
+    const emoji = view.emoji && i !== view.heroSeat ? view.emoji(p.name) : '';
+    q2('.list-name').textContent = (emoji ? emoji + ' ' : '') + p.name;
+    q2('.list-hud').style.display = view.showHud ? '' : 'none';
+    const allIn = p.state === 'AllIn'
+      ? (view.allInAmounts?.get(i) ?? (p.bet > 0 ? p.bet : null)) : null;
+    q2('.list-stack').textContent = allIn != null ? fmt(allIn) : fmt(p.chips);
+    q2('.list-bb').textContent =
+      view.bigBlind > 0 && allIn == null
+        ? Math.round((p.chips ?? 0) / view.bigBlind) + 'BB' : '';
+    const lbl = actionLabels[i];
+    const variant = pillVariant(lbl);
+    const pill = q2('.list-pill');
+    pill.className = 'list-pill' + (variant ? ' pill-' + variant : '');
+    pill.textContent = lbl ? shortLabel(lbl) : '';
+    pill.style.visibility = lbl ? 'visible' : 'hidden';
+  }
+
   function update(view) {
     pot.textContent = 'POT ' + fmt(view.pot);
     label.textContent = view.smallBlind
@@ -202,6 +269,15 @@ export function createTable(rootEl, { replay = false } = {}) {
     });
     const bySeat = new Map((view.seats ?? []).map(p => [p.seat, p]));
     for (let i = 0; i < 9; i++) renderSeat(i, bySeat.get(i) ?? null, view);
+
+    stripPot.textContent = 'POT ' + fmt(view.pot);
+    stripBlinds.textContent = view.smallBlind ? `${view.smallBlind}/${view.bigBlind}` : '';
+    stripSlots.forEach((slot, idx) => {
+      const c = view.board?.[idx] ?? null;
+      slot.replaceChildren();
+      if (c) slot.append(makeCard(c, 'mini'));
+    });
+    for (let i = 0; i < 9; i++) renderListRow(i, bySeat.get(i) ?? null, view);
   }
 
   function clear() {
@@ -213,6 +289,10 @@ export function createTable(rootEl, { replay = false } = {}) {
     slots.forEach((slot, idx) => {
       slot.replaceChildren(el('span', 'slot-label', SLOT_LABELS[idx]));
     });
+    stripPot.textContent = 'POT $0';
+    stripBlinds.textContent = '';
+    stripSlots.forEach(slot => slot.replaceChildren());
+    for (let i = 0; i < 9; i++) renderListRow(i, null, { heroSeat: null });
   }
 
   return { update, setActionLabel, clear };

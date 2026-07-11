@@ -119,6 +119,46 @@
 .suit-d { color: var(--pip-diamond); }
 .suit-c { color: var(--pip-club); }
 
+/* Seat list (mobile treatment 2). Hidden until the mobile media query shows it. */
+.seat-list-wrap { display: none; flex-direction: column; height: 100%; }
+.board-strip {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-bottom: var(--line); flex: none;
+}
+.strip-pot {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  color: var(--pot-col); background: var(--pot-bg); border: var(--pot-border);
+  border-radius: var(--pot-radius); padding: 3px 11px;
+}
+.strip-board { display: flex; gap: 4px; flex: 1; }
+.strip-slot {
+  width: 20px; height: 28px; border-radius: var(--slot-radius);
+  border: var(--slot-border); background: var(--slot-bg);
+}
+.strip-slot:has(.card) { border: none; background: transparent; }
+.strip-blinds { font-family: var(--font-mono); font-size: 9px; color: var(--dim); }
+.seat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.list-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-bottom: var(--line);
+}
+.list-row.list-hero { border: 1.5px solid var(--accent); border-radius: var(--ring-radius); }
+.list-row.list-fold, .list-row.list-empty { opacity: .5; }
+.list-tag {
+  width: 32px; flex: none; font-family: var(--font-mono); font-size: 9px; color: var(--tag-col);
+}
+.list-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.list-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.list-hud { font-family: var(--font-mono); font-size: 8px; color: var(--hud-col); }
+.list-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.list-stack { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--stack-col); }
+.list-bb { font-size: 8.5px; color: var(--bb-col); }
+.list-pill {
+  width: 58px; flex: none; text-align: center; font-family: var(--font-mono);
+  font-size: 8px; font-weight: 600; padding: 3px 0; border-radius: var(--pill-radius);
+  text-transform: uppercase; background: var(--pill-blind-bg); color: var(--pill-blind-col);
+}
+
 /* ─────────────────────────── mobile (< 760px) ─────────────────────────── */
 @media (max-width: 759px) {
   .felt, .felt-ring { left: 5%; right: 5%; top: 4%; bottom: 5%; }

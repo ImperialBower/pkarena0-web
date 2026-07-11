@@ -3,7 +3,7 @@
     import { createTable } from './table.js';
     import { makeCard }    from './cards.js';
     import { initReplay }  from './replay.js';
-    import { initThemes, initDeckToggle } from './themes.js';
+    import { initThemes, initDeckToggle, initViewToggle } from './themes.js';
 
     // The live design2.0 table instance (felt + 9 seats + center). Built once;
     // driven by table.update(buildTableView(state)) on every render.
@@ -303,6 +303,7 @@
     }
     initThemes();
     initDeckToggle();
+    initViewToggle();
     boot();
 
     // ── Audio ─────────────────────────────────────────────────────────────────

@@ -34,3 +34,24 @@ test.describe('mobile mini-table', () => {
     expect(ratio).toBeLessThan(0.6); // 50%, not 71%
   });
 });
+
+test.describe('mobile seat-list', () => {
+  test('view toggle switches to the seat list and persists', async ({ page }) => {
+    await startGame(page);
+    await waitForHumanTurn(page);
+    // Default = table mode: mini-table visible, list hidden.
+    await expect(page.locator('#table-zone .felt')).toBeVisible();
+    await expect(page.locator('#table-zone .seat-list')).toBeHidden();
+
+    await page.click('#view-toggle');
+    expect(await page.evaluate(() => document.body.classList.contains('seats-list'))).toBe(true);
+    await expect(page.locator('#table-zone .seat-list')).toBeVisible();
+    await expect(page.locator('#table-zone .felt')).toBeHidden();
+    await expect(page.locator('#table-zone .list-row')).toHaveCount(9);
+    await expect(page.locator('#table-zone .board-strip')).toBeVisible();
+
+    await page.reload();
+    await waitForBoot(page);  // no active game after reload; just wait for the module to init
+    expect(await page.evaluate(() => document.body.classList.contains('seats-list'))).toBe(true);
+  });
+});

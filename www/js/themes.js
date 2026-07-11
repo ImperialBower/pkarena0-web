@@ -1,6 +1,7 @@
 // Theme + deck-color switching with localStorage persistence.
 const THEME_KEY = 'pkarena.theme';
 const DECK_KEY = 'pkarena.deck';
+const SEATS_KEY = 'pkarena.mobileSeats';
 const THEMES = ['midnight', 'terminal', 'luxe', 'organic'];
 
 function applyTheme(name) {
@@ -18,6 +19,24 @@ export function initThemes() {
   sel.addEventListener('change', () => {
     applyTheme(sel.value);
     try { localStorage.setItem(THEME_KEY, sel.value); } catch { /* ignore */ }
+  });
+}
+
+export function initViewToggle() {
+  const btn = document.getElementById('view-toggle');
+  if (!btn) return;
+  let saved = null;
+  try { saved = localStorage.getItem(SEATS_KEY); } catch { /* ignore */ }
+  const apply = mode => {
+    const list = mode === 'list';
+    document.body.classList.toggle('seats-list', list);
+    btn.textContent = list ? 'TABLE ⇄' : 'LIST ⇄';   // label = what you switch TO
+  };
+  apply(saved === 'list' ? 'list' : 'table');
+  btn.addEventListener('click', () => {
+    const next = document.body.classList.contains('seats-list') ? 'table' : 'list';
+    apply(next);
+    try { localStorage.setItem(SEATS_KEY, next); } catch { /* ignore */ }
   });
 }
 
