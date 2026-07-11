@@ -516,6 +516,31 @@
 
       table.update(buildTableView(state));
       updateHeroCardsDisplay(state.hero);
+      renderHeroDock(state);
+    }
+
+    const POS_TAGS = ['BTN','SB','BB','UTG','UTG+1','MP','LJ','HJ','CO'];
+    function renderHeroDock(state) {
+      const hero = state.hero;
+      const title = document.getElementById('hero-title');
+      const sub = document.getElementById('hero-sub');
+      if (!hero) { title.textContent = ''; sub.textContent = ''; return; }
+      const chips = hero.chips ?? 0;
+      const bb = state.big_blind > 0 ? Math.round(chips / state.big_blind) : 0;
+      const pos = state.dealer_seat != null
+        ? POS_TAGS[((0 - state.dealer_seat) % 9 + 9) % 9] : '';
+      title.textContent = `You${pos ? ' · ' + pos : ''} · $${chips.toLocaleString()} (${bb} BB)`;
+      const toCall = state.to_call ?? 0;
+      // pkcore's `pot` excludes live (uncommitted) street bets, so fold them back
+      // in for realistic pot-odds/SPR — otherwise preflop reads POT ODDS 100%.
+      const liveBets = [state.hero, ...(state.players ?? [])]
+        .filter(Boolean).reduce((s, p) => s + (p.bet ?? 0), 0);
+      const pot = (state.pot ?? 0) + liveBets;
+      const odds = toCall > 0 ? Math.round((toCall / (pot + toCall)) * 100) : 0;
+      const spr = pot > 0 ? (chips / pot).toFixed(1) : '—';
+      const hand = cardsToLogStr(hero.hole_cards);
+      sub.textContent =
+        `${hand ? hand + ' · ' : ''}TO CALL $${toCall.toLocaleString()} · POT ODDS ${odds}% · SPR ${spr}`;
     }
 
     // Full render: visuals + phase-appropriate status and action buttons.
@@ -678,6 +703,15 @@
         btn.textContent = b.label;
         if (b.cls) btn.className = b.cls;
 
+        btn.dataset.act =
+          b.betAction === 'raise-open' || /raise/i.test(b.label) ? 'raise'
+          : /min/i.test(b.label) ? 'min'
+          : /all-?in/i.test(b.label) ? 'allin'
+          : /call/i.test(b.label) ? 'call'
+          : /check/i.test(b.label) ? 'check'
+          : /bet/i.test(b.label) ? 'bet'
+          : /fold/i.test(b.label) ? 'fold' : '';
+
         if (b.action === 'new-game') {
           btn.addEventListener('click', () => {
             beginNewGame();
@@ -709,37 +743,42 @@
       }
     }
 
-    // ── Bet slider ────────────────────────────────────────────────────────────
-    function showBetControls(state) {
-      betState = state;  // saved so the confirm handler can build the hero action label
-      const minBet = state.min_raise ?? 100;
-      const maxBet = state.max_bet ?? 10000;
+    // ── Raise strip ───────────────────────────────────────────────────────────
+    function setRaiseAmount(v) {
       const slider = document.getElementById('bet-slider');
       const input = document.getElementById('bet-input');
-      slider.min = minBet;
-      slider.max = maxBet;
-      slider.step = Math.max(10, Math.floor((maxBet - minBet) / 50));
-      slider.value = minBet;
-      input.min = minBet;
-      input.max = maxBet;
-      input.value = minBet;
-      document.getElementById('bet-controls').style.display = 'flex';
+      const clamped = Math.max(Number(slider.min), Math.min(Number(slider.max), Math.round(v)));
+      slider.value = String(clamped);
+      input.value = String(clamped);
+      document.getElementById('raise-amount').textContent = '$' + clamped.toLocaleString();
+    }
+
+    function showBetControls(state) {
+      pendingBetAction = state.legal_actions?.includes('Raise') ? 'Raise' : 'Bet';
+      betState = state;
+      const slider = document.getElementById('bet-slider');
+      const min = state.min_raise ?? state.big_blind ?? 0;
+      const max = state.max_bet ?? (state.hero?.chips ?? 0);
+      slider.min = String(min);
+      slider.max = String(max);
+      slider.step = String(state.big_blind || 50);
+      document.getElementById('raise-strip').hidden = false;
+      setRaiseAmount(min);
     }
 
     function hideBetControls() {
-      document.getElementById('bet-controls').style.display = 'none';
+      document.getElementById('raise-strip').hidden = true;
     }
 
-    document.getElementById('bet-slider').addEventListener('input', function () {
-      document.getElementById('bet-input').value = this.value;
-    });
-    document.getElementById('bet-input').addEventListener('input', function () {
-      document.getElementById('bet-slider').value = this.value;
-    });
+    document.getElementById('bet-slider').addEventListener('input', function () { setRaiseAmount(Number(this.value)); });
+    document.getElementById('bet-input').addEventListener('input', function () { setRaiseAmount(Number(this.value)); });
+    document.getElementById('raise-min').addEventListener('click', () => setRaiseAmount(Number(betState?.min_raise ?? betState?.big_blind ?? 0)));
+    document.getElementById('raise-3x').addEventListener('click', () => setRaiseAmount(3 * (betState?.big_blind ?? 0)));
+    document.getElementById('raise-pot').addEventListener('click', () => setRaiseAmount(betState?.pot ?? 0));
+    document.getElementById('raise-allin').addEventListener('click', () => setRaiseAmount(Number(betState?.max_bet ?? betState?.hero?.chips ?? 0)));
     document.getElementById('bet-confirm').addEventListener('click', () => {
       const amount = parseInt(document.getElementById('bet-input').value, 10);
       if (!isNaN(amount)) onHumanAction(pendingBetAction, amount, betState);
-      hideBetControls();
     });
 
     // ── Utilities ─────────────────────────────────────────────────────────────

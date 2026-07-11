@@ -83,13 +83,18 @@
     </div>
   </footer>
 
-  <div id="bet-controls">
-    <label for="bet-slider">Bet: $</label>
-    <input type="range" id="bet-slider" min="0" max="10000" step="50" value="0" aria-label="Bet amount">
-    <div class="bet-row">
-      <input type="number" id="bet-input" min="0" max="10000" value="0" aria-label="Bet amount in chips">
-      <button id="bet-confirm">Confirm</button>
+  <div id="raise-strip" hidden>
+    <span class="raise-label">RAISE TO</span>
+    <span id="raise-amount">$0</span>
+    <input type="range" id="bet-slider" min="0" max="10000" step="50" value="0" aria-label="Raise amount">
+    <div class="raise-quick">
+      <button id="raise-min" type="button">MIN</button>
+      <button id="raise-3x" type="button">3×</button>
+      <button id="raise-pot" type="button">POT</button>
+      <button id="raise-allin" type="button">ALL-IN</button>
     </div>
+    <input type="number" id="bet-input" min="0" max="10000" value="0" aria-label="Raise amount in chips">
+    <button id="bet-confirm">Confirm</button>
   </div>
 
   <div id="game-state-overlay">

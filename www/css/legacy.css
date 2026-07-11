@@ -2,32 +2,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root { color-scheme: dark; }
 
-    /* ── Bet sizing controls (container positioned by layout.css) ── */
-    #bet-controls label { font-size: 13px; color: var(--dim); white-space: nowrap; }
-    #bet-slider { flex: 1 1 auto; min-width: 100px; accent-color: var(--accent); }
-    #bet-input {
-      width: 80px;
-      background: #111;
-      border: 1px solid #333;
-      border-radius: 4px;
-      color: #f0d060;
-      font-size: 16px;
-      padding: 6px 8px;
-      text-align: right;
-      min-height: 36px;
-    }
-    #bet-confirm {
-      padding: 10px 16px;
-      background: #2a3a5e;
-      border: 1px solid #4a90d9;
-      border-radius: 5px;
-      color: #aad4ff;
-      cursor: pointer;
-      font-weight: bold;
-      min-height: 44px;
-      white-space: nowrap;
-    }
-    #bet-confirm:hover { background: #3a4a6e; }
+    /* Raise strip (slider / input / confirm) is fully styled in layout.css. */
 
     #hand-log p { margin: 0; }
 

@@ -117,12 +117,33 @@ body {
 body[data-tab="arena"] #arena-panel { display: flex; }
 body[data-tab="arena"] .play-only, body[data-tab="arena"] #action-buttons { display: none; }
 
-#bet-controls {
-  display: none; position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
-  z-index: 20; gap: 10px; align-items: center; padding: 12px 18px;
-  background: var(--panel-2); border: var(--line); border-radius: var(--radius-btn);
+#raise-strip {
+  position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%);
+  z-index: 20; display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; background: var(--panel-2); border: var(--line);
+  border-radius: var(--radius-btn);
 }
-#bet-controls .bet-row { display: flex; gap: 8px; }
+#raise-strip[hidden] { display: none; }
+.raise-label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: .12em; color: var(--dim);
+}
+#raise-amount { font-family: var(--font-mono); font-size: 17px; font-weight: 700; color: var(--bet); }
+#raise-strip #bet-slider { width: 180px; accent-color: var(--accent); }
+.raise-quick { display: flex; gap: 6px; }
+.raise-quick button {
+  font-family: var(--font-mono); font-size: 9px; padding: 6px 9px;
+  border-radius: 6px; border: var(--chip-border); background: var(--chip-bg);
+  color: var(--chip-col); cursor: pointer;
+}
+#raise-strip #bet-input {
+  width: 84px; font-family: var(--font-mono); font-size: 12px; padding: 6px 8px;
+  background: var(--panel); border: var(--line); color: var(--text); border-radius: 6px;
+}
+#bet-confirm {
+  font-size: 12px; font-weight: 600; padding: var(--btn-pad);
+  border: var(--btn-call-border); background: var(--btn-call-bg);
+  color: var(--btn-call-col); border-radius: var(--radius-btn); cursor: pointer;
+}
 
 /* ─────────────────────────── mobile (< 760px) ─────────────────────────── */
 @media (max-width: 759px) {
@@ -178,4 +199,14 @@ body[data-tab="arena"] .play-only, body[data-tab="arena"] #action-buttons { disp
     width: 36px; height: 4px; border-radius: 2px; background: var(--divider);
   }
   body.theme-terminal #log-aside { border-radius: 0; }
+
+  /* Min/All-In fold into the raise strip's quick buttons on mobile. */
+  #action-buttons button[data-act="min"],
+  #action-buttons button[data-act="allin"] { display: none; }
+  #raise-strip {
+    flex-wrap: wrap; bottom: 0; left: 0; right: 0; transform: none;
+    border-radius: 16px 16px 0 0; justify-content: center;
+  }
+  #raise-strip #bet-slider { width: 100%; order: 1; }
+  .raise-quick { order: 2; }
 }
