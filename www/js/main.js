@@ -816,14 +816,16 @@
       if (e.target === gameStateOverlay) gameStateOverlay.classList.remove('open');
     });
 
-    // ── Hand-log aside ─────────────────────────────────────────────────────────
+    // ── Hand-log aside / mobile bottom drawer ──────────────────────────────────
     const logAside = document.getElementById('log-aside');
-    document.getElementById('log-toggle').addEventListener('click', () => {
-      logAside.hidden = !logAside.hidden;
-    });
-    document.getElementById('log-close').addEventListener('click', () => {
-      logAside.hidden = true;
-    });
+    const logBackdrop = document.getElementById('log-backdrop');
+    function setLog(open) {
+      logAside.hidden = !open;
+      logBackdrop.hidden = !open;   // inert on desktop (backdrop is display:none there)
+    }
+    document.getElementById('log-toggle').addEventListener('click', () => setLog(logAside.hidden));
+    document.getElementById('log-close').addEventListener('click', () => setLog(false));
+    logBackdrop.addEventListener('click', () => setLog(false));
 
     // ── Settings overlay ───────────────────────────────────────────────────────
     const settingsOverlay = document.getElementById('settings-overlay');

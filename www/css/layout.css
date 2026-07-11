@@ -58,6 +58,7 @@ body {
 /* The id-level display above out-specifies the [hidden] UA rule, so restore it
    explicitly — without this the LOG toggle can never hide the aside. */
 #log-aside[hidden] { display: none; }
+#log-backdrop { display: none; }   /* mobile-only; a full-screen tap-to-close scrim */
 .log-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 14px; border-bottom: var(--line); flex: none;
@@ -161,4 +162,20 @@ body[data-tab="arena"] .play-only, body[data-tab="arena"] #action-buttons { disp
   /* list mode: felt/seats off, list on. */
   body.seats-list #table-zone .table-inner { display: none; }
   body.seats-list #table-zone .seat-list-wrap { display: flex; }
+
+  /* Hand log becomes a bottom sheet with a tap-to-close backdrop. */
+  #log-backdrop:not([hidden]) {
+    display: block; position: fixed; inset: 0; z-index: 30;
+    background: rgba(0,0,0,.5);
+  }
+  #log-aside {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 31;
+    width: auto; height: 62vh; border-left: none; border-top: var(--line);
+    border-radius: 16px 16px 0 0;
+  }
+  #log-aside::before {
+    content: ''; position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+    width: 36px; height: 4px; border-radius: 2px; background: var(--divider);
+  }
+  body.theme-terminal #log-aside { border-radius: 0; }
 }

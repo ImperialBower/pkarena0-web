@@ -55,3 +55,21 @@ test.describe('mobile seat-list', () => {
     expect(await page.evaluate(() => document.body.classList.contains('seats-list'))).toBe(true);
   });
 });
+
+test.describe('mobile log drawer', () => {
+  test('LOG opens a bottom sheet; backdrop tap closes it', async ({ page }) => {
+    await page.goto('/');
+    await waitForBoot(page);
+    await expect(page.locator('#log-aside')).toBeHidden();
+    await page.click('#log-toggle');
+    await expect(page.locator('#log-aside')).toBeVisible();
+    // Bottom sheet: taller than a third of the viewport, anchored to the bottom.
+    const box = await page.locator('#log-aside').boundingBox();
+    expect(box.height).toBeGreaterThan(844 * 0.5);
+    await expect(page.locator('#log-backdrop')).toBeVisible();
+    // Tap the visible scrim above the 62vh sheet (the backdrop's centre is
+    // covered by the sheet, which sits at a higher z-index).
+    await page.click('#log-backdrop', { position: { x: 8, y: 8 } });
+    await expect(page.locator('#log-aside')).toBeHidden();
+  });
+});
