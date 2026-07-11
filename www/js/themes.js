@@ -22,5 +22,17 @@ export function initThemes() {
 }
 
 export function initDeckToggle() {
-  // Implemented in the deck-toggle task.
+  const btn = document.getElementById('deck-toggle');
+  let saved = null;
+  try { saved = localStorage.getItem(DECK_KEY); } catch { /* ignore */ }
+  const apply = four => {
+    document.body.classList.toggle('four-color', four);
+    btn.textContent = four ? '4-COLOR ●' : '2-COLOR ○';
+  };
+  apply(saved === '4');
+  btn.addEventListener('click', () => {
+    const four = !document.body.classList.contains('four-color');
+    apply(four);
+    try { localStorage.setItem(DECK_KEY, four ? '4' : '2'); } catch { /* ignore */ }
+  });
 }

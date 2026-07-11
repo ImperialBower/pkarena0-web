@@ -23,4 +23,16 @@ test.describe('Theme token layer', () => {
     await page.reload();
     expect(await page.evaluate(() => document.body.className)).toContain('theme-terminal');
   });
+
+  test('deck toggle switches diamond pip color and persists', async ({ page }) => {
+    await page.goto('/');
+    const pip = () => page.evaluate(() =>
+      getComputedStyle(document.body).getPropertyValue('--pip-diamond').trim());
+    expect(await pip()).toBe('#C63C4C');
+    await page.click('#deck-toggle');
+    expect(await pip()).toBe('#2E5FD0');
+    expect(await page.textContent('#deck-toggle')).toContain('4-COLOR');
+    await page.reload();
+    expect(await pip()).toBe('#2E5FD0');
+  });
 });
