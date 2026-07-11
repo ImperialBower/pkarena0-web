@@ -53,6 +53,9 @@ body {
   width: 248px; flex: none; background: var(--panel); border-left: var(--line);
   display: flex; flex-direction: column; min-height: 0;
 }
+/* The id-level display above out-specifies the [hidden] UA rule, so restore it
+   explicitly — without this the LOG toggle can never hide the aside. */
+#log-aside[hidden] { display: none; }
 .log-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 14px; border-bottom: var(--line); flex: none;
@@ -117,3 +120,32 @@ body[data-tab="arena"] .play-only, body[data-tab="arena"] #action-buttons { disp
   background: var(--panel-2); border: var(--line); border-radius: var(--radius-btn);
 }
 #bet-controls .bet-row { display: flex; gap: 8px; }
+
+/* ─────────────────────────── mobile (< 760px) ─────────────────────────── */
+@media (max-width: 759px) {
+  #topbar { height: 48px; gap: 8px; padding: 0 12px; }
+  .brand { font-size: 12px; letter-spacing: .12em; }
+  #tab-bar { margin-left: 2px; gap: 3px; }
+  #tab-bar button, .tab { padding: 5px 9px; font-size: 10px; }
+  /* Keep hand/P&L only; blinds+stack live in the dock on mobile. */
+  .topbar-stats span.play-only:nth-of-type(2),
+  .topbar-stats span.play-only:nth-of-type(3) { display: none; }
+  .topbar-stats { gap: 9px; font-size: 9.5px; }
+  #new-table-btn { display: none; }
+  #view-toggle { display: inline-block; }   /* revealed on mobile (button added in Task 9) */
+
+  #main-row { flex-direction: column; }
+
+  /* Portrait felt: left/right 5%, top 4%, bottom 5% (design README §Mobile). */
+  #table-zone { flex: 1; }
+
+  #dock {
+    flex-wrap: wrap; gap: 10px 12px; padding: 10px 12px;
+  }
+  #hero-cards { min-height: 52px; }
+  #hero-info { flex: 1 1 40%; }
+  .dock-spacer { display: none; }
+  #action-buttons { width: 100%; order: 5; gap: 8px; }
+  #action-buttons button { flex: 1; min-height: 48px; font-size: 14px; }
+  #action-buttons button.safe, #action-buttons button.primary { flex: 1.3; }
+}

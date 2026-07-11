@@ -74,12 +74,13 @@ function buildSeat(i) {
   return seat;
 }
 
-// Abbreviate an action label for the mobile pill ("Raise $400" -> "R $400").
+// Abbreviate an action label for the mobile pill. Handles both button-style
+// labels ("Raise $400") and pkcore's verb labels ("raises to $400", "calls $100").
 function shortLabel(label) {
   return label
-    .replace(/^raise\s*/i, 'R ').replace(/^bet\s*/i, 'B ')
-    .replace(/^call\s*/i, 'C ').replace(/^check.*/i, 'CHK')
-    .replace(/^fold.*/i, 'FOLD').replace(/^all-in\s*/i, 'AI ')
+    .replace(/^raises?\s*(?:to\s*)?/i, 'R ').replace(/^bets?\s*/i, 'B ')
+    .replace(/^calls?\s*/i, 'C ').replace(/^checks?.*/i, 'CHK')
+    .replace(/^folds?.*/i, 'FOLD').replace(/^all-?in\s*/i, 'AI ')
     .toUpperCase().trim();
 }
 

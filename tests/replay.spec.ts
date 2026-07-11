@@ -6,6 +6,8 @@ test('replay overlay renders a table for the completed hand', async ({ page }) =
   await waitForHumanTurn(page);
   await page.locator('#action-buttons button:has-text("Fold")').click();
   await waitForYamlReady(page);
+  // REPLAY lives in the (default-collapsed) hand-log aside — open it.
+  await page.click('#log-toggle');
   await page.waitForSelector('#btn-replay:not([disabled])', { timeout: 30_000 });
   await page.click('#btn-replay');
   await expect(page.locator('#replay-overlay')).toBeVisible();

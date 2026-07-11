@@ -118,3 +118,23 @@
 .suit-h { color: var(--pip-red); }
 .suit-d { color: var(--pip-diamond); }
 .suit-c { color: var(--pip-club); }
+
+/* ─────────────────────────── mobile (< 760px) ─────────────────────────── */
+@media (max-width: 759px) {
+  .felt, .felt-ring { left: 5%; right: 5%; top: 4%; bottom: 5%; }
+  .seat { left: var(--mx); top: var(--my); }
+  .seat-plate { min-width: 62px; padding: 4px 8px; }
+  .seat-tag, .seat-bb, .seat-hud { display: none; }
+  .seat-name { font-size: 9px; }
+  .seat-stack { font-size: 9px; }
+  .seat-pill { font-size: 7.5px; padding: 2px 7px; }
+  .seat-pill .act-full { display: none; }
+  .seat-pill .act-short { display: inline; }
+  .board-slot { width: 26px; height: 36px; }
+  .card-board { width: 26px; height: 36px; }
+  .card-board .card-rank { font-size: 11px; }
+  .card-board .card-suit { font-size: 8px; }
+  .card-mini { width: 18px; height: 26px; }
+  .card-mini .card-rank { font-size: 8px; }
+  .card-mini .card-suit { font-size: 6px; }
+}
