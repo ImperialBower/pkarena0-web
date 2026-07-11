@@ -1,0 +1,211 @@
+/* Semantic design tokens — design2.0. Source of truth: themes() in
+   docs/design2.0/Poker Table.dc.html. Components reference ONLY these tokens
+   (plus the per-theme exception rules at the bottom of this file). */
+
+:root {
+  /* Card pips — fixed across themes (design README "Interactions") */
+  --pip-red: #C63C4C;
+  --pip-black: #20242C;
+  --pip-diamond: var(--pip-red);
+  --pip-club: var(--pip-black);
+}
+body.four-color {
+  --pip-diamond: #2E5FD0;
+  --pip-club: #1F8A54;
+}
+
+/* ───────────────────────── midnight ───────────────────────── */
+body.theme-midnight {
+  --font-body: 'Space Grotesk', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-display: 'Space Grotesk', sans-serif;
+  --bg: #0B0E13; --panel: #0E1219; --panel-2: #10141B;
+  --line: 1px solid rgba(255,255,255,.07); --divider: rgba(255,255,255,.1);
+  --text: #E7ECF3; --dim: #7C8698; --faint: #4A5364; --good: #2FD98F;
+  --accent: #2FD98F; --accent-text: #08110C; --glow: rgba(47,217,143,.35);
+  --bet: #F2C14E; --danger: #F26D7E;
+  --logo-col: #E7ECF3;
+  --zone-bg: none;
+  --felt-radius: 280px;
+  --felt-bg: radial-gradient(ellipse at 50% 32%, #154236 0%, #0F2E27 72%);
+  --felt-border: 1px solid rgba(255,255,255,.05); --felt-shadow: none;
+  --felt-inset: 16px; --felt-inner-border: 1px solid rgba(255,255,255,.07);
+  --pot-col: #F2C14E; --pot-bg: rgba(0,0,0,.34); --pot-border: none; --pot-radius: 99px;
+  --slot-radius: 5px; --slot-border: 1.5px dashed rgba(255,255,255,.16);
+  --slot-bg: transparent; --slot-text: rgba(255,255,255,.3);
+  --tlabel-col: rgba(255,255,255,.24);
+  --plate-bg: #141A23; --plate-border: 1px solid rgba(255,255,255,.09);
+  --plate-radius: 10px; --plate-shadow: none; --plate-pad: 6px 12px;
+  --tag-col: #7C8698; --stack-col: #C9D2E0; --bb-col: #66707F; --hud-col: #596272;
+  --pill-radius: 99px; --ring-radius: 12px;
+  --pill-fold-bg: rgba(138,148,166,.14); --pill-fold-col: #8A94A6;
+  --pill-raise-bg: rgba(242,109,126,.16); --pill-raise-col: #F26D7E;
+  --pill-blind-bg: rgba(255,255,255,.08); --pill-blind-col: #A7B1C2;
+  --pill-hero-bg: rgba(47,217,143,.16); --pill-hero-col: #2FD98F;
+  --chipamt-col: #F2C14E; --chipamt-bg: rgba(0,0,0,.4); --chipamt-border: none;
+  --badge-bg: #F2C14E; --badge-col: #141A23;
+  --card-bg: #FBFBF8; --card-radius: 6px; --card-border: none;
+  --card-shadow: 0 2px 10px rgba(0,0,0,.5);
+  --radius-btn: 8px; --btn-pad: 13px 22px;
+  --btn-fold-border: 1px solid rgba(242,109,126,.5); --btn-fold-bg: transparent; --btn-fold-col: #F26D7E;
+  --btn-call-border: none; --btn-call-bg: #2FD98F; --btn-call-col: #08110C;
+  --btn-min-border: 1px solid rgba(255,255,255,.16); --btn-min-bg: transparent; --btn-min-col: #E7ECF3;
+  --btn-raise-border: 1px solid rgba(47,217,143,.45); --btn-raise-bg: rgba(47,217,143,.08); --btn-raise-col: #2FD98F;
+  --btn-allin-border: 1px solid rgba(242,193,78,.45); --btn-allin-bg: transparent; --btn-allin-col: #F2C14E;
+  --chip-border: 1px solid rgba(255,255,255,.14); --chip-bg: transparent; --chip-col: #9AA4B5;
+  --newbtn-border: 1px solid rgba(47,217,143,.4); --newbtn-bg: transparent; --newbtn-col: #2FD98F;
+  --tab-on-bg: rgba(47,217,143,.13); --tab-on-col: #2FD98F; --tab-off-col: #7C8698;
+  --logtitle-col: #7C8698; --logtext-col: #A7B1C2;
+}
+
+/* ───────────────────────── terminal ───────────────────────── */
+body.theme-terminal {
+  --font-body: 'Archivo', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'JetBrains Mono', monospace;
+  --bg: #F4F2EC; --panel: #FCFBF7; --panel-2: #EFEDE5;
+  --line: 1.5px solid #1A1712; --divider: #1A1712;
+  --text: #1A1712; --dim: #6D675B; --faint: #B0AA9C; --good: #1F7A45;
+  --accent: #2E5FD0; --accent-text: #FCFBF7; --glow: rgba(46,95,208,.25);
+  --bet: #2E5FD0; --danger: #C4432F;
+  --logo-col: #1A1712;
+  --zone-bg: radial-gradient(rgba(26,23,18,.08) 1px, transparent 1px) 0 0 / 22px 22px;
+  --felt-radius: 270px; --felt-bg: #EBEFE6;
+  --felt-border: 1.5px solid #1A1712; --felt-shadow: none;
+  --felt-inset: 14px; --felt-inner-border: 1px dashed rgba(26,23,18,.28);
+  --pot-col: #1A1712; --pot-bg: #FCFBF7; --pot-border: 1.5px solid #1A1712; --pot-radius: 0;
+  --slot-radius: 0; --slot-border: 1.5px dashed rgba(26,23,18,.3);
+  --slot-bg: rgba(252,251,247,.6); --slot-text: rgba(26,23,18,.4);
+  --tlabel-col: rgba(26,23,18,.4);
+  --plate-bg: #FCFBF7; --plate-border: 1.5px solid #1A1712;
+  --plate-radius: 0; --plate-shadow: 3px 3px 0 rgba(26,23,18,.14); --plate-pad: 5px 11px;
+  --tag-col: #8A8477; --stack-col: #1A1712; --bb-col: #8A8477; --hud-col: #8A8477;
+  --pill-radius: 0; --ring-radius: 0;
+  --pill-fold-bg: rgba(26,23,18,.08); --pill-fold-col: #8A8477;
+  --pill-raise-bg: #C4432F; --pill-raise-col: #FCFBF7;
+  --pill-blind-bg: #FCFBF7; --pill-blind-col: #6D675B;
+  --pill-hero-bg: #2E5FD0; --pill-hero-col: #FCFBF7;
+  --chipamt-col: #1A1712; --chipamt-bg: #FCFBF7; --chipamt-border: 1.5px solid #1A1712;
+  --badge-bg: #1A1712; --badge-col: #FCFBF7;
+  --card-bg: #FFFFFF; --card-radius: 0; --card-border: 1.5px solid #1A1712;
+  --card-shadow: 3px 3px 0 rgba(26,23,18,.14);
+  --radius-btn: 0; --btn-pad: 12px 20px;
+  --btn-fold-border: 1.5px solid #C4432F; --btn-fold-bg: transparent; --btn-fold-col: #C4432F;
+  --btn-call-border: 1.5px solid #1A1712; --btn-call-bg: #1A1712; --btn-call-col: #FCFBF7;
+  --btn-min-border: 1.5px solid #1A1712; --btn-min-bg: transparent; --btn-min-col: #1A1712;
+  --btn-raise-border: 1.5px solid #2E5FD0; --btn-raise-bg: transparent; --btn-raise-col: #2E5FD0;
+  --btn-allin-border: 1.5px solid #C4432F; --btn-allin-bg: transparent; --btn-allin-col: #C4432F;
+  --chip-border: 1.5px solid #1A1712; --chip-bg: transparent; --chip-col: #1A1712;
+  --newbtn-border: 1.5px solid #2E5FD0; --newbtn-bg: #2E5FD0; --newbtn-col: #FCFBF7;
+  --tab-on-bg: #1A1712; --tab-on-col: #FCFBF7; --tab-off-col: #1A1712;
+  --logtitle-col: #1A1712; --logtext-col: #3D382F;
+}
+
+/* ───────────────────────── luxe ───────────────────────── */
+body.theme-luxe {
+  --font-body: 'Archivo', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-display: 'Marcellus', serif;
+  --bg: #131110; --panel: #181512; --panel-2: #161310;
+  --line: 1px solid rgba(201,164,92,.25); --divider: rgba(201,164,92,.3);
+  --text: #EAE3D6; --dim: #8A7D66; --faint: #5C523F; --good: #8FBF7F;
+  --accent: #C9A45C; --accent-text: #171310; --glow: rgba(201,164,92,.3);
+  --bet: #D9B878; --danger: #CE8080;
+  --logo-col: #D9B878;
+  --zone-bg: radial-gradient(ellipse at 50% 40%, #1A1714 0%, #131110 75%);
+  --felt-radius: 50%;
+  --felt-bg: radial-gradient(ellipse at 50% 34%, #123528 0%, #0C271D 74%);
+  --felt-border: 1px solid rgba(201,164,92,.5);
+  --felt-shadow: 0 0 60px rgba(0,0,0,.6), inset 0 0 80px rgba(0,0,0,.45);
+  --felt-inset: 10px; --felt-inner-border: 1px solid rgba(201,164,92,.28);
+  --pot-col: #D9B878; --pot-bg: rgba(0,0,0,.4); --pot-border: 1px solid rgba(201,164,92,.35); --pot-radius: 99px;
+  --slot-radius: 5px; --slot-border: 1px solid rgba(201,164,92,.3);
+  --slot-bg: rgba(0,0,0,.22); --slot-text: rgba(217,184,120,.45);
+  --tlabel-col: rgba(217,184,120,.4);
+  --plate-bg: #1C1916; --plate-border: 1px solid rgba(201,164,92,.3);
+  --plate-radius: 9px; --plate-shadow: none; --plate-pad: 6px 12px;
+  --tag-col: #8A7D66; --stack-col: #D9B878; --bb-col: #7A6F5C; --hud-col: #6E6353;
+  --pill-radius: 99px; --ring-radius: 11px;
+  --pill-fold-bg: rgba(122,111,92,.16); --pill-fold-col: #8A7D66;
+  --pill-raise-bg: rgba(178,91,91,.2); --pill-raise-col: #CE8080;
+  --pill-blind-bg: rgba(234,227,214,.08); --pill-blind-col: #BCB09B;
+  --pill-hero-bg: rgba(201,164,92,.18); --pill-hero-col: #D9B878;
+  --chipamt-col: #D9B878; --chipamt-bg: rgba(0,0,0,.45); --chipamt-border: 1px solid rgba(201,164,92,.3);
+  --badge-bg: #C9A45C; --badge-col: #171310;
+  --card-bg: #F5EFE0; --card-radius: 6px; --card-border: 1px solid rgba(201,164,92,.5);
+  --card-shadow: 0 3px 14px rgba(0,0,0,.6);
+  --radius-btn: 99px; --btn-pad: 12px 24px;
+  --btn-fold-border: 1px solid rgba(178,91,91,.6); --btn-fold-bg: transparent; --btn-fold-col: #CE8080;
+  --btn-call-border: none; --btn-call-bg: #C9A45C; --btn-call-col: #171310;
+  --btn-min-border: 1px solid rgba(201,164,92,.4); --btn-min-bg: transparent; --btn-min-col: #D9B878;
+  --btn-raise-border: 1px solid #C9A45C; --btn-raise-bg: rgba(201,164,92,.1); --btn-raise-col: #D9B878;
+  --btn-allin-border: 1px solid rgba(206,128,128,.5); --btn-allin-bg: transparent; --btn-allin-col: #CE8080;
+  --chip-border: 1px solid rgba(201,164,92,.4); --chip-bg: transparent; --chip-col: #C9A45C;
+  --newbtn-border: 1px solid #C9A45C; --newbtn-bg: transparent; --newbtn-col: #D9B878;
+  --tab-on-bg: transparent; --tab-on-col: #D9B878; --tab-off-col: #8A7D66;
+  --logtitle-col: #C9A45C; --logtext-col: #BCB09B;
+}
+
+/* ───────────────────────── organic ───────────────────────── */
+/* Reads ramps from organic-ds.css (:root). --font-body deliberately NOT set
+   here — it falls through to the design-system's Figtree. */
+body.theme-organic {
+  --font-mono: var(--font-body);       /* Figtree everywhere per handoff */
+  --font-display: var(--font-heading); /* Caprasimo */
+  --bg: var(--color-bg); --panel: var(--color-neutral-100); --panel-2: var(--color-neutral-200);
+  --line: 1px solid var(--color-neutral-300); --divider: var(--color-neutral-400);
+  --text: var(--color-text); --dim: var(--color-neutral-600); --faint: var(--color-neutral-500);
+  --good: var(--color-accent-2-700);
+  --accent: var(--color-accent); --accent-text: #fff;
+  --glow: color-mix(in oklab, var(--color-accent) 35%, transparent);
+  --bet: var(--color-accent-700); --danger: var(--color-accent-800);
+  --logo-col: var(--color-text);
+  --zone-bg: none;
+  --felt-radius: 999px; --felt-bg: var(--color-accent-2-200);
+  --felt-border: 2px solid var(--color-accent-2-500); --felt-shadow: none;
+  --felt-inset: 14px; --felt-inner-border: 1px solid var(--color-accent-2-400);
+  --pot-col: var(--color-accent-2-900); --pot-bg: #fff;
+  --pot-border: 1px solid var(--color-accent-2-500); --pot-radius: 999px;
+  --slot-radius: 10px; --slot-border: 1.5px dashed var(--color-accent-2-500);
+  --slot-bg: rgba(255,255,255,.5); --slot-text: var(--color-accent-2-800);
+  --tlabel-col: var(--color-accent-2-700);
+  --plate-bg: #fff; --plate-border: 1px solid var(--color-neutral-300);
+  --plate-radius: 16px; --plate-shadow: var(--shadow-sm); --plate-pad: 6px 13px;
+  --tag-col: var(--color-neutral-500); --stack-col: var(--color-text);
+  --bb-col: var(--color-neutral-500); --hud-col: var(--color-neutral-500);
+  --pill-radius: 999px; --ring-radius: 18px;
+  --pill-fold-bg: var(--color-neutral-200); --pill-fold-col: var(--color-neutral-600);
+  --pill-raise-bg: var(--color-accent-200); --pill-raise-col: var(--color-accent-800);
+  --pill-blind-bg: var(--color-accent-2-200); --pill-blind-col: var(--color-accent-2-800);
+  --pill-hero-bg: var(--color-accent); --pill-hero-col: #fff;
+  --chipamt-col: var(--color-accent-800); --chipamt-bg: var(--color-accent-100);
+  --chipamt-border: 1px solid var(--color-accent-300);
+  --badge-bg: var(--color-accent); --badge-col: #fff;
+  --card-bg: #fff; --card-radius: 10px; --card-border: 1px solid var(--color-neutral-300);
+  --card-shadow: var(--shadow-sm);
+  --radius-btn: 999px; --btn-pad: 13px 24px;
+  --btn-fold-border: 1px solid var(--color-neutral-400); --btn-fold-bg: #fff; --btn-fold-col: var(--color-neutral-700);
+  --btn-call-border: none; --btn-call-bg: var(--color-accent); --btn-call-col: #fff;
+  --btn-min-border: 1px solid var(--color-neutral-400); --btn-min-bg: transparent; --btn-min-col: var(--color-text);
+  --btn-raise-border: 1px solid var(--color-accent); --btn-raise-bg: var(--color-accent-100); --btn-raise-col: var(--color-accent-800);
+  --btn-allin-border: 1px solid var(--color-accent-2-500); --btn-allin-bg: transparent; --btn-allin-col: var(--color-accent-2-800);
+  --chip-border: 1px solid var(--color-neutral-400); --chip-bg: #fff; --chip-col: var(--color-neutral-700);
+  --newbtn-border: none; --newbtn-bg: var(--color-accent); --newbtn-col: #fff;
+  --tab-on-bg: var(--color-accent); --tab-on-col: #fff; --tab-off-col: var(--color-neutral-600);
+  --logtitle-col: var(--color-text); --logtext-col: var(--color-neutral-700);
+}
+
+/* ───────── per-theme structural exceptions (shape/typography that
+   tokens can't express; keep this section tiny) ───────── */
+body.theme-terminal .seat-name,
+body.theme-terminal #dock button,
+body.theme-terminal .brand { font-family: var(--font-mono); }
+body.theme-luxe .seat-name,
+body.theme-luxe .brand,
+body.theme-luxe #dock button,
+body.theme-luxe .table-label,
+body.theme-luxe #new-table-btn { font-family: var(--font-display); }
+body.theme-luxe .tab { border-radius: 0; padding: 4px 2px; letter-spacing: .18em; font-family: var(--font-display); }
+body.theme-luxe .tab.active { background: transparent; border-bottom: 1px solid var(--accent); }
+body.theme-terminal .tab { border: 1.5px solid #1A1712; border-radius: 0; font-family: var(--font-mono); }
+body.theme-organic .brand { font-family: var(--font-display); }

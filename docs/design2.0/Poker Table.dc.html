@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Marcellus&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_ds/organic-049daa9e-84a1-4a65-9491-d13e353f6c31/styles.css">
+<style>
+html,body{margin:0;padding:0;height:100%}
+a{color:#2FD98F}a:hover{color:#4BE6A4}
+</style>
+</helmet>
+
+<div data-screen-label="Play" style="{{ t.root }}">
+
+  <!-- ================= DESKTOP ================= -->
+  <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div style="{{ t.topbar }}">
+        <div style="{{ t.logo }}">PK<span style="{{ t.logoAccent }}">ARENA</span></div>
+        <div style="{{ t.version }}">v0.1.12</div>
+        <div style="display:flex;gap:5px;margin-left:8px;align-items:center">
+          <div style="{{ t.tabOn }}">PLAY</div>
+          <div style="{{ t.tabOff }}">ARENA</div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="{{ t.stats }}">
+          <span>HAND <span style="{{ t.statStrong }}">1</span>/100</span>
+          <span>STACK <span style="{{ t.statStrong }}">$10,000</span></span>
+          <span>P&amp;L <span style="{{ t.pnl }}">+$14,933</span></span>
+        </div>
+        <div style="{{ t.divider }}"></div>
+        <select value="{{ themeVal }}" onChange="{{ setTheme }}" style="{{ t.select }}">
+          <option value="midnight">Theme: Midnight Pro</option>
+          <option value="terminal">Theme: Engine Terminal</option>
+          <option value="luxe">Theme: Table Stakes</option>
+          <option value="organic">Theme: Organic</option>
+        </select>
+        <button onClick="{{ toggleFc }}" style="{{ t.toolBtn }}">{{ fcLabel }}</button>
+        <button onClick="{{ toggleLog }}" style="{{ t.toolBtn }}">LOG</button>
+        <button style="{{ t.newBtn }}">New Table</button>
+      </div>
+
+      <div style="flex:1;display:flex;min-height:0">
+        <div style="{{ t.zone }}">
+          <div style="{{ t.felt }}"></div>
+          <div style="{{ t.ring }}"><div style="{{ t.ringInner }}"></div></div>
+          <div style="position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:12px">
+            <div style="{{ t.pot }}">POT&nbsp;&nbsp;$1,500</div>
+            <div style="display:flex;gap:8px">
+              <div style="{{ t.slot }}">FLOP</div>
+              <div style="{{ t.slot }}">FLOP</div>
+              <div style="{{ t.slot }}">FLOP</div>
+              <div style="{{ t.slot }}">TURN</div>
+              <div style="{{ t.slot }}">RIVER</div>
+            </div>
+            <div style="{{ t.tableLabel }}">NO LIMIT HOLD'EM · 50/100</div>
+          </div>
+          <sc-for list="{{ seats }}" as="s" hint-placeholder-count="9">
+            <div style="{{ s.wrap }}">
+              <div style="{{ s.fade }}">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+                  <div style="{{ s.ring }}">
+                    <div style="{{ s.plate }}">
+                      <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
+                        <span style="{{ s.nameStyle }}">{{ s.name }}</span>
+                        <span style="{{ s.tagStyle }}">{{ s.tag }}</span>
+                      </div>
+                      <div style="{{ s.stackStyle }}">{{ s.stackTxt }} <span style="{{ s.bbStyle }}">{{ s.bbTxt }}</span></div>
+                      <div style="{{ s.hudStyle }}">{{ s.hud }}</div>
+                    </div>
+                    <div style="{{ s.badgeStyle }}">{{ s.badge }}</div>
+                  </div>
+                  <div style="{{ s.pill }}">{{ s.act }}</div>
+                  <div style="{{ s.betStyle }}">{{ s.bet }}</div>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ logOpen }}" hint-placeholder-val="{{ true }}">
+          <div style="{{ t.aside }}">
+            <div style="{{ t.logHead }}">
+              <span style="{{ t.logTitle }}">HAND LOG</span>
+              <button onClick="{{ toggleLog }}" style="{{ t.logClose }}">✕</button>
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:7px">
+              <sc-for list="{{ logRows }}" as="e" hint-placeholder-count="6">
+                <div style="{{ t.logRow }}">
+                  <span style="{{ t.logN }}">{{ e.n }}</span>
+                  <span style="{{ t.logT }}">{{ e.t }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="{{ t.logFoot }}">
+              <button style="{{ t.logBtn }}">EXPORT YAML</button>
+              <button style="{{ t.logBtn }}">REPLAY</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ roOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ t.strip }}">
+          <span style="{{ t.stripLabel }}">RAISE TO</span>
+          <span style="{{ t.stripAmt }}">{{ raiseTxt }}</span>
+          <input type="range" min="1500" max="10000" step="25" value="{{ raise }}" onInput="{{ setRaise }}" style="{{ t.slider }}">
+          <sc-for list="{{ quick }}" as="q" hint-placeholder-count="4">
+            <button onClick="{{ q.set }}" style="{{ t.quickBtn }}">{{ q.label }}</button>
+          </sc-for>
+          <button style="{{ t.confirmBtn }}">Raise to {{ raiseTxt }}</button>
+        </div>
+      </sc-if>
+
+      <div style="{{ t.dock }}">
+        <div style="display:flex;gap:6px">
+          <div style="{{ t.card }}">
+            <span style="{{ t.rankK }}">K</span><span style="{{ t.suitK }}">♦</span>
+          </div>
+          <div style="{{ t.card }}">
+            <span style="{{ t.rankT }}">10</span><span style="{{ t.suitT }}">♥</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="{{ t.heroTitle }}">{{ heroName }} · BTN · $10,000 <span style="{{ t.heroDim }}">(100 BB)</span></div>
+          <div style="{{ t.heroSub }}">KTo · TO CALL $950 · POT ODDS 39% · SPR 4.1</div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;gap:10px">
+          <button style="{{ t.btnFold }}">Fold</button>
+          <button style="{{ t.btnCall }}">Call $950</button>
+          <button style="{{ t.btnMin }}">Min $1,500</button>
+          <button onClick="{{ toggleRo }}" style="{{ t.btnRaise }}">Raise…</button>
+          <button style="{{ t.btnAllin }}">All-In $10,000</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= MOBILE ================= -->
+  <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div style="{{ t.mBar }}">
+        <div style="{{ t.mLogo }}">PK<span style="{{ t.logoAccent }}">ARENA</span></div>
+        <div style="flex:1"></div>
+        <div style="{{ t.mStats }}">
+          <span>H <span style="{{ t.statStrong }}">1</span>/100</span>
+          <span style="{{ t.pnl }}">+$14,933</span>
+        </div>
+        <select value="{{ themeVal }}" onChange="{{ setTheme }}" style="{{ t.mSelect }}">
+          <option value="midnight">Midnight</option>
+          <option value="terminal">Terminal</option>
+          <option value="luxe">Stakes</option>
+          <option value="organic">Organic</option>
+        </select>
+        <button onClick="{{ toggleView }}" style="{{ t.mTool }}">{{ viewLabel }}</button>
+        <button onClick="{{ toggleDrawer }}" style="{{ t.mTool }}">LOG</button>
+      </div>
+
+      <!-- mini table mode -->
+      <sc-if value="{{ viewTable }}" hint-placeholder-val="{{ true }}">
+        <div style="{{ t.zone }}">
+          <div style="{{ t.mFelt }}"></div>
+          <div style="position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;zIndex:0">
+            <div style="{{ t.mPot }}">POT $1,500</div>
+            <div style="display:flex;gap:5px">
+              <div style="{{ t.mSlot }}"></div>
+              <div style="{{ t.mSlot }}"></div>
+              <div style="{{ t.mSlot }}"></div>
+              <div style="{{ t.mSlot }}"></div>
+              <div style="{{ t.mSlot }}"></div>
+            </div>
+          </div>
+          <sc-for list="{{ seatsM }}" as="s" hint-placeholder-count="9">
+            <div style="{{ s.wrap }}">
+              <div style="{{ s.fade }}">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+                  <div style="{{ s.ring }}">
+                    <div style="{{ s.plate }}">
+                      <div style="{{ s.nameStyle }}">{{ s.name }}</div>
+                      <div style="{{ s.stackStyle }}">{{ s.stackTxt }}</div>
+                    </div>
+                    <div style="{{ s.badgeStyle }}">{{ s.badge }}</div>
+                  </div>
+                  <div style="{{ s.pill }}">{{ s.act }}</div>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- seat list mode -->
+      <sc-if value="{{ viewList }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:10px 12px">
+          <div style="{{ t.mBoardStrip }}">
+            <span style="{{ t.mPotInline }}">POT $1,500</span>
+            <div style="display:flex;gap:4px">
+              <div style="{{ t.mSlotSm }}"></div>
+              <div style="{{ t.mSlotSm }}"></div>
+              <div style="{{ t.mSlotSm }}"></div>
+              <div style="{{ t.mSlotSm }}"></div>
+              <div style="{{ t.mSlotSm }}"></div>
+            </div>
+            <span style="{{ t.mBlindsLbl }}">50/100</span>
+          </div>
+          <sc-for list="{{ rowsM }}" as="s" hint-placeholder-count="9">
+            <div style="{{ s.row }}">
+              <div style="{{ s.rowTag }}">{{ s.tag }}</div>
+              <div style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1">
+                <div style="{{ s.nameStyle }}">{{ s.name }}</div>
+                <div style="{{ s.hudStyle }}">{{ s.hud }}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
+                <div style="{{ s.stackStyle }}">{{ s.stackTxt }}</div>
+                <div style="{{ s.bbStyle }}">{{ s.bbTxt }}</div>
+              </div>
+              <div style="{{ s.pill }}">{{ s.act }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ roOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ t.mStrip }}">
+          <div style="display:flex;align-items:center;gap:12px;width:100%">
+            <span style="{{ t.stripLabel }}">RAISE TO</span>
+            <span style="{{ t.stripAmt }}">{{ raiseTxt }}</span>
+            <input type="range" min="1500" max="10000" step="25" value="{{ raise }}" onInput="{{ setRaise }}" style="{{ t.slider }}">
+          </div>
+          <div style="display:flex;gap:8px;width:100%">
+            <sc-for list="{{ quick }}" as="q" hint-placeholder-count="4">
+              <button onClick="{{ q.set }}" style="{{ t.mQuickBtn }}">{{ q.label }}</button>
+            </sc-for>
+            <button style="{{ t.mConfirm }}">Raise {{ raiseTxt }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="{{ t.mDock }}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="display:flex;gap:4px">
+            <div style="{{ t.mCard }}">
+              <span style="{{ t.mRankK }}">K</span><span style="{{ t.mSuitK }}">♦</span>
+            </div>
+            <div style="{{ t.mCard }}">
+              <span style="{{ t.mRankT }}">10</span><span style="{{ t.mSuitT }}">♥</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+            <div style="{{ t.mHeroTitle }}">{{ heroName }} · BTN · $10,000</div>
+            <div style="{{ t.heroSub }}">TO CALL $950 · ODDS 39%</div>
+          </div>
+          <div style="flex:1"></div>
+          <button onClick="{{ toggleFc }}" style="{{ t.mTool }}">{{ fcLabel }}</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button style="{{ t.mBtnFold }}">Fold</button>
+          <button style="{{ t.mBtnCall }}">Call $950</button>
+          <button onClick="{{ toggleRo }}" style="{{ t.mBtnRaise }}">Raise…</button>
+        </div>
+      </div>
+
+      <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ toggleDrawer }}" style="{{ t.mBackdrop }}"></div>
+        <div style="{{ t.mDrawer }}">
+          <div style="{{ t.mDrawerHandle }}"></div>
+          <div style="{{ t.logHead }}">
+            <span style="{{ t.logTitle }}">HAND LOG</span>
+            <button onClick="{{ toggleDrawer }}" style="{{ t.logClose }}">✕</button>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:10px 16px;display:flex;flex-direction:column;gap:7px">
+            <sc-for list="{{ logRows }}" as="e" hint-placeholder-count="6">
+              <div style="{{ t.logRow }}">
+                <span style="{{ t.logN }}">{{ e.n }}</span>
+                <span style="{{ t.logT }}">{{ e.t }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="{{ t.logFoot }}">
+            <button style="{{ t.logBtn }}">EXPORT YAML</button>
+            <button style="{{ t.logBtn }}">REPLAY</button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;midnight&quot;,&quot;options&quot;:[&quot;midnight&quot;,&quot;terminal&quot;,&quot;luxe&quot;,&quot;organic&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;mobileSeats&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;table&quot;,&quot;options&quot;:[&quot;table&quot;,&quot;list&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Mobile&quot;},&quot;showHud&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Table&quot;},&quot;heroName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;You&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Table&quot;}}">
+class Component extends DCLogic {
+  state = { theme: null, fc: false, log: true, ro: false, raise: 1500, w: null, view: null, drawer: false };
+
+  componentDidMount() {
+    this._onR = () => this.setState({ w: window.innerWidth });
+    window.addEventListener('resize', this._onR);
+    this.setState({ w: window.innerWidth });
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this._onR); }
+
+  renderVals() {
+    const theme = this.state.theme ?? this.props.theme ?? 'midnight';
+    const w = this.state.w ?? (typeof window !== 'undefined' ? window.innerWidth : 1200);
+    const forced = !!this.props.forceMobile;
+    const isMobile = forced || w < 760;
+    const view = this.state.view ?? this.props.mobileSeats ?? 'table';
+    const key = JSON.stringify([theme, isMobile, forced, view, this.state.fc, this.state.log, this.state.ro, this.state.raise, this.state.drawer, this.props.showHud, this.props.heroName]);
+    if (this._key === key) return this._vals;
+    this._key = key;
+    this._vals = this.build(theme, isMobile, view, forced);
+    return this._vals;
+  }
+
+  build(theme, isMobile, view, forced) {
+    const fmt = n => '$' + n.toLocaleString('en-US');
+    const showHud = this.props.showHud ?? true;
+    const heroName = this.props.heroName ?? 'You';
+    const { fc, log, ro, raise, drawer } = this.state;
+    const PIP = { red: '#C63C4C', black: '#20242C', blue: '#2E5FD0', green: '#1F8A54' };
+    const dCol = fc ? PIP.blue : PIP.red;
+    const hCol = PIP.red;
+
+    const P = this.themes()[theme];
+
+    const t = {
+      root: { background: P.bg, color: P.text, fontFamily: P.body, display: 'flex', flexDirection: 'column', height: forced ? '100%' : '100vh', minHeight: isMobile ? '0' : '720px', position: 'relative', overflow: forced ? 'hidden' : 'visible', ...(P.rootExtra || {}) },
+      topbar: { display: 'flex', alignItems: 'center', gap: '13px', padding: '0 18px', height: '52px', flex: 'none', background: P.panel, borderBottom: P.line },
+      logo: { ...P.logoFont, color: P.logoCol, whiteSpace: 'nowrap' },
+      logoAccent: { color: P.accent },
+      version: { fontFamily: P.mono, fontSize: '9px', color: P.faint },
+      tabOn: P.tabOn,
+      tabOff: { ...P.tabOff, cursor: 'pointer' },
+      stats: { display: 'flex', gap: '15px', fontFamily: P.mono, fontSize: '10.5px', color: P.dim, whiteSpace: 'nowrap' },
+      statStrong: { color: P.text, fontWeight: 700 },
+      pnl: { color: P.good, fontWeight: 700 },
+      divider: { width: '1px', height: '20px', background: P.divider },
+      select: { ...P.chip, cursor: 'pointer' },
+      toolBtn: { ...P.chip, cursor: 'pointer' },
+      newBtn: { ...P.newBtn, cursor: 'pointer' },
+      zone: { flex: 1, position: 'relative', ...(P.zoneExtra || {}) },
+      felt: { position: 'absolute', left: '6%', right: '6%', top: '8%', bottom: '11%', borderRadius: P.feltRadius, background: P.feltBg, border: P.feltBorder, boxShadow: P.feltShadow || 'none' },
+      ring: { position: 'absolute', left: '6%', right: '6%', top: '8%', bottom: '11%', borderRadius: P.feltRadius, pointerEvents: 'none' },
+      ringInner: { position: 'absolute', inset: P.feltInset, borderRadius: P.feltRadius, border: P.feltInner },
+      pot: { fontFamily: P.mono, fontSize: '12px', fontWeight: 700, letterSpacing: '.05em', padding: '5px 16px', ...P.pot },
+      slot: { width: '36px', height: '50px', borderRadius: P.slotRadius, border: P.slotBorder, background: P.slotBg, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '3px', fontFamily: P.mono, fontSize: '6.5px', color: P.slotText, letterSpacing: '.08em' },
+      tableLabel: P.tableLabel,
+      aside: { width: '248px', flex: 'none', background: P.panel, borderLeft: P.line, display: 'flex', flexDirection: 'column', minHeight: 0 },
+      logHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: P.line, flex: 'none' },
+      logTitle: P.logTitle,
+      logClose: { background: 'transparent', border: 'none', color: P.dim, cursor: 'pointer', fontSize: '13px', padding: 0, lineHeight: 1 },
+      logRow: { display: 'flex', gap: '8px', fontFamily: P.mono, fontSize: '9.5px', lineHeight: 1.45 },
+      logN: { color: P.faint, flex: 'none' },
+      logT: { color: P.logText },
+      logFoot: { padding: '12px 14px', borderTop: P.line, flex: 'none', display: 'flex', gap: '8px' },
+      logBtn: { ...P.chip, flex: 1, textAlign: 'center', padding: '7px 0', cursor: 'pointer' },
+      strip: { flex: 'none', display: 'flex', alignItems: 'center', gap: '16px', padding: '12px 18px', background: P.panel2, borderTop: P.line },
+      stripLabel: { fontFamily: P.mono, fontSize: '9px', letterSpacing: '.14em', color: P.dim, whiteSpace: 'nowrap' },
+      stripAmt: { fontFamily: P.mono, fontSize: '17px', fontWeight: 700, color: P.bet, minWidth: '86px' },
+      slider: { flex: 1, accentColor: P.accent, cursor: 'pointer', minWidth: 0 },
+      quickBtn: { ...P.chip, cursor: 'pointer' },
+      confirmBtn: { ...P.btnFont, padding: '9px 20px', borderRadius: P.rBtn, border: 'none', background: P.accent, color: P.accentText, cursor: 'pointer' },
+      dock: { flex: 'none', display: 'flex', alignItems: 'center', gap: '18px', padding: '14px 18px', background: P.panel, borderTop: P.line },
+      card: { width: '48px', height: '66px', background: P.cardBg, borderRadius: P.cardRadius, border: P.cardBorder, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: P.mono, fontWeight: 700, boxShadow: P.cardShadow },
+      rankK: { fontSize: '19px', lineHeight: 1, color: dCol },
+      suitK: { fontSize: '15px', lineHeight: 1.2, color: dCol },
+      rankT: { fontSize: '19px', lineHeight: 1, color: hCol },
+      suitT: { fontSize: '15px', lineHeight: 1.2, color: hCol },
+      heroTitle: { ...P.heroTitle },
+      heroDim: { color: P.dim, fontWeight: 400 },
+      heroSub: { fontFamily: P.mono, fontSize: '9.5px', color: P.dim, whiteSpace: 'nowrap' },
+      btnFold: { ...P.btnFont, padding: P.btnPad, borderRadius: P.rBtn, cursor: 'pointer', ...P.vFold },
+      btnCall: { ...P.btnFont, padding: P.btnPad, borderRadius: P.rBtn, cursor: 'pointer', ...P.vCall },
+      btnMin: { ...P.btnFont, padding: P.btnPad, borderRadius: P.rBtn, cursor: 'pointer', ...P.vMin },
+      btnRaise: { ...P.btnFont, padding: P.btnPad, borderRadius: P.rBtn, cursor: 'pointer', ...P.vRaise },
+      btnAllin: { ...P.btnFont, padding: P.btnPad, borderRadius: P.rBtn, cursor: 'pointer', ...P.vAllin },
+
+      mBar: { display: 'flex', alignItems: 'center', gap: '8px', padding: '0 12px', height: '48px', flex: 'none', background: P.panel, borderBottom: P.line },
+      mLogo: { ...P.logoFont, color: P.logoCol, fontSize: '12px', whiteSpace: 'nowrap' },
+      mStats: { display: 'flex', gap: '10px', fontFamily: P.mono, fontSize: '9.5px', color: P.dim, whiteSpace: 'nowrap' },
+      mSelect: { ...P.chip, cursor: 'pointer', fontSize: '8.5px', padding: '5px 6px' },
+      mTool: { ...P.chip, cursor: 'pointer', fontSize: '8.5px', padding: '5px 8px', whiteSpace: 'nowrap' },
+      mFelt: { position: 'absolute', left: '5%', right: '5%', top: '4%', bottom: '5%', borderRadius: P.feltRadius === '50%' ? '50%' : '999px', background: P.feltBg, border: P.feltBorder, boxShadow: P.feltShadow || 'none' },
+      mPot: { fontFamily: P.mono, fontSize: '11px', fontWeight: 700, letterSpacing: '.04em', padding: '4px 12px', ...P.pot },
+      mSlot: { width: '26px', height: '36px', borderRadius: P.slotRadius, border: P.slotBorder, background: P.slotBg },
+      mSlotSm: { width: '20px', height: '28px', borderRadius: P.slotRadius, border: P.slotBorder, background: P.slotBg },
+      mBoardStrip: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', background: P.panel, border: P.line, borderRadius: P.plate.borderRadius, flex: 'none' },
+      mPotInline: { fontFamily: P.mono, fontSize: '11px', fontWeight: 700, color: P.bet },
+      mBlindsLbl: { fontFamily: P.mono, fontSize: '9px', color: P.faint, marginLeft: 'auto' },
+      mStrip: { flex: 'none', display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', background: P.panel2, borderTop: P.line },
+      mQuickBtn: { ...P.chip, cursor: 'pointer', flex: 1, textAlign: 'center', padding: '10px 0' },
+      mConfirm: { ...P.btnFont, fontSize: '12px', padding: '10px 14px', borderRadius: P.rBtn, border: 'none', background: P.accent, color: P.accentText, cursor: 'pointer', whiteSpace: 'nowrap' },
+      mDock: { flex: 'none', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px 12px 14px', background: P.panel, borderTop: P.line },
+      mCard: { width: '38px', height: '52px', background: P.cardBg, borderRadius: P.cardRadius, border: P.cardBorder, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: P.mono, fontWeight: 700, boxShadow: P.cardShadow },
+      mRankK: { fontSize: '15px', lineHeight: 1, color: dCol },
+      mSuitK: { fontSize: '12px', lineHeight: 1.2, color: dCol },
+      mRankT: { fontSize: '15px', lineHeight: 1, color: hCol },
+      mSuitT: { fontSize: '12px', lineHeight: 1.2, color: hCol },
+      mHeroTitle: { ...P.heroTitle, fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      mBtnFold: { ...P.btnFont, fontSize: '14px', padding: '15px 0', flex: 1, borderRadius: P.rBtn, cursor: 'pointer', ...P.vFold },
+      mBtnCall: { ...P.btnFont, fontSize: '14px', padding: '15px 0', flex: 1.3, borderRadius: P.rBtn, cursor: 'pointer', ...P.vCall },
+      mBtnRaise: { ...P.btnFont, fontSize: '14px', padding: '15px 0', flex: 1, borderRadius: P.rBtn, cursor: 'pointer', ...P.vRaise },
+      mBackdrop: { position: forced ? 'absolute' : 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 40 },
+      mDrawer: { position: forced ? 'absolute' : 'fixed', left: 0, right: 0, bottom: 0, height: '62%', background: P.panel, borderTop: P.line, borderRadius: P.rBtn === '0' ? '0' : '16px 16px 0 0', display: 'flex', flexDirection: 'column', zIndex: 41, boxShadow: '0 -12px 40px rgba(0,0,0,.3)' },
+      mDrawerHandle: { width: '40px', height: '4px', borderRadius: '99px', background: P.divider, margin: '8px auto 2px', flex: 'none' }
+    };
+
+    const SEATS = [
+      { name: heroName, hero: true, stack: 10000, tag: 'BTN', act: 'TO ACT', type: 'hero', badge: 'D', hud: 'VPIP 25 · PFR 20 · AF 2.4', x: 71, y: 90, mx: 50, my: 92 },
+      { name: 'loose_passive', stack: 9950, tag: 'SB', act: 'POST $50', type: 'blind', bet: '$50', badge: 'SB', hud: 'VPIP 44 · PFR 9 · AF 0.8', x: 29, y: 90, mx: 13, my: 82 },
+      { name: 'tight_aggressive', stack: 9900, tag: 'BB', act: 'POST $100', type: 'blind', bet: '$100', badge: 'BB', hud: 'VPIP 18 · PFR 15 · AF 2.9', x: 8, y: 64, mx: 8, my: 60 },
+      { name: 'gto', stack: 10000, tag: 'UTG', act: 'FOLD', type: 'fold', hud: 'VPIP 21 · PFR 16 · AF 1.8', x: 8, y: 30, mx: 8, my: 36 },
+      { name: 'maniac', stack: 9600, tag: 'UTG+1', act: 'RAISE $400', type: 'raise', bet: '$400', hud: 'VPIP 58 · PFR 44 · AF 4.6', x: 27, y: 7, mx: 16, my: 13 },
+      { name: 'loose_aggressive', stack: 10000, tag: 'MP', act: 'FOLD', type: 'fold', hud: 'VPIP 38 · PFR 29 · AF 3.1', x: 50, y: 4, mx: 50, my: 6 },
+      { name: 'tight_passive', stack: 10000, tag: 'LJ', act: 'FOLD', type: 'fold', hud: 'VPIP 15 · PFR 6 · AF 0.9', x: 73, y: 7, mx: 84, my: 13 },
+      { name: 'abc', stack: 10000, tag: 'HJ', act: 'FOLD', type: 'fold', hud: 'VPIP 24 · PFR 18 · AF 2.0', x: 92, y: 30, mx: 92, my: 36 },
+      { name: 'short_stack_ninja', stack: 9050, tag: 'CO', act: 'RAISE $950', type: 'raise', bet: '$950', hud: 'VPIP 31 · PFR 26 · AF 2.7', x: 92, y: 64, mx: 92, my: 60 }
+    ];
+
+    const pillBase = { fontFamily: P.mono, fontSize: '8.5px', fontWeight: 600, letterSpacing: '.08em', padding: '3px 11px', borderRadius: P.pillRadius, whiteSpace: 'nowrap' };
+    const byType = {
+      fold: { background: P.foldBg, color: P.foldCol },
+      raise: { background: P.raiseBg, color: P.raiseCol },
+      blind: { background: P.blindBg, color: P.blindCol },
+      hero: { background: P.heroBg, color: P.heroCol }
+    };
+    const heroRing = radius => ({ position: 'relative', borderRadius: radius, boxShadow: '0 0 0 2px ' + P.accent + ', 0 0 24px ' + P.glow });
+
+    const seats = SEATS.map(s => ({
+      name: s.name, tag: s.tag, stackTxt: fmt(s.stack), bbTxt: Math.round(s.stack / 100) + 'BB',
+      hud: showHud ? s.hud : '', act: s.act, bet: s.bet || '', badge: s.badge || '',
+      wrap: { position: 'absolute', left: s.x + '%', top: s.y + '%', transform: 'translate(-50%,-50%)', zIndex: 1 },
+      fade: s.type === 'fold' ? { opacity: .42 } : {},
+      ring: s.hero ? heroRing(P.ringRadius) : { position: 'relative' },
+      plate: P.plate, nameStyle: P.nameStyle, tagStyle: P.tagStyle, stackStyle: P.stackStyle, bbStyle: P.bbStyle, hudStyle: P.hudStyle,
+      badgeStyle: s.badge
+        ? { position: 'absolute', top: '-8px', right: '-9px', minWidth: '18px', height: '18px', padding: '0 3px', borderRadius: '50%', background: P.badgeBg, color: P.badgeCol, fontSize: '7.5px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: P.mono }
+        : { display: 'none' },
+      pill: { ...pillBase, ...byType[s.type] },
+      betStyle: s.bet
+        ? { fontFamily: P.mono, fontSize: '10px', fontWeight: 700, color: P.betCol, background: P.betBg, padding: '2px 9px', borderRadius: P.pillRadius, border: P.betBorder }
+        : { display: 'none' }
+    }));
+
+    const actShort = s => s.type === 'fold' ? 'FOLD' : s.type === 'raise' ? 'R ' + s.bet : s.type === 'blind' ? s.badge + ' ' + s.bet : 'TO ACT';
+
+    const seatsM = SEATS.map(s => ({
+      name: s.name.length > 9 ? s.name.slice(0, 8) + '…' : s.name,
+      stackTxt: fmt(s.stack),
+      act: actShort(s), badge: s.badge || '',
+      wrap: { position: 'absolute', left: s.mx + '%', top: s.my + '%', transform: 'translate(-50%,-50%)', zIndex: 1 },
+      fade: s.type === 'fold' ? { opacity: .42 } : {},
+      ring: s.hero ? heroRing(P.ringRadius) : { position: 'relative' },
+      plate: { ...P.plate, minWidth: '62px', padding: '4px 8px', textAlign: 'center' },
+      nameStyle: { ...P.nameStyle, fontSize: '9px' },
+      stackStyle: { ...P.stackStyle, fontSize: '9.5px' },
+      badgeStyle: s.badge
+        ? { position: 'absolute', top: '-7px', right: '-8px', minWidth: '15px', height: '15px', padding: '0 2px', borderRadius: '50%', background: P.badgeBg, color: P.badgeCol, fontSize: '6.5px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: P.mono }
+        : { display: 'none' },
+      pill: { ...pillBase, fontSize: '7.5px', padding: '2px 8px', ...byType[s.type] }
+    }));
+
+    const rowsM = SEATS.map(s => ({
+      name: s.name, tag: s.badge || s.tag,
+      stackTxt: fmt(s.stack), bbTxt: Math.round(s.stack / 100) + 'BB',
+      hud: showHud ? s.hud : '', act: actShort(s),
+      row: {
+        display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', flex: 'none',
+        background: P.plate.background, border: s.hero ? '1.5px solid ' + P.accent : P.plate.border,
+        borderRadius: P.plate.borderRadius, boxShadow: P.plate.boxShadow || 'none',
+        opacity: s.type === 'fold' ? .5 : 1
+      },
+      rowTag: { fontFamily: P.mono, fontSize: '8px', fontWeight: 700, color: P.dim, width: '32px', flex: 'none' },
+      nameStyle: { ...P.nameStyle, fontSize: '11.5px', overflow: 'hidden', textOverflow: 'ellipsis' },
+      hudStyle: { ...P.hudStyle, fontSize: '8px' },
+      stackStyle: { ...P.stackStyle, fontSize: '11px' },
+      bbStyle: { ...P.bbStyle },
+      pill: { ...pillBase, fontSize: '8px', padding: '3px 9px', width: '58px', textAlign: 'center', flex: 'none', ...byType[s.type] }
+    }));
+
+    const LOG = [
+      '#1 · blinds 50/100 · 9 players',
+      'loose_passive posts SB $50',
+      'tight_aggressive posts BB $100',
+      'dealt to ' + heroName + ': K♦ 10♥',
+      'gto folds (UTG)',
+      'maniac raises to $400',
+      'loose_aggressive folds',
+      'tight_passive folds',
+      'abc folds',
+      'short_stack_ninja raises to $950',
+      '— ' + heroName + ' to act: call $950 —'
+    ];
+
+    return {
+      t, seats, seatsM, rowsM,
+      logRows: LOG.map((x, i) => ({ n: String(i + 1).padStart(2, '0'), t: x })),
+      isMobile, isDesktop: !isMobile,
+      viewTable: view === 'table', viewList: view === 'list',
+      viewLabel: view === 'table' ? 'LIST ⇄' : 'TABLE ⇄',
+      toggleView: () => this.setState({ view: view === 'table' ? 'list' : 'table' }),
+      drawerOpen: drawer,
+      toggleDrawer: () => this.setState(s => ({ drawer: !s.drawer })),
+      themeVal: theme,
+      setTheme: e => this.setState({ theme: e.target.value }),
+      fcLabel: fc ? '4-COLOR ●' : '2-COLOR ○',
+      toggleFc: () => this.setState(s => ({ fc: !s.fc })),
+      logOpen: log,
+      toggleLog: () => this.setState(s => ({ log: !s.log })),
+      roOpen: ro,
+      toggleRo: () => this.setState(s => ({ ro: !s.ro })),
+      raise, raiseTxt: fmt(raise),
+      setRaise: e => this.setState({ raise: +e.target.value }),
+      quick: [
+        { label: 'MIN', v: 1500 },
+        { label: '3×', v: 2850 },
+        { label: 'POT', v: 3400 },
+        { label: 'ALL-IN', v: 10000 }
+      ].map(q => ({ label: q.label, set: () => this.setState({ raise: q.v }) })),
+      heroName
+    };
+  }
+
+  themes() {
+    const mono1 = "'IBM Plex Mono',monospace";
+    const mono2 = "'JetBrains Mono',monospace";
+    return {
+
+      midnight: {
+        body: "'Space Grotesk',sans-serif", mono: mono1,
+        bg: '#0B0E13', panel: '#0E1219', panel2: '#10141B', line: '1px solid rgba(255,255,255,.07)',
+        text: '#E7ECF3', dim: '#7C8698', faint: '#4A5364', good: '#2FD98F', divider: 'rgba(255,255,255,.1)',
+        accent: '#2FD98F', accentText: '#08110C', glow: 'rgba(47,217,143,.35)', bet: '#F2C14E',
+        logoFont: { fontWeight: 700, letterSpacing: '.16em', fontSize: '13px' }, logoCol: '#E7ECF3',
+        tabOn: { fontSize: '11px', fontWeight: 600, letterSpacing: '.08em', padding: '6px 14px', borderRadius: '99px', background: 'rgba(47,217,143,.13)', color: '#2FD98F' },
+        tabOff: { fontSize: '11px', fontWeight: 500, letterSpacing: '.08em', padding: '6px 14px', borderRadius: '99px', color: '#7C8698' },
+        chip: { fontFamily: mono1, fontSize: '9px', letterSpacing: '.06em', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,.14)', background: 'transparent', color: '#9AA4B5' },
+        newBtn: { fontSize: '11px', fontWeight: 600, padding: '7px 14px', borderRadius: '6px', border: '1px solid rgba(47,217,143,.4)', background: 'transparent', color: '#2FD98F' },
+        feltRadius: '280px', feltBg: 'radial-gradient(ellipse at 50% 32%,#154236 0%,#0F2E27 72%)', feltBorder: '1px solid rgba(255,255,255,.05)', feltInset: '16px', feltInner: '1px solid rgba(255,255,255,.07)',
+        pot: { color: '#F2C14E', background: 'rgba(0,0,0,.34)', borderRadius: '99px', border: 'none' },
+        slotRadius: '5px', slotBorder: '1.5px dashed rgba(255,255,255,.16)', slotBg: 'transparent', slotText: 'rgba(255,255,255,.3)',
+        tableLabel: { fontFamily: mono1, fontSize: '8px', letterSpacing: '.28em', color: 'rgba(255,255,255,.24)' },
+        plate: { background: '#141A23', border: '1px solid rgba(255,255,255,.09)', borderRadius: '10px', padding: '6px 12px', minWidth: '120px', textAlign: 'left' },
+        nameStyle: { fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' },
+        tagStyle: { fontSize: '8.5px', color: '#7C8698', fontFamily: mono1 },
+        stackStyle: { fontFamily: mono1, fontSize: '11px', color: '#C9D2E0', fontWeight: 600 },
+        bbStyle: { color: '#66707F', fontSize: '8.5px', fontWeight: 400 },
+        hudStyle: { fontFamily: mono1, fontSize: '8px', color: '#596272', whiteSpace: 'nowrap' },
+        pillRadius: '99px', ringRadius: '12px',
+        foldBg: 'rgba(138,148,166,.14)', foldCol: '#8A94A6', raiseBg: 'rgba(242,109,126,.16)', raiseCol: '#F26D7E',
+        blindBg: 'rgba(255,255,255,.08)', blindCol: '#A7B1C2', heroBg: 'rgba(47,217,143,.16)', heroCol: '#2FD98F',
+        betCol: '#F2C14E', betBg: 'rgba(0,0,0,.4)', betBorder: 'none', badgeBg: '#F2C14E', badgeCol: '#141A23',
+        logTitle: { fontFamily: mono1, fontSize: '9px', letterSpacing: '.18em', color: '#7C8698' }, logText: '#A7B1C2',
+        cardBg: '#FBFBF8', cardRadius: '6px', cardBorder: 'none', cardShadow: '0 2px 10px rgba(0,0,0,.5)',
+        heroTitle: { fontSize: '12.5px', fontWeight: 600 },
+        btnFont: { fontSize: '13px', fontWeight: 600, fontFamily: "'Space Grotesk',sans-serif" }, btnPad: '13px 22px', rBtn: '8px',
+        vFold: { border: '1px solid rgba(242,109,126,.5)', background: 'transparent', color: '#F26D7E' },
+        vCall: { border: 'none', background: '#2FD98F', color: '#08110C' },
+        vMin: { border: '1px solid rgba(255,255,255,.16)', background: 'transparent', color: '#E7ECF3' },
+        vRaise: { border: '1px solid rgba(47,217,143,.45)', background: 'rgba(47,217,143,.08)', color: '#2FD98F' },
+        vAllin: { border: '1px solid rgba(242,193,78,.45)', background: 'transparent', color: '#F2C14E' }
+      },
+
+      terminal: {
+        body: "'Archivo',sans-serif", mono: mono2,
+        bg: '#F4F2EC', panel: '#FCFBF7', panel2: '#EFEDE5', line: '1.5px solid #1A1712',
+        text: '#1A1712', dim: '#6D675B', faint: '#B0AA9C', good: '#1F7A45', divider: '#1A1712',
+        accent: '#2E5FD0', accentText: '#FCFBF7', glow: 'rgba(46,95,208,.25)', bet: '#2E5FD0',
+        logoFont: { fontFamily: mono2, fontWeight: 700, letterSpacing: '.1em', fontSize: '13px' }, logoCol: '#1A1712',
+        tabOn: { fontFamily: mono2, fontSize: '10px', fontWeight: 700, letterSpacing: '.08em', padding: '5px 14px', background: '#1A1712', color: '#FCFBF7', border: '1.5px solid #1A1712' },
+        tabOff: { fontFamily: mono2, fontSize: '10px', fontWeight: 500, letterSpacing: '.08em', padding: '5px 14px', color: '#1A1712', border: '1.5px solid #1A1712' },
+        chip: { fontFamily: mono2, fontSize: '9px', letterSpacing: '.05em', padding: '5px 10px', border: '1.5px solid #1A1712', borderRadius: '0', background: 'transparent', color: '#1A1712' },
+        newBtn: { fontFamily: mono2, fontSize: '9px', fontWeight: 700, letterSpacing: '.05em', padding: '5px 12px', border: '1.5px solid #2E5FD0', borderRadius: '0', background: '#2E5FD0', color: '#FCFBF7' },
+        zoneExtra: { backgroundImage: 'radial-gradient(rgba(26,23,18,.08) 1px,transparent 1px)', backgroundSize: '22px 22px' },
+        feltRadius: '270px', feltBg: '#EBEFE6', feltBorder: '1.5px solid #1A1712', feltInset: '14px', feltInner: '1px dashed rgba(26,23,18,.28)',
+        pot: { color: '#1A1712', background: '#FCFBF7', border: '1.5px solid #1A1712', borderRadius: '0' },
+        slotRadius: '0', slotBorder: '1.5px dashed rgba(26,23,18,.3)', slotBg: 'rgba(252,251,247,.6)', slotText: 'rgba(26,23,18,.4)',
+        tableLabel: { fontFamily: mono2, fontSize: '8px', letterSpacing: '.28em', color: 'rgba(26,23,18,.4)' },
+        plate: { background: '#FCFBF7', border: '1.5px solid #1A1712', borderRadius: '0', padding: '5px 11px', minWidth: '122px', textAlign: 'left', boxShadow: '3px 3px 0 rgba(26,23,18,.14)' },
+        nameStyle: { fontFamily: mono2, fontSize: '10.5px', fontWeight: 700, whiteSpace: 'nowrap' },
+        tagStyle: { fontSize: '8.5px', color: '#8A8477', fontFamily: mono2 },
+        stackStyle: { fontFamily: mono2, fontSize: '11px', color: '#1A1712', fontWeight: 600 },
+        bbStyle: { color: '#8A8477', fontSize: '8.5px', fontWeight: 400 },
+        hudStyle: { fontFamily: mono2, fontSize: '8px', color: '#8A8477', whiteSpace: 'nowrap' },
+        pillRadius: '0', ringRadius: '0',
+        foldBg: 'rgba(26,23,18,.08)', foldCol: '#8A8477', raiseBg: '#C4432F', raiseCol: '#FCFBF7',
+        blindBg: '#FCFBF7', blindCol: '#6D675B', heroBg: '#2E5FD0', heroCol: '#FCFBF7',
+        betCol: '#1A1712', betBg: '#FCFBF7', betBorder: '1.5px solid #1A1712', badgeBg: '#1A1712', badgeCol: '#FCFBF7',
+        logTitle: { fontFamily: mono2, fontSize: '9px', fontWeight: 700, letterSpacing: '.18em', color: '#1A1712' }, logText: '#3D382F',
+        cardBg: '#FFFFFF', cardRadius: '0', cardBorder: '1.5px solid #1A1712', cardShadow: '3px 3px 0 rgba(26,23,18,.14)',
+        heroTitle: { fontSize: '12.5px', fontWeight: 700 },
+        btnFont: { fontFamily: mono2, fontSize: '11px', fontWeight: 700 }, btnPad: '12px 20px', rBtn: '0',
+        vFold: { border: '1.5px solid #C4432F', background: 'transparent', color: '#C4432F' },
+        vCall: { border: '1.5px solid #1A1712', background: '#1A1712', color: '#FCFBF7' },
+        vMin: { border: '1.5px solid #1A1712', background: 'transparent', color: '#1A1712' },
+        vRaise: { border: '1.5px solid #2E5FD0', background: 'transparent', color: '#2E5FD0' },
+        vAllin: { border: '1.5px solid #C4432F', background: 'transparent', color: '#C4432F' }
+      },
+
+      luxe: {
+        body: "'Archivo',sans-serif", mono: mono1,
+        bg: '#131110', panel: '#181512', panel2: '#161310', line: '1px solid rgba(201,164,92,.25)',
+        text: '#EAE3D6', dim: '#8A7D66', faint: '#5C523F', good: '#8FBF7F', divider: 'rgba(201,164,92,.3)',
+        accent: '#C9A45C', accentText: '#171310', glow: 'rgba(201,164,92,.3)', bet: '#D9B878',
+        logoFont: { fontFamily: "'Marcellus',serif", fontSize: '16px', letterSpacing: '.12em' }, logoCol: '#D9B878',
+        tabOn: { fontFamily: "'Marcellus',serif", fontSize: '12px', letterSpacing: '.18em', color: '#D9B878', borderBottom: '1px solid #C9A45C', padding: '4px 2px' },
+        tabOff: { fontFamily: "'Marcellus',serif", fontSize: '12px', letterSpacing: '.18em', color: '#8A7D66', padding: '4px 2px' },
+        chip: { fontFamily: mono1, fontSize: '9px', letterSpacing: '.06em', padding: '6px 10px', borderRadius: '99px', border: '1px solid rgba(201,164,92,.4)', background: 'transparent', color: '#C9A45C' },
+        newBtn: { fontFamily: "'Marcellus',serif", fontSize: '12px', letterSpacing: '.08em', padding: '7px 16px', borderRadius: '99px', border: '1px solid #C9A45C', background: 'transparent', color: '#D9B878' },
+        zoneExtra: { background: 'radial-gradient(ellipse at 50% 40%,#1A1714 0%,#131110 75%)' },
+        feltRadius: '50%', feltBg: 'radial-gradient(ellipse at 50% 34%,#123528 0%,#0C271D 74%)', feltBorder: '1px solid rgba(201,164,92,.5)', feltShadow: '0 0 60px rgba(0,0,0,.6),inset 0 0 80px rgba(0,0,0,.45)', feltInset: '10px', feltInner: '1px solid rgba(201,164,92,.28)',
+        pot: { color: '#D9B878', background: 'rgba(0,0,0,.4)', border: '1px solid rgba(201,164,92,.35)', borderRadius: '99px' },
+        slotRadius: '5px', slotBorder: '1px solid rgba(201,164,92,.3)', slotBg: 'rgba(0,0,0,.22)', slotText: 'rgba(217,184,120,.45)',
+        tableLabel: { fontFamily: "'Marcellus',serif", fontSize: '9px', letterSpacing: '.4em', color: 'rgba(217,184,120,.4)' },
+        plate: { background: '#1C1916', border: '1px solid rgba(201,164,92,.3)', borderRadius: '9px', padding: '6px 12px', minWidth: '120px', textAlign: 'left' },
+        nameStyle: { fontFamily: "'Marcellus',serif", fontSize: '12px', whiteSpace: 'nowrap', color: '#EAE3D6' },
+        tagStyle: { fontSize: '8.5px', color: '#8A7D66', fontFamily: mono1 },
+        stackStyle: { fontFamily: mono1, fontSize: '11px', color: '#D9B878', fontWeight: 600 },
+        bbStyle: { color: '#7A6F5C', fontSize: '8.5px', fontWeight: 400 },
+        hudStyle: { fontFamily: mono1, fontSize: '8px', color: '#6E6353', whiteSpace: 'nowrap' },
+        pillRadius: '99px', ringRadius: '11px',
+        foldBg: 'rgba(122,111,92,.16)', foldCol: '#8A7D66', raiseBg: 'rgba(178,91,91,.2)', raiseCol: '#CE8080',
+        blindBg: 'rgba(234,227,214,.08)', blindCol: '#BCB09B', heroBg: 'rgba(201,164,92,.18)', heroCol: '#D9B878',
+        betCol: '#D9B878', betBg: 'rgba(0,0,0,.45)', betBorder: '1px solid rgba(201,164,92,.3)', badgeBg: '#C9A45C', badgeCol: '#171310',
+        logTitle: { fontFamily: "'Marcellus',serif", fontSize: '11px', letterSpacing: '.24em', color: '#C9A45C' }, logText: '#BCB09B',
+        cardBg: '#F5EFE0', cardRadius: '6px', cardBorder: '1px solid rgba(201,164,92,.5)', cardShadow: '0 3px 14px rgba(0,0,0,.6)',
+        heroTitle: { fontFamily: "'Marcellus',serif", fontSize: '14px' },
+        btnFont: { fontFamily: "'Marcellus',serif", fontSize: '14px', letterSpacing: '.05em' }, btnPad: '12px 24px', rBtn: '99px',
+        vFold: { border: '1px solid rgba(178,91,91,.6)', background: 'transparent', color: '#CE8080' },
+        vCall: { border: 'none', background: '#C9A45C', color: '#171310' },
+        vMin: { border: '1px solid rgba(201,164,92,.4)', background: 'transparent', color: '#D9B878' },
+        vRaise: { border: '1px solid #C9A45C', background: 'rgba(201,164,92,.1)', color: '#D9B878' },
+        vAllin: { border: '1px solid rgba(206,128,128,.5)', background: 'transparent', color: '#CE8080' }
+      },
+
+      organic: {
+        body: 'var(--font-body)', mono: 'var(--font-body)',
+        bg: 'var(--color-bg)', panel: 'var(--color-neutral-100)', panel2: 'var(--color-neutral-200)', line: '1px solid var(--color-neutral-300)',
+        text: 'var(--color-text)', dim: 'var(--color-neutral-600)', faint: 'var(--color-neutral-500)', good: 'var(--color-accent-2-700)', divider: 'var(--color-neutral-400)',
+        accent: 'var(--color-accent)', accentText: '#fff', glow: 'color-mix(in oklab, var(--color-accent) 35%, transparent)', bet: 'var(--color-accent-700)',
+        logoFont: { fontFamily: 'var(--font-heading)', fontSize: '16px', letterSpacing: '.02em' }, logoCol: 'var(--color-text)',
+        tabOn: { fontSize: '11px', fontWeight: 700, letterSpacing: '.06em', padding: '6px 16px', borderRadius: '999px', background: 'var(--color-accent)', color: '#fff' },
+        tabOff: { fontSize: '11px', fontWeight: 600, letterSpacing: '.06em', padding: '6px 16px', borderRadius: '999px', color: 'var(--color-neutral-600)' },
+        chip: { fontSize: '9.5px', fontWeight: 700, letterSpacing: '.05em', padding: '6px 12px', borderRadius: '999px', border: '1px solid var(--color-neutral-400)', background: '#fff', color: 'var(--color-neutral-700)' },
+        newBtn: { fontSize: '11px', fontWeight: 700, padding: '7px 16px', borderRadius: '999px', border: 'none', background: 'var(--color-accent)', color: '#fff' },
+        feltRadius: '999px', feltBg: 'var(--color-accent-2-200)', feltBorder: '2px solid var(--color-accent-2-500)', feltInset: '14px', feltInner: '1px solid var(--color-accent-2-400)',
+        pot: { color: 'var(--color-accent-2-900)', background: '#fff', border: '1px solid var(--color-accent-2-500)', borderRadius: '999px' },
+        slotRadius: '10px', slotBorder: '1.5px dashed var(--color-accent-2-500)', slotBg: 'rgba(255,255,255,.5)', slotText: 'var(--color-accent-2-800)',
+        tableLabel: { fontFamily: 'var(--font-heading)', fontSize: '9px', letterSpacing: '.3em', color: 'var(--color-accent-2-700)' },
+        plate: { background: '#fff', border: '1px solid var(--color-neutral-300)', borderRadius: '16px', padding: '6px 13px', minWidth: '122px', textAlign: 'left', boxShadow: 'var(--shadow-sm)' },
+        nameStyle: { fontSize: '11.5px', fontWeight: 700, whiteSpace: 'nowrap' },
+        tagStyle: { fontSize: '8.5px', color: 'var(--color-neutral-500)', fontWeight: 600 },
+        stackStyle: { fontSize: '11px', color: 'var(--color-text)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
+        bbStyle: { color: 'var(--color-neutral-500)', fontSize: '8.5px', fontWeight: 500 },
+        hudStyle: { fontSize: '8px', color: 'var(--color-neutral-500)', whiteSpace: 'nowrap', fontWeight: 500 },
+        pillRadius: '999px', ringRadius: '18px',
+        foldBg: 'var(--color-neutral-200)', foldCol: 'var(--color-neutral-600)', raiseBg: 'var(--color-accent-200)', raiseCol: 'var(--color-accent-800)',
+        blindBg: 'var(--color-accent-2-200)', blindCol: 'var(--color-accent-2-800)', heroBg: 'var(--color-accent)', heroCol: '#fff',
+        betCol: 'var(--color-accent-800)', betBg: 'var(--color-accent-100)', betBorder: '1px solid var(--color-accent-300)', badgeBg: 'var(--color-accent)', badgeCol: '#fff',
+        logTitle: { fontFamily: 'var(--font-heading)', fontSize: '12px', letterSpacing: '.08em', color: 'var(--color-text)' }, logText: 'var(--color-neutral-700)',
+        cardBg: '#fff', cardRadius: '10px', cardBorder: '1px solid var(--color-neutral-300)', cardShadow: 'var(--shadow-sm)',
+        heroTitle: { fontSize: '13px', fontWeight: 700 },
+        btnFont: { fontSize: '13px', fontWeight: 700, fontFamily: 'var(--font-body)' }, btnPad: '13px 24px', rBtn: '999px',
+        vFold: { border: '1px solid var(--color-neutral-400)', background: '#fff', color: 'var(--color-neutral-700)' },
+        vCall: { border: 'none', background: 'var(--color-accent)', color: '#fff' },
+        vMin: { border: '1px solid var(--color-neutral-400)', background: 'transparent', color: 'var(--color-text)' },
+        vRaise: { border: '1px solid var(--color-accent)', background: 'var(--color-accent-100)', color: 'var(--color-accent-800)' },
+        vAllin: { border: '1px solid var(--color-accent-2-500)', background: 'transparent', color: 'var(--color-accent-2-800)' }
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

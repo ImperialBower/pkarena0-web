@@ -15,6 +15,9 @@ test.describe('YAML download', () => {
     await page.locator('#action-buttons button:has-text("Fold")').click();
     await waitForYamlReady(page);
 
+    // EXPORT YAML lives in the (default-collapsed) hand-log aside — open it.
+    await page.click('#log-toggle');
+
     // Intercept the browser download triggered by the button.
     const [download] = await Promise.all([
       page.waitForEvent('download'),
