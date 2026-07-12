@@ -1,5 +1,12 @@
 # Player Stats (HUD)
 
+> **Superseded by [EPIC-47 — Adaptive Bots](EPIC-47_Adaptive_Bots_Player_Stats.md)** (2026-07-12).
+> The HUD design below carries forward as EPIC-47 Phase 4; the identity-threading
+> sketch carries forward as Phase 1. The "bots won't adapt" caveat (§Opportunity 1)
+> is exactly what EPIC-47 removes via pkcore's `ExploitativeDecider` (EPIC-27),
+> which shipped after this doc was written. Line numbers below reference the
+> pkcore 0.0.51 era; see EPIC-47 for current (0.2.1) references.
+
 **Status:** Planned / not yet shipped. This doc captures the design and motivation for leveraging pkcore's EPIC-26 Player Stats layer (introduced in pkcore 0.0.51) inside pkarena0-web.
 
 **pkcore version:** 0.0.51 (bumped from 0.0.50 on branch `tracker`) — drop-in; `cargo check --target wasm32-unknown-unknown` passes with no source edits.
