@@ -530,7 +530,10 @@
       const bb = state.big_blind > 0 ? Math.round(chips / state.big_blind) : 0;
       const pos = state.dealer_seat != null
         ? POS_TAGS[((0 - state.dealer_seat) % 9 + 9) % 9] : '';
-      title.textContent = `You${pos ? ' · ' + pos : ''} · $${chips.toLocaleString()} (${bb} BB)`;
+      // Name comes from the engine: "You" for the play hero, the bot's name in
+      // arena (seat 0 is a bot there, so "You" would be wrong).
+      const who = hero.name || 'You';
+      title.textContent = `${who}${pos ? ' · ' + pos : ''} · $${chips.toLocaleString()} (${bb} BB)`;
       const toCall = state.to_call ?? 0;
       // pkcore's `pot` excludes live (uncommitted) street bets, so fold them back
       // in for realistic pot-odds/SPR — otherwise preflop reads POT ODDS 100%.
@@ -542,6 +545,52 @@
       const hand = cardsToLogStr(hero.hole_cards);
       sub.textContent =
         `${hand ? hand + ' · ' : ''}TO CALL $${toCall.toLocaleString()} · POT ODDS ${odds}% · SPR ${spr}`;
+    }
+
+    // Persist a completed hand's outcome to the scrollback hand log: a
+    // winner-first showdown reveal when the pot was contested, else a single
+    // "wins $N uncontested" line. Reads only the post-next_hand() `nextState`
+    // (its one-shot `showdown` / `last_result`). Shared by play and arena modes;
+    // seat names come straight from the engine ("You" for the play hero, the
+    // bot's name otherwise), so no mode-specific relabelling is needed.
+    function logHandOutcome(nextState) {
+      const result = nextState.last_result?.[0];
+      const showdown = nextState.showdown;
+      if (Array.isArray(showdown) && showdown.length) {
+        // Winner seats + amount won per seat, summed across pots (side pots),
+        // splitting an entry's amount across its seats for chopped pots.
+        const wonBySeat = new Map();
+        for (const pot of nextState.last_result ?? []) {
+          const n = pot.seats.length || 1;
+          const base = Math.floor(pot.amount / n);
+          let rem = pot.amount - base * n; // odd chips: hand one each to the first `rem` seats
+          for (const s of pot.seats) {
+            wonBySeat.set(s, (wonBySeat.get(s) ?? 0) + base + (rem > 0 ? 1 : 0));
+            if (rem > 0) rem--;
+          }
+        }
+        // Winners first, then the rest.
+        const ordered = [...showdown].sort(
+          (a, b) => (wonBySeat.has(b.seat) ? 1 : 0) - (wonBySeat.has(a.seat) ? 1 : 0),
+        );
+        for (const p of ordered) {
+          const name = p.name;
+          const cards = cardsToLogStr(p.cards);
+          const catStr = p.hand ? `: ${p.hand}` : ''; // omit the colon when category is unknown
+          if (wonBySeat.has(p.seat)) {
+            const amt = wonBySeat.get(p.seat); // already an integer (exact chip distribution above)
+            appendHandLog(`★ ${name} ${cards}${catStr} — wins $${amt.toLocaleString()}`);
+          } else {
+            appendHandLog(`  ${name} ${cards}${catStr}`);
+          }
+        }
+      } else if (result) {
+        // Fold-out: one uncontested winner. No hand category (single-seat eval
+        // is meaningless). The winner's own fold/action line is already above.
+        const winnerStr = result.names[0] ?? 'Unknown';
+        const verb = winnerStr === 'You' ? 'win' : 'wins';
+        appendHandLog(`${winnerStr} ${verb} $${result.amount.toLocaleString()} uncontested`);
+      }
     }
 
     // Full render: visuals + phase-appropriate status and action buttons.
@@ -613,43 +662,7 @@
         if (resultText) showHandResult(resultText, isWin);
 
         // ── Persist the outcome to the hand log (scrollback), not just banner ──
-        const showdown = nextState.showdown;
-        if (Array.isArray(showdown) && showdown.length) {
-          // Winner seats + amount won per seat, summed across pots (side pots),
-          // splitting an entry's amount across its seats for chopped pots.
-          const wonBySeat = new Map();
-          for (const pot of nextState.last_result ?? []) {
-            const n = pot.seats.length || 1;
-            const base = Math.floor(pot.amount / n);
-            let rem = pot.amount - base * n; // odd chips: hand one each to the first `rem` seats
-            for (const s of pot.seats) {
-              wonBySeat.set(s, (wonBySeat.get(s) ?? 0) + base + (rem > 0 ? 1 : 0));
-              if (rem > 0) rem--;
-            }
-          }
-          // Winners first, then the rest.
-          const ordered = [...showdown].sort(
-            (a, b) => (wonBySeat.has(b.seat) ? 1 : 0) - (wonBySeat.has(a.seat) ? 1 : 0),
-          );
-          for (const p of ordered) {
-            const name = p.seat === 0 ? 'You' : p.name;
-            const cards = cardsToLogStr(p.cards);
-            const catStr = p.hand ? `: ${p.hand}` : ''; // omit the colon when category is unknown
-            if (wonBySeat.has(p.seat)) {
-              const amt = wonBySeat.get(p.seat); // already an integer (exact chip distribution above)
-              appendHandLog(`★ ${name} ${cards}${catStr} — wins $${amt.toLocaleString()}`);
-            } else {
-              appendHandLog(`  ${name} ${cards}${catStr}`);
-            }
-          }
-        } else if (result) {
-          // Fold-out: one uncontested winner. No hand category (single-seat eval
-          // is meaningless). The winner's own fold/action line is already above.
-          const displayNames = result.names.map(n => (n === 'You' ? 'You' : n));
-          const winnerStr = displayNames[0] ?? 'Unknown';
-          const verb = winnerStr === 'You' ? 'win' : 'wins';
-          appendHandLog(`${winnerStr} ${verb} $${result.amount.toLocaleString()} uncontested`);
-        }
+        logHandOutcome(nextState);
 
         // When the session is over, say so immediately in the status bar.
         if (nextState.phase === 'SessionOver') {
@@ -1160,6 +1173,14 @@
             arenaAdapter?.pushEvent('action', result.seat, {
               verb, amount, pot_after: 0, to_call_after: 0,
             });
+            // Mirror play mode's per-action scrollback entry (see stepBotsUntilHuman).
+            // Arena reveals every hand, but a fold mucks the cards immediately —
+            // step_bot() captures them pre-fold, so show them inline on the fold
+            // line (the one moment they'd otherwise never reach the log).
+            const foldCards = result.action_label === 'folds' && result.hole_cards?.length
+              ? ` ${cardsToLogStr(result.hole_cards)}`
+              : '';
+            appendHandLog(`${result.name}${foldCards}: ${result.action_label}`);
           }
           renderTableVisuals(state);   // not renderState — avoids triggering play-mode hand flow
           updateArenaStatus(state);
@@ -1169,6 +1190,10 @@
         }
 
         const state = JSON.parse(_arenaMod.get_state());
+        // Record the completed hand in the scrollback log, mirroring play mode.
+        if (state.phase === 'HandComplete') {
+          appendHandLog(`Hand #${state.hand_number} complete — ${state.street ?? ''}`);
+        }
         if (state.phase === 'SessionOver') {
           const winner = [...state.players].sort((a, b) => b.chips - a.chips)[0];
           document.getElementById('arena-status').textContent =
@@ -1185,6 +1210,9 @@
         // Advance the hand (syncs blind level, then calls next_hand()).
         const { state: nextState, blindLevel: newArenaLevel } = advanceHand(_arenaMod, state.hand_number, arenaBlindLevel);
         arenaBlindLevel = newArenaLevel;
+        // next_hand() populated the just-ended hand's one-shot showdown/last_result;
+        // record the winner reveal in the log (same helper play mode uses).
+        logHandOutcome(nextState);
         updateUrlState('arena', nextState.hand_number);
       }
     }

@@ -1198,8 +1198,11 @@ fn build_game_state() -> String {
         );
 
         // Bot views — reveal hole cards at HandComplete/Showdown for in-hand bots.
-        let reveal_bot_cards = phase_val == SessionPhase::HandComplete
-            && table.board.len() == 5;
+        // In Arena (all-bot spectator) mode there is no one to hide from, so every
+        // in-hand seat is face-up at all times; play mode reveals only at a
+        // full-board hand end.
+        let reveal_bot_cards = IS_ALL_BOT.with(|f| *f.borrow())
+            || (phase_val == SessionPhase::HandComplete && table.board.len() == 5);
 
         let players: Vec<PlayerView> = (1..table.seats.0.len())
             .map(|i| {
