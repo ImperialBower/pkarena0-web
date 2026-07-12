@@ -1580,6 +1580,7 @@ mod sort_tests {
 #[cfg(test)]
 mod decider_path_parity_tests {
     use super::*;
+    use std::collections::BTreeSet;
 
     fn hero_action(session: &PokerSession) -> PlayerAction {
         let to_call = session.table.to_call(0);
@@ -1597,7 +1598,24 @@ mod decider_path_parity_tests {
         }
     }
 
-    fn run_bot_sequence(use_profile_convenience: bool) -> Vec<PlayerAction> {
+    /// Regression guard for EPIC-46 Phase 1b: the web loop replaced
+    /// `BotProfile::decide(&table, seat, rng)` with
+    /// `RuleBasedDecider::decide_seeded(&profile, &TableSnapshot::from_table(..), rng)`.
+    /// The refactor is only safe if those two paths are *behaviourally
+    /// identical* for a non-joker seat.
+    ///
+    /// We cannot compare two independently dealt games: `PokerSession::start_hand`
+    /// reshuffles via `Cards::shuffle_in_place`, which draws from the entropy
+    /// thread-local RNG (`pkcore .../cards.rs`), not our seeded `SmallRng` — so two
+    /// runs are dealt different boards and their action sequences only match by
+    /// luck. Instead we drive a *single* game and, at every bot decision, evaluate
+    /// **both** paths against the identical `table` + a *clone* of the live RNG.
+    /// Because the deck never enters the assertion, the check is deal-independent
+    /// and cannot flake; it fails only if pkcore's convenience method and the
+    /// explicit decider path genuinely diverge (e.g. a future `decide` that builds
+    /// a stats-bearing snapshot — the exact seam EPIC-47 will touch).
+    #[test]
+    fn convenience_and_decider_paths_agree_at_every_decision() {
         let profile = BotProfile::default_profiles()
             .into_iter()
             .find(|p| p.name != "joker")
@@ -1613,10 +1631,10 @@ mod decider_path_parity_tests {
 
         let mut rng = SmallRng::seed_from_u64(42);
         let rule = RuleBasedDecider;
-        let mut actions = Vec::new();
+        let mut compared = 0usize;
         let mut hands_completed = 0usize;
 
-        while hands_completed < 4 {
+        while hands_completed < 8 {
             match session.next_actor() {
                 None => {
                     session.end_hand().expect("failed to end hand");
@@ -1635,28 +1653,78 @@ mod decider_path_parity_tests {
                         .expect("hero action should always apply");
                 }
                 Some(1) => {
-                    let action = if use_profile_convenience {
-                        profile.decide(&session.table, 1, &mut rng)
-                    } else {
-                        let snapshot = TableSnapshot::from_table(&session.table, 1);
-                        rule.decide_seeded(&profile, &snapshot, &mut rng)
-                    };
-                    actions.push(action.clone());
-                    session
-                        .apply_action(1, action)
-                        .expect("bot action should apply");
+                    // Old path (convenience method) and new path (explicit
+                    // decider) evaluated on the SAME state with clones of the
+                    // live RNG, so neither consumes the stream before the other.
+                    let mut rng_convenience = rng.clone();
+                    let via_convenience =
+                        profile.decide(&session.table, 1, &mut rng_convenience);
+
+                    let mut rng_decider = rng.clone();
+                    let snapshot = TableSnapshot::from_table(&session.table, 1);
+                    let via_decider =
+                        rule.decide_seeded(&profile, &snapshot, &mut rng_decider);
+
+                    assert_eq!(
+                        via_convenience, via_decider,
+                        "decider path diverged from convenience method at decision {compared}"
+                    );
+
+                    // Advance the real RNG identically to either path and apply.
+                    rng = rng_convenience;
+                    compared += 1;
+                    // Mirror production's `step_bot` fallback: some deals produce
+                    // an action the engine rejects (e.g. a raise below the minimum
+                    // increment), which the web loop force-converts to a Fold. We
+                    // do the same so the game keeps advancing deterministically —
+                    // the invariant under test is the assert_eq above, not that
+                    // every decider action is legal.
+                    if session.apply_action(1, via_convenience).is_err() {
+                        session
+                            .apply_action(1, PlayerAction::Fold)
+                            .expect("forced fold should always apply");
+                    }
                 }
                 Some(other) => panic!("unexpected seat in two-player test: {other}"),
             }
         }
 
-        actions
+        assert!(
+            compared > 0,
+            "test exercised no bot decisions — game never reached the bot seat"
+        );
     }
 
+    /// EPIC-46 acceptance #2: "the joker demonstrably plays different styles
+    /// across hands." `JokerDecider::on_new_hand_with_rng` re-rolls its active
+    /// profile from `BotProfile::default_profiles()` each hand; the web loop
+    /// fires it via `notify_bots_new_hand()`. Here we fire the same hook over N
+    /// seeded hands and confirm the joker adopts at least two distinct
+    /// aggression profiles. The joker's active profile is private, but its
+    /// `Debug` impl exposes the active profile's name, which we map back to an
+    /// aggression factor. Seeded RNG ⇒ fully deterministic, never flaky.
     #[test]
-    fn non_joker_rule_based_matches_convenience_decide() {
-        let old_path = run_bot_sequence(true);
-        let new_path = run_bot_sequence(false);
-        assert_eq!(old_path, new_path);
+    fn joker_morphs_style_across_hands() {
+        let profiles = BotProfile::default_profiles();
+        let joker = JokerDecider::new_with_rng(&mut SmallRng::seed_from_u64(7));
+        let mut rng = SmallRng::seed_from_u64(7);
+
+        let mut aggression_factors = BTreeSet::new();
+        for _ in 0..40 {
+            joker.on_new_hand_with_rng(&mut rng);
+            // Debug renders `JokerDecider { active: "<name>" }`.
+            let dbg = format!("{joker:?}");
+            let active = profiles
+                .iter()
+                .find(|p| dbg.contains(&format!("\"{}\"", p.name)))
+                .expect("joker's active profile should be one of the default profiles");
+            aggression_factors.insert(active.betting_strategy.aggression_factor);
+        }
+
+        assert!(
+            aggression_factors.len() >= 2,
+            "joker should exhibit at least two distinct aggression profiles across \
+             hands, but only saw {aggression_factors:?}"
+        );
     }
 }
