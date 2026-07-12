@@ -189,8 +189,9 @@
           });
         }
         setStatus(`${result.name} ${result.action_label}`);
-        const botCards = cardsToLogStr(result.hole_cards);
-        appendHandLog(`${result.name}${botCards ? ' ' + botCards : ''}: ${result.action_label}`);
+        // Opponents' hole cards stay hidden during play — they are revealed only
+        // at showdown (see the showdown reveal block in the HandComplete handler).
+        appendHandLog(`${result.name}: ${result.action_label}`);
         setActionLabel(result.seat, result.action_label);
         const state = JSON.parse(_playMod.get_state());
         renderTableVisuals(state);
