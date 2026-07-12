@@ -297,10 +297,8 @@ pub fn next_hand() -> String {
                         .dealt_hole_cards
                         .get(&seat_num)
                         .and_then(|bc| {
-                            let s: String = bc
-                                .as_slice()
+                            let s: String = sorted_hand(bc.as_slice())
                                 .iter()
-                                .filter(|c| **c != Card::BLANK)
                                 .map(|c| c.to_string())
                                 .collect::<Vec<_>>()
                                 .join(" ");
@@ -322,13 +320,7 @@ pub fn next_hand() -> String {
                         let cards: Vec<String> = table
                             .dealt_hole_cards
                             .get(&seat_num)
-                            .map(|bc| {
-                                bc.as_slice()
-                                    .iter()
-                                    .filter(|c| **c != Card::BLANK)
-                                    .map(card_to_str)
-                                    .collect()
-                            })
+                            .map(|bc| sorted_hand(bc.as_slice()).iter().map(card_to_str).collect())
                             .unwrap_or_default();
                         let hand = table
                             .effective_player_cards(seat_num)
@@ -891,11 +883,8 @@ fn build_replay_snapshot(hh: &HandHistory, target_step: usize) -> Result<ReplayS
                     is_bb: false,
                 };
             }
-            let cards: Vec<String> = s
-                .cards
-                .as_slice()
+            let cards: Vec<String> = sorted_hand(s.cards.as_slice())
                 .iter()
-                .filter(|c| **c != Card::BLANK)
                 .map(card_to_str)
                 .collect();
             ReplaySeat {
@@ -1092,10 +1081,7 @@ pub fn step_bot() -> String {
                                 .unwrap_or_default();
                             let hole_cards: Vec<String> = session.table.seats.get_seat(seat)
                                 .map_or_else(Vec::new, |s| {
-                                    s.cards.as_slice().iter()
-                                        .filter(|c| **c != Card::BLANK)
-                                        .map(card_to_str)
-                                        .collect()
+                                    sorted_hand(s.cards.as_slice()).iter().map(card_to_str).collect()
                                 });
                             if let Some(bot) = bots.get(bot_idx) {
                                 let act = bot.decide(&session.table, seat, &mut *rng);
@@ -1279,11 +1265,8 @@ fn seat_to_player_view(
     };
 
     let hole_cards: Option<Vec<String>> = if show_cards {
-        let cards: Vec<String> = s
-            .cards
-            .as_slice()
+        let cards: Vec<String> = sorted_hand(s.cards.as_slice())
             .iter()
-            .filter(|c| **c != Card::BLANK)
             .map(card_to_str)
             .collect();
         if cards.is_empty() { None } else { Some(cards) }
