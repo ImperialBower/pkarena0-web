@@ -16,6 +16,8 @@ use pkcore::casino::winnings::Winnings;
 use pkcore::casino::table::{Player, Seat, Seats, Table};
 use pkcore::card::Card;
 use pkcore::cards::Cards;
+use pkcore::arrays::seven::Seven;
+use pkcore::analysis::eval::Eval;
 use pkcore::games::GamePhase;
 use pkcore::hand_history::{
     Action as HhAction, ActionType, HandCollection, HandHistory, Outcome,
@@ -55,6 +57,9 @@ thread_local! {
     static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
     /// One-shot hand result populated by next_hand(), consumed by build_game_state().
     static LAST_HAND_RESULT: RefCell<Option<Vec<PotResult>>> = const { RefCell::new(None) };
+    /// One-shot showdown reveal populated by next_hand() (only when 2+ players
+    /// reached showdown), consumed by build_game_state().
+    static LAST_SHOWDOWN: RefCell<Option<Vec<ShowdownPlayer>>> = const { RefCell::new(None) };
     /// When true, seat 0 is a bot (Arena mode); step_bot() never sets WaitingForHuman.
     static IS_ALL_BOT: RefCell<bool> = const { RefCell::new(false) };
 }
@@ -264,6 +269,7 @@ pub fn next_hand() -> String {
         event_log: Vec<TableAction>,
         player_snapshot: Vec<(u8, String, usize, Option<String>)>,
         shuffled_deck_str: Option<String>,
+        showdown: Option<Vec<ShowdownPlayer>>,
     }
 
     let snap: Option<PreEnd> = SESSION.with(|s| {
@@ -304,6 +310,44 @@ pub fn next_hand() -> String {
                 })
                 .collect();
 
+            // Reveal every seat still in the hand (2+ = genuine showdown).
+            // All-in players are included. Evaluate each seat's 7 cards for its
+            // hand category. Skipped (None) when it was a fold-out.
+            let active = table.seats.active_in_hand();
+            let showdown: Option<Vec<ShowdownPlayer>> = if active.len() >= 2 {
+                let players = active
+                    .iter()
+                    .filter_map(|&seat_num| {
+                        let seat = table.seats.get_seat(seat_num)?;
+                        let cards: Vec<String> = table
+                            .dealt_hole_cards
+                            .get(&seat_num)
+                            .map(|bc| {
+                                bc.as_slice()
+                                    .iter()
+                                    .filter(|c| **c != Card::BLANK)
+                                    .map(card_to_str)
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        let hand = table
+                            .effective_player_cards(seat_num)
+                            .and_then(|c| Seven::try_from(c).ok())
+                            .and_then(|seven| hand_rank_name_to_str(Eval::from(seven).hand_rank.name))
+                            .unwrap_or_default();
+                        Some(ShowdownPlayer {
+                            seat: seat_num,
+                            name: seat.player.handle.clone(),
+                            cards,
+                            hand,
+                        })
+                    })
+                    .collect();
+                Some(players)
+            } else {
+                None
+            };
+
             PreEnd {
                 hand_num: session.hand_number as usize,
                 button: table.button,
@@ -317,6 +361,7 @@ pub fn next_hand() -> String {
                 event_log: table.event_log.clone(),
                 player_snapshot,
                 shuffled_deck_str: session.shuffled_deck_str.clone(),
+                showdown,
             }
         })
     });
@@ -408,6 +453,7 @@ pub fn next_hand() -> String {
                         }
                     }).collect();
                     LAST_HAND_RESULT.with(|r| *r.borrow_mut() = Some(pot_results));
+                    LAST_SHOWDOWN.with(|r| *r.borrow_mut() = s.showdown.clone());
                 }
             }
         });
@@ -948,6 +994,16 @@ struct PotResult {
     hand: Option<String>,
 }
 
+/// One revealed hand at a genuine showdown (2+ players still in the hand).
+/// Included in `GameState.showdown` immediately after such a hand ends.
+#[derive(Serialize, Clone)]
+struct ShowdownPlayer {
+    seat: u8,
+    name: String,
+    cards: Vec<String>, // two-char codes, e.g. ["9s","As"]; JS renders [9♠ A♠]
+    hand: String,       // evaluated category, e.g. "Two Pair" ("" if unknown)
+}
+
 #[derive(Serialize)]
 struct GameState {
     hand_number: u32,
@@ -971,6 +1027,8 @@ struct GameState {
     error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     last_result: Option<Vec<PotResult>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    showdown: Option<Vec<ShowdownPlayer>>,
 }
 
 #[derive(Serialize)]
@@ -1109,6 +1167,7 @@ fn build_game_state() -> String {
                 session_over: false,
                 error: None,
                 last_result: None,
+                showdown: None,
             })
             .unwrap_or_else(|_| r#"{"error":"serialize failed"}"#.to_string());
         };
@@ -1177,6 +1236,7 @@ fn build_game_state() -> String {
         // Consume any one-shot values so they surface to the UI exactly once.
         let last_error = LAST_ERROR.with(|e| e.borrow_mut().take());
         let last_result = LAST_HAND_RESULT.with(|r| r.borrow_mut().take());
+        let showdown = LAST_SHOWDOWN.with(|r| r.borrow_mut().take());
 
         let state = GameState {
             hand_number: session.hand_number,
@@ -1198,6 +1258,7 @@ fn build_game_state() -> String {
             session_over: phase_val == SessionPhase::SessionOver,
             error: last_error,
             last_result,
+            showdown,
         };
 
         serde_json::to_string(&state)
