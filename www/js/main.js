@@ -611,6 +611,39 @@
         }
         if (resultText) showHandResult(resultText, isWin);
 
+        // ── Persist the outcome to the hand log (scrollback), not just banner ──
+        const showdown = nextState.showdown;
+        if (Array.isArray(showdown) && showdown.length) {
+          // Winner seats + amount won per seat, summed across pots (side pots),
+          // splitting an entry's amount across its seats for chopped pots.
+          const wonBySeat = new Map();
+          for (const pot of nextState.last_result ?? []) {
+            const share = pot.amount / (pot.seats.length || 1);
+            for (const s of pot.seats) wonBySeat.set(s, (wonBySeat.get(s) ?? 0) + share);
+          }
+          // Winners first, then the rest.
+          const ordered = [...showdown].sort(
+            (a, b) => (wonBySeat.has(b.seat) ? 1 : 0) - (wonBySeat.has(a.seat) ? 1 : 0),
+          );
+          for (const p of ordered) {
+            const name = p.seat === 0 ? 'You' : p.name;
+            const cards = cardsToLogStr(p.cards);
+            const cat = p.hand ? p.hand : '';
+            if (wonBySeat.has(p.seat)) {
+              const amt = Math.round(wonBySeat.get(p.seat));
+              appendHandLog(`★ ${name} ${cards}: ${cat} — wins $${amt.toLocaleString()}`);
+            } else {
+              appendHandLog(`  ${name} ${cards}: ${cat}`);
+            }
+          }
+        } else if (result) {
+          // Fold-out: one uncontested winner. No hand category (single-seat eval
+          // is meaningless). The winner's own fold/action line is already above.
+          const displayNames = result.names.map(n => (n === 'You' ? 'You' : n));
+          const winnerStr = displayNames[0] ?? 'Unknown';
+          appendHandLog(`${winnerStr} wins $${result.amount.toLocaleString()} uncontested`);
+        }
+
         // When the session is over, say so immediately in the status bar.
         if (nextState.phase === 'SessionOver') {
           setStatus(resultText ? resultText + ' — Session over!' : 'Session over!');
