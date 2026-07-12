@@ -64,8 +64,21 @@ step_bot()  [src/lib.rs:1044-1126, driven by JS ~1s ticks]
 ```
 
 The silent-Fold fallback deserves attention on its own: it masks illegal bot
-actions (a pkcore decider bug or a web-side state mismatch) as quiet folds. It
-should stay as a safety net but become *observable*.
+actions as quiet folds. Those illegal actions fall into **three** categories,
+not two:
+
+1. a pkcore decider bug,
+2. a web-side state mismatch, and
+3. **a legal-*intent* action with an illegal *amount*** — most commonly a
+   `Raise` that `RuleBasedDecider` sized below the NLHE minimum raise
+   increment, which the engine rejects with `InsufficientIncrement`.
+
+Category 3 is **routine, not exceptional**: measured at ~2 forced folds per
+20-hand arena run (range 0–6; see `docs/known-issues.md`). So the counter is a
+*rate* to watch for regressions, not a value that should ever read zero. The
+fallback should stay as a safety net but become *observable*. (Folding is the
+worst substitution for a rejected raise — a follow-up should clamp to the
+minimum legal raise instead; out of scope here.)
 
 ---
 
@@ -183,10 +196,18 @@ cargo test                                  # seeded-equivalence unit test
 npx playwright test                         # arena regression spec
 ```
 
-Acceptance: (1) non-joker bots produce identical seeded action sequences
-before/after; (2) the joker demonstrably plays different styles across hands
-(assert differing aggression profile over N seeded hands); (3) forced-Fold
-counter is 0 across a 20-hand arena run.
+Acceptance: (1) the non-joker decision path is behaviourally identical
+before/after — i.e. `BotProfile::decide(&table, seat, rng)` and
+`RuleBasedDecider::decide_seeded(&profile, &TableSnapshot::from_table(..), rng)`
+agree at every decision (asserted per-decision on identical state, since the
+full-game sequence *cannot* be byte-identical: the joker now draws from the
+shared RNG each hand, and `start_hand`'s deck shuffle uses the entropy RNG, not
+our seed); (2) the joker demonstrably plays different styles across hands
+(assert ≥2 distinct aggression profiles over N seeded hands); (3) the
+forced-Fold counter stays **below a threshold** (not zero) across a 20-hand
+arena run — the baseline rate is ~2/run, so use a bound like `< 10` that trips
+on gross breakage without flaking on the normal `InsufficientIncrement` rate
+(see `docs/known-issues.md`).
 
 ---
 

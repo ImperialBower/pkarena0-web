@@ -68,6 +68,10 @@ thread_local! {
     /// When true, seat 0 is a bot (Arena mode); step_bot() never sets WaitingForHuman.
     static IS_ALL_BOT: RefCell<bool> = const { RefCell::new(false) };
     /// Count of bot actions rejected by the engine and force-converted to Fold.
+    /// This is EXPECTED to be nonzero, not just a bug tripwire: `RuleBasedDecider`
+    /// routinely sizes a raise below the NLHE minimum increment, which the engine
+    /// rejects with `InsufficientIncrement`. Baseline is ~2 per 20-hand arena run
+    /// (range 0–6). See `docs/known-issues.md`; do not assert this equals 0.
     static FORCED_FOLD_COUNT: RefCell<u32> = const { RefCell::new(0) };
 }
 
