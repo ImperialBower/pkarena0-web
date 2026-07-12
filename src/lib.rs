@@ -1393,6 +1393,15 @@ fn is_in_hand(state: &PlayerState) -> bool {
     )
 }
 
+/// Non-blank cards ordered high rank first (poker display convention).
+/// Relies on pkcore's derived `Card: Ord` (rank-primary in the Cactus-Kev
+/// u32); a descending sort is Ace-high first. Suit is a minor tiebreak.
+fn sorted_hand(cards: &[Card]) -> Vec<Card> {
+    let mut v: Vec<Card> = cards.iter().copied().filter(|c| *c != Card::BLANK).collect();
+    v.sort_unstable_by(|a, b| b.cmp(a)); // descending: Ace-high first
+    v
+}
+
 fn card_to_str(card: &Card) -> String {
     let rank = card.get_rank().to_char();
     let suit = match card.get_suit() {
@@ -1449,6 +1458,38 @@ mod street_tests {
         assert_eq!(street_from_board(4, false), "Turn");
         // Flag is irrelevant before the river.
         assert_eq!(street_from_board(3, true), "Flop");
+    }
+}
+
+#[cfg(test)]
+mod sort_tests {
+    use super::{card_to_str, sorted_hand};
+    use pkcore::card::Card;
+    use std::str::FromStr;
+
+    fn codes(cards: &[Card]) -> Vec<String> {
+        sorted_hand(cards).iter().map(card_to_str).collect()
+    }
+
+    #[test]
+    fn orders_high_rank_first_and_drops_blank() {
+        let hand = [
+            Card::from_str("2c").unwrap(),
+            Card::from_str("As").unwrap(),
+            Card::BLANK, // padding must be dropped
+            Card::from_str("Td").unwrap(),
+            Card::from_str("Kh").unwrap(),
+        ];
+        assert_eq!(codes(&hand), vec!["As", "Kh", "Td", "2c"]);
+    }
+
+    #[test]
+    fn already_sorted_stays_sorted() {
+        let hand = [
+            Card::from_str("Ah").unwrap(),
+            Card::from_str("Kd").unwrap(),
+        ];
+        assert_eq!(codes(&hand), vec!["Ah", "Kd"]);
     }
 }
 
