@@ -823,7 +823,7 @@ fn build_replay_snapshot(hh: &HandHistory, target_step: usize) -> Result<ReplayS
         .map(|s| s.player.bet)
         .sum::<usize>()
         + table.pot;
-    let street = street_from_board(table.board.len(), SessionPhase::BotsActing);
+    let street = street_from_board(table.board.len(), false);
 
     let replay_seats: Vec<ReplaySeat> = table
         .seats
@@ -1122,7 +1122,11 @@ fn build_game_state() -> String {
             SessionPhase::Uninitialized => "Uninitialized",
         };
 
-        let street = street_from_board(table.board.len(), phase_val);
+        // A completed hand is a real showdown only when 2+ seats are still in
+        // the hand (all-ins included); a river fold-out has exactly one.
+        let is_showdown = phase_val == SessionPhase::HandComplete
+            && table.seats.active_in_hand().len() >= 2;
+        let street = street_from_board(table.board.len(), is_showdown);
         let board: Vec<String> = table.board.iter().map(card_to_str).collect();
 
         let dealer_seat = table.button;
@@ -1286,19 +1290,20 @@ fn derive_legal_actions(to_call: usize, hero_chips: usize, current_bet: usize) -
     }
 }
 
-fn street_from_board(board_len: usize, phase: SessionPhase) -> String {
+fn street_from_board(board_len: usize, is_showdown: bool) -> String {
     match board_len {
         0 => "Preflop",
         3 => "Flop",
         4 => "Turn",
-        5 => {
-            if phase == SessionPhase::HandComplete {
+        // A full board is a showdown only when 2+ players revealed; a river
+        // fold-out (or mid-hand) reads "River".
+        _ => {
+            if is_showdown {
                 "Showdown"
             } else {
                 "River"
             }
         }
-        _ => "Showdown",
     }
     .to_string()
 }
@@ -1361,6 +1366,28 @@ fn hand_rank_name_to_str(name: HandRankName) -> Option<String> {
         HandRankName::HighCard       => Some("High Card".to_string()),
         HandRankName::RazzLow        => Some("Razz Low".to_string()),
         HandRankName::Invalid        => None,
+    }
+}
+
+#[cfg(test)]
+mod street_tests {
+    use super::street_from_board;
+
+    #[test]
+    fn full_board_is_showdown_only_when_contested() {
+        // Genuine showdown: 5-card board, 2+ still in.
+        assert_eq!(street_from_board(5, true), "Showdown");
+        // River fold-out: 5-card board, only one left -> not a showdown.
+        assert_eq!(street_from_board(5, false), "River");
+    }
+
+    #[test]
+    fn pre_river_streets_ignore_showdown_flag() {
+        assert_eq!(street_from_board(0, false), "Preflop");
+        assert_eq!(street_from_board(3, false), "Flop");
+        assert_eq!(street_from_board(4, false), "Turn");
+        // Flag is irrelevant before the river.
+        assert_eq!(street_from_board(3, true), "Flop");
     }
 }
 
