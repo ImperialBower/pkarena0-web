@@ -189,8 +189,9 @@
           });
         }
         setStatus(`${result.name} ${result.action_label}`);
-        const botCards = cardsToLogStr(result.hole_cards);
-        appendHandLog(`${result.name}${botCards ? ' ' + botCards : ''}: ${result.action_label}`);
+        // Opponents' hole cards stay hidden during play — they are revealed only
+        // at showdown (see the showdown reveal block in the HandComplete handler).
+        appendHandLog(`${result.name}: ${result.action_label}`);
         setActionLabel(result.seat, result.action_label);
         const state = JSON.parse(_playMod.get_state());
         renderTableVisuals(state);
@@ -610,6 +611,45 @@
           isWin = heroWon;
         }
         if (resultText) showHandResult(resultText, isWin);
+
+        // ── Persist the outcome to the hand log (scrollback), not just banner ──
+        const showdown = nextState.showdown;
+        if (Array.isArray(showdown) && showdown.length) {
+          // Winner seats + amount won per seat, summed across pots (side pots),
+          // splitting an entry's amount across its seats for chopped pots.
+          const wonBySeat = new Map();
+          for (const pot of nextState.last_result ?? []) {
+            const n = pot.seats.length || 1;
+            const base = Math.floor(pot.amount / n);
+            let rem = pot.amount - base * n; // odd chips: hand one each to the first `rem` seats
+            for (const s of pot.seats) {
+              wonBySeat.set(s, (wonBySeat.get(s) ?? 0) + base + (rem > 0 ? 1 : 0));
+              if (rem > 0) rem--;
+            }
+          }
+          // Winners first, then the rest.
+          const ordered = [...showdown].sort(
+            (a, b) => (wonBySeat.has(b.seat) ? 1 : 0) - (wonBySeat.has(a.seat) ? 1 : 0),
+          );
+          for (const p of ordered) {
+            const name = p.seat === 0 ? 'You' : p.name;
+            const cards = cardsToLogStr(p.cards);
+            const catStr = p.hand ? `: ${p.hand}` : ''; // omit the colon when category is unknown
+            if (wonBySeat.has(p.seat)) {
+              const amt = wonBySeat.get(p.seat); // already an integer (exact chip distribution above)
+              appendHandLog(`★ ${name} ${cards}${catStr} — wins $${amt.toLocaleString()}`);
+            } else {
+              appendHandLog(`  ${name} ${cards}${catStr}`);
+            }
+          }
+        } else if (result) {
+          // Fold-out: one uncontested winner. No hand category (single-seat eval
+          // is meaningless). The winner's own fold/action line is already above.
+          const displayNames = result.names.map(n => (n === 'You' ? 'You' : n));
+          const winnerStr = displayNames[0] ?? 'Unknown';
+          const verb = winnerStr === 'You' ? 'win' : 'wins';
+          appendHandLog(`${winnerStr} ${verb} $${result.amount.toLocaleString()} uncontested`);
+        }
 
         // When the session is over, say so immediately in the status bar.
         if (nextState.phase === 'SessionOver') {
