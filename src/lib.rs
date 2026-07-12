@@ -5,29 +5,29 @@
 
 use std::cell::RefCell;
 
+use pkcore::analysis::eval::Eval;
+use pkcore::analysis::name::HandRankName;
+use pkcore::arrays::seven::Seven;
+use pkcore::bot::decider::{BotDecider, JokerDecider, RuleBasedDecider};
 use pkcore::bot::profile::BotProfile;
+use pkcore::bot::table_snapshot::TableSnapshot;
+use pkcore::card::Card;
+use pkcore::cards::Cards;
 use pkcore::casino::action::PlayerAction;
+use pkcore::casino::action::TableAction;
 use pkcore::casino::game::ForcedBets;
 use pkcore::casino::session::PokerSession;
 use pkcore::casino::state::PlayerState;
-use pkcore::casino::action::TableAction;
-use pkcore::analysis::name::HandRankName;
-use pkcore::casino::winnings::Winnings;
 use pkcore::casino::table::{Player, Seat, Seats, Table};
-use pkcore::card::Card;
-use pkcore::cards::Cards;
-use pkcore::arrays::seven::Seven;
-use pkcore::analysis::eval::Eval;
+use pkcore::casino::winnings::Winnings;
 use pkcore::games::GamePhase;
-use pkcore::hand_history::{
-    Action as HhAction, ActionType, HandCollection, HandHistory, Outcome,
-};
+use pkcore::hand_history::{Action as HhAction, ActionType, HandCollection, HandHistory, Outcome};
 use pkcore::suit::Suit;
-use std::str::FromStr;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 // ── Thread-local game state ───────────────────────────────────────────────────
@@ -44,9 +44,14 @@ enum SessionPhase {
     SessionOver,
 }
 
+struct BotSeat {
+    profile: BotProfile,
+    decider: Box<dyn BotDecider>,
+}
+
 thread_local! {
     static SESSION: RefCell<Option<PokerSession>> = const { RefCell::new(None) };
-    static BOTS: RefCell<Vec<BotProfile>> = const { RefCell::new(Vec::new()) };
+    static BOTS: RefCell<Vec<BotSeat>> = RefCell::new(Vec::new());
     static RNG: RefCell<SmallRng> = RefCell::new(SmallRng::seed_from_u64(0));
     static PHASE: RefCell<SessionPhase> = const { RefCell::new(SessionPhase::Uninitialized) };
     /// Chip counts at the start of the current hand (before blinds), indexed by seat.
@@ -62,6 +67,8 @@ thread_local! {
     static LAST_SHOWDOWN: RefCell<Option<Vec<ShowdownPlayer>>> = const { RefCell::new(None) };
     /// When true, seat 0 is a bot (Arena mode); step_bot() never sets WaitingForHuman.
     static IS_ALL_BOT: RefCell<bool> = const { RefCell::new(false) };
+    /// Count of bot actions rejected by the engine and force-converted to Fold.
+    static FORCED_FOLD_COUNT: RefCell<u32> = const { RefCell::new(0) };
 }
 
 // ── WASM entry point ──────────────────────────────────────────────────────────
@@ -93,18 +100,16 @@ pub fn init_game(rand_seed: f64) -> String {
     let mut profile_pool = BotProfile::default_profiles();
     profile_pool.push(BotProfile::joker());
     RNG.with(|r| profile_pool.shuffle(&mut *r.borrow_mut()));
-    let bots: Vec<BotProfile> = profile_pool.into_iter().take(8).collect();
-    let bot_names: Vec<String> = bots.iter().map(|b| b.name.clone()).collect();
+    let bots: Vec<BotSeat> = profile_pool
+        .into_iter()
+        .take(8)
+        .map(make_bot_seat)
+        .collect();
+    let bot_names: Vec<String> = bots.iter().map(|b| b.profile.name.clone()).collect();
 
-    let mut seats_vec = vec![Seat::new(Player::new_with_chips(
-        "You".to_string(),
-        10_000,
-    ))];
+    let mut seats_vec = vec![Seat::new(Player::new_with_chips("You".to_string(), 10_000))];
     for name in &bot_names {
-        seats_vec.push(Seat::new(Player::new_with_chips(
-            name.clone(),
-            10_000,
-        )));
+        seats_vec.push(Seat::new(Player::new_with_chips(name.clone(), 10_000)));
     }
 
     // Capture chip counts BEFORE start_hand() posts blinds.
@@ -115,11 +120,9 @@ pub fn init_game(rand_seed: f64) -> String {
         .collect();
     HAND_START_CHIPS.with(|h| *h.borrow_mut() = start_chips);
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
+    FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() = 0);
 
-    let table = Table::nlh_from_seats(
-        Seats::new(seats_vec),
-        ForcedBets::new(50, 100),
-    );
+    let table = Table::nlh_from_seats(Seats::new(seats_vec), ForcedBets::new(50, 100));
 
     let mut session = PokerSession::new(table);
     if session.start_hand().is_err() {
@@ -127,6 +130,7 @@ pub fn init_game(rand_seed: f64) -> String {
     }
 
     BOTS.with(|b| *b.borrow_mut() = bots);
+    notify_bots_new_hand();
     SESSION.with(|s| *s.borrow_mut() = Some(session));
     PHASE.with(|p| *p.borrow_mut() = SessionPhase::BotsActing);
 
@@ -146,8 +150,12 @@ pub fn init_bot_game(rand_seed: f64) -> String {
     let mut profile_pool = BotProfile::default_profiles();
     profile_pool.push(BotProfile::joker());
     RNG.with(|r| profile_pool.shuffle(&mut *r.borrow_mut()));
-    let bots: Vec<BotProfile> = profile_pool.into_iter().take(9).collect();
-    let bot_names: Vec<String> = bots.iter().map(|b| b.name.clone()).collect();
+    let bots: Vec<BotSeat> = profile_pool
+        .into_iter()
+        .take(9)
+        .map(make_bot_seat)
+        .collect();
+    let bot_names: Vec<String> = bots.iter().map(|b| b.profile.name.clone()).collect();
 
     let seats_vec: Vec<Seat> = bot_names
         .iter()
@@ -161,11 +169,9 @@ pub fn init_bot_game(rand_seed: f64) -> String {
         .collect();
     HAND_START_CHIPS.with(|h| *h.borrow_mut() = start_chips);
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
+    FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() = 0);
 
-    let table = Table::nlh_from_seats(
-        Seats::new(seats_vec),
-        ForcedBets::new(50, 100),
-    );
+    let table = Table::nlh_from_seats(Seats::new(seats_vec), ForcedBets::new(50, 100));
 
     let mut session = PokerSession::new(table);
     if session.start_hand().is_err() {
@@ -173,6 +179,7 @@ pub fn init_bot_game(rand_seed: f64) -> String {
     }
 
     BOTS.with(|b| *b.borrow_mut() = bots);
+    notify_bots_new_hand();
     SESSION.with(|s| *s.borrow_mut() = Some(session));
     PHASE.with(|p| *p.borrow_mut() = SessionPhase::BotsActing);
 
@@ -187,10 +194,7 @@ pub fn init_bot_game(rand_seed: f64) -> String {
 pub fn set_blinds(small_blind: f64, big_blind: f64) -> String {
     SESSION.with(|s| {
         if let Some(session) = s.borrow_mut().as_mut() {
-            session.set_blinds(ForcedBets::new(
-                small_blind as usize,
-                big_blind as usize,
-            ));
+            session.set_blinds(ForcedBets::new(small_blind as usize, big_blind as usize));
         }
     });
     build_game_state()
@@ -293,17 +297,14 @@ pub fn next_hand() -> String {
                         .map_or(0, |(_, c)| *c);
                     // Use dealt_hole_cards (survives folds) so folders' cards
                     // appear in the hand history, not just the winner's.
-                    let hole_str = table
-                        .dealt_hole_cards
-                        .get(&seat_num)
-                        .and_then(|bc| {
-                            let s: String = sorted_hand(bc.as_slice())
-                                .iter()
-                                .map(|c| c.to_string())
-                                .collect::<Vec<_>>()
-                                .join(" ");
-                            if s.is_empty() { None } else { Some(s) }
-                        });
+                    let hole_str = table.dealt_hole_cards.get(&seat_num).and_then(|bc| {
+                        let s: String = sorted_hand(bc.as_slice())
+                            .iter()
+                            .map(|c| c.to_string())
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        if s.is_empty() { None } else { Some(s) }
+                    });
                     Some((seat_num, seat.player.handle.clone(), starting, hole_str))
                 })
                 .collect();
@@ -325,7 +326,9 @@ pub fn next_hand() -> String {
                         let hand = table
                             .effective_player_cards(seat_num)
                             .and_then(|c| Seven::try_from(c).ok())
-                            .and_then(|seven| hand_rank_name_to_str(Eval::from(seven).hand_rank.name))
+                            .and_then(|seven| {
+                                hand_rank_name_to_str(Eval::from(seven).hand_rank.name)
+                            })
                             .unwrap_or_default();
                         Some(ShowdownPlayer {
                             seat: seat_num,
@@ -426,24 +429,31 @@ pub fn next_hand() -> String {
                     COLLECTION.with(|c| c.borrow_mut().push(hh));
 
                     // Build per-pot winner summary for the UI.
-                    let pot_results: Vec<PotResult> = winnings.vec().iter().map(|pot_win| {
-                        let seats: Vec<u8> = (0u8..9)
-                            .filter(|&i| pot_win.equity.seats.contains(i))
-                            .collect();
-                        let names: Vec<String> = seats.iter().map(|&seat| {
-                            s.player_snapshot
+                    let pot_results: Vec<PotResult> = winnings
+                        .vec()
+                        .iter()
+                        .map(|pot_win| {
+                            let seats: Vec<u8> = (0u8..9)
+                                .filter(|&i| pot_win.equity.seats.contains(i))
+                                .collect();
+                            let names: Vec<String> = seats
                                 .iter()
-                                .find(|(sn, _, _, _)| *sn == seat)
-                                .map(|(_, name, _, _)| name.clone())
-                                .unwrap_or_default()
-                        }).collect();
-                        PotResult {
-                            seats,
-                            names,
-                            amount: pot_win.equity.chips,
-                            hand: hand_rank_name_to_str(pot_win.eval.hand_rank.name),
-                        }
-                    }).collect();
+                                .map(|&seat| {
+                                    s.player_snapshot
+                                        .iter()
+                                        .find(|(sn, _, _, _)| *sn == seat)
+                                        .map(|(_, name, _, _)| name.clone())
+                                        .unwrap_or_default()
+                                })
+                                .collect();
+                            PotResult {
+                                seats,
+                                names,
+                                amount: pot_win.equity.chips,
+                                hand: hand_rank_name_to_str(pot_win.eval.hand_rank.name),
+                            }
+                        })
+                        .collect();
                     LAST_HAND_RESULT.with(|r| *r.borrow_mut() = Some(pot_results));
                     LAST_SHOWDOWN.with(|r| *r.borrow_mut() = s.showdown.clone());
                 }
@@ -487,11 +497,7 @@ pub fn next_hand() -> String {
         }
     });
 
-    let funded = SESSION.with(|s| {
-        s.borrow()
-            .as_ref()
-            .map_or(0, |sess| sess.count_funded())
-    });
+    let funded = SESSION.with(|s| s.borrow().as_ref().map_or(0, |sess| sess.count_funded()));
 
     if funded < 2 {
         PHASE.with(|p| *p.borrow_mut() = SessionPhase::SessionOver);
@@ -509,6 +515,8 @@ pub fn next_hand() -> String {
     if let Some(err) = start_result {
         return error_state(&err);
     }
+
+    notify_bots_new_hand();
 
     PHASE.with(|p| *p.borrow_mut() = SessionPhase::BotsActing);
     build_game_state()
@@ -604,7 +612,9 @@ fn format_hand_summary(hh: &HandHistory) -> String {
     let button = hh.table.button.unwrap_or(0);
     let mut desc = format!("BTN Seat {button}, {player_count} handed");
 
-    let Some(results) = hh.results.as_deref() else { return desc; };
+    let Some(results) = hh.results.as_deref() else {
+        return desc;
+    };
     let winner = results
         .iter()
         .filter(|r| matches!(r.outcome, Outcome::Win | Outcome::Tie))
@@ -614,7 +624,9 @@ fn format_hand_summary(hh: &HandHistory) -> String {
                 .partial_cmp(&b.pot_won.unwrap_or(0.0))
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-    let Some(w) = winner else { return desc; };
+    let Some(w) = winner else {
+        return desc;
+    };
 
     let winner_name = hh
         .players
@@ -657,9 +669,15 @@ fn winner_cards_pretty(hh: &HandHistory, seat: u8) -> String {
 
 fn card_token_to_unicode(token: &str) -> String {
     let mut chars = token.chars();
-    let Some(rank) = chars.next() else { return String::new(); };
+    let Some(rank) = chars.next() else {
+        return String::new();
+    };
     let suit_char = chars.next().unwrap_or(' ');
-    let rank_str = if rank == 'T' { "10".to_string() } else { rank.to_string() };
+    let rank_str = if rank == 'T' {
+        "10".to_string()
+    } else {
+        rank.to_string()
+    };
     let suit = match suit_char {
         's' | 'S' | '\u{2660}' => "\u{2660}",
         'h' | 'H' | '\u{2665}' => "\u{2665}",
@@ -672,7 +690,9 @@ fn card_token_to_unicode(token: &str) -> String {
 
 fn compute_total_steps(hh: &HandHistory) -> usize {
     let mut steps = 1; // step 0 = initial state after blinds posted
-    let Some(streets) = &hh.streets else { return steps; };
+    let Some(streets) = &hh.streets else {
+        return steps;
+    };
     if let Some(pre) = &streets.preflop {
         steps += pre
             .actions
@@ -705,7 +725,9 @@ enum ReplayEvent {
 
 fn build_event_list(hh: &HandHistory) -> Vec<ReplayEvent> {
     let mut events = Vec::new();
-    let Some(streets) = &hh.streets else { return events; };
+    let Some(streets) = &hh.streets else {
+        return events;
+    };
 
     let push_actions = |events: &mut Vec<ReplayEvent>, actions: &[HhAction]| {
         for a in actions {
@@ -782,7 +804,12 @@ fn build_replay_snapshot(hh: &HandHistory, target_step: usize) -> Result<ReplayS
     let bb = hh.table.stakes.big_blind as usize;
     let button = hh.table.button.unwrap_or(0);
 
-    let max_seat = hh.players.iter().map(|p| p.seat as usize).max().unwrap_or(0);
+    let max_seat = hh
+        .players
+        .iter()
+        .map(|p| p.seat as usize)
+        .max()
+        .unwrap_or(0);
     let table_size = max_seat.max(button as usize) + 1;
     let mut seats_vec: Vec<Seat> = (0..table_size)
         .map(|_| Seat::new(Player::default()))
@@ -802,11 +829,10 @@ fn build_replay_snapshot(hh: &HandHistory, target_step: usize) -> Result<ReplayS
         .iter()
         .filter_map(|p| p.hole_cards.as_ref().map(|h| (p.seat, h.clone())))
         .collect();
-    let hole_refs: Vec<(u8, &str)> = hole_entries
-        .iter()
-        .map(|(s, h)| (*s, h.as_str()))
-        .collect();
-    table.inject_hole_cards(&hole_refs).map_err(|e| e.to_string())?;
+    let hole_refs: Vec<(u8, &str)> = hole_entries.iter().map(|(s, h)| (*s, h.as_str())).collect();
+    table
+        .inject_hole_cards(&hole_refs)
+        .map_err(|e| e.to_string())?;
 
     let events = build_event_list(hh);
     let total_steps = events.len() + 1;
@@ -817,7 +843,11 @@ fn build_replay_snapshot(hh: &HandHistory, target_step: usize) -> Result<ReplayS
 
     for event in events.iter().take(target) {
         match event {
-            ReplayEvent::Action { seat, action, label } => {
+            ReplayEvent::Action {
+                seat,
+                action,
+                label,
+            } => {
                 table
                     .apply_action(*seat, action.clone())
                     .map_err(|e| e.to_string())?;
@@ -854,13 +884,8 @@ fn build_replay_snapshot(hh: &HandHistory, target_step: usize) -> Result<ReplayS
     let sb_seat = table.determine_small_blind();
     let bb_seat = table.determine_big_blind();
     let board: Vec<String> = table.board.iter().map(card_to_str).collect();
-    let pot_committed: usize = table
-        .seats
-        .0
-        .iter()
-        .map(|s| s.player.bet)
-        .sum::<usize>()
-        + table.pot;
+    let pot_committed: usize =
+        table.seats.0.iter().map(|s| s.player.bet).sum::<usize>() + table.pot;
     let street = street_from_board(table.board.len(), false);
 
     let replay_seats: Vec<ReplaySeat> = table
@@ -1018,6 +1043,7 @@ struct GameState {
     last_result: Option<Vec<PotResult>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     showdown: Option<Vec<ShowdownPlayer>>,
+    forced_fold_count: u32,
 }
 
 #[derive(Serialize)]
@@ -1048,9 +1074,7 @@ pub fn step_bot() -> String {
         return serde_json::json!({"done": true}).to_string();
     }
 
-    let next = SESSION.with(|s| {
-        s.borrow_mut().as_mut().and_then(|sess| sess.next_actor())
-    });
+    let next = SESSION.with(|s| s.borrow_mut().as_mut().and_then(|sess| sess.next_actor()));
 
     match next {
         None => {
@@ -1063,54 +1087,84 @@ pub fn step_bot() -> String {
         }
         Some(seat) => {
             let all_bot = IS_ALL_BOT.with(|f| *f.borrow());
-            let (action, call_amount, allin_chips, name, hole_cards) = SESSION.with(|s| {
-                BOTS.with(|b| {
-                    RNG.with(|r| {
-                        let bots = b.borrow();
-                        let mut rng = r.borrow_mut();
-                        // In all-bot mode seat N → bot N directly.
-                        // In normal mode seats 1-8 → bots 0-7 (seat 0 is human).
-                        let bot_idx = if all_bot { seat as usize } else { (seat as usize).saturating_sub(1) };
-                        let session_ref = s.borrow();
-                        if let Some(session) = session_ref.as_ref() {
-                            let call_amt = session.table.to_call(seat);
-                            let chips = session.table.seats.get_seat(seat)
-                                .map_or(0, |s| s.player.chips);
-                            let name = session.table.seats.get_seat(seat)
-                                .map(|s| s.player.handle.clone())
-                                .unwrap_or_default();
-                            let hole_cards: Vec<String> = session.table.seats.get_seat(seat)
-                                .map_or_else(Vec::new, |s| {
-                                    sorted_hand(s.cards.as_slice()).iter().map(card_to_str).collect()
-                                });
-                            if let Some(bot) = bots.get(bot_idx) {
-                                let act = bot.decide(&session.table, seat, &mut *rng);
-                                return (act, call_amt, chips, name, hole_cards);
-                            }
-                        }
-                        (PlayerAction::Fold, 0, 0, String::new(), Vec::new())
-                    })
-                })
-            });
-
-            let action_label = match &action {
-                PlayerAction::Fold => "folds".to_string(),
-                PlayerAction::Check => "checks".to_string(),
-                PlayerAction::Call => format!("calls ${}", call_amount),
-                PlayerAction::Bet(n) => format!("bets ${}", n),
-                PlayerAction::Raise(n) => format!("raises to ${}", n),
-                PlayerAction::AllIn => format!("goes all-in ${}", allin_chips),
+            let bot_idx = if all_bot {
+                seat as usize
+            } else {
+                (seat as usize).saturating_sub(1)
             };
 
-            let err = SESSION.with(|s| {
-                s.borrow_mut().as_mut()
-                    .and_then(|sess| sess.apply_action(seat, action).err())
+            let (call_amount, allin_chips, name, hole_cards, snapshot) = SESSION.with(|s| {
+                let session_ref = s.borrow();
+                if let Some(session) = session_ref.as_ref() {
+                    let call_amt = session.table.to_call(seat);
+                    let chips = session
+                        .table
+                        .seats
+                        .get_seat(seat)
+                        .map_or(0, |s| s.player.chips);
+                    let name = session
+                        .table
+                        .seats
+                        .get_seat(seat)
+                        .map(|s| s.player.handle.clone())
+                        .unwrap_or_default();
+                    let hole_cards: Vec<String> =
+                        session
+                            .table
+                            .seats
+                            .get_seat(seat)
+                            .map_or_else(Vec::new, |s| {
+                                sorted_hand(s.cards.as_slice())
+                                    .iter()
+                                    .map(card_to_str)
+                                    .collect()
+                            });
+                    let snapshot = TableSnapshot::from_table(&session.table, seat);
+                    (call_amt, chips, name, hole_cards, Some(snapshot))
+                } else {
+                    (0, 0, String::new(), Vec::new(), None)
+                }
             });
-            if err.is_some() {
+
+            let action = if let Some(snapshot) = snapshot {
+                BOTS.with(|b| {
+                    RNG.with(|r| {
+                        let mut bots = b.borrow_mut();
+                        let mut rng = r.borrow_mut();
+                        bots.get_mut(bot_idx).map_or(PlayerAction::Fold, |bot| {
+                            bot.decider
+                                .decide_seeded(&bot.profile, &snapshot, &mut *rng)
+                        })
+                    })
+                })
+            } else {
+                PlayerAction::Fold
+            };
+
+            let attempted_label = action_label(&action, call_amount, allin_chips);
+            let mut action_label = attempted_label.clone();
+            let mut fallback_notice: Option<String> = None;
+
+            let err = SESSION.with(|s| {
+                s.borrow_mut()
+                    .as_mut()
+                    .and_then(|sess| sess.apply_action(seat, action.clone()).err())
+            });
+            if let Some(err) = err {
+                FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() += 1);
+                let warning = format!(
+                    "Bot action rejected at seat {seat}: attempted `{attempted_label}`; forcing fold ({err})"
+                );
+                console_warn(&warning);
+                fallback_notice = Some(format!(
+                    "engine rejected {attempted_label} for {name}; folded"
+                ));
                 let _ = SESSION.with(|s| {
-                    s.borrow_mut().as_mut()
+                    s.borrow_mut()
+                        .as_mut()
                         .and_then(|sess| sess.apply_action(seat, PlayerAction::Fold).err())
                 });
+                action_label = "folds".to_string();
             }
 
             serde_json::json!({
@@ -1119,6 +1173,7 @@ pub fn step_bot() -> String {
                 "name": name,
                 "action_label": action_label,
                 "hole_cards": hole_cards,
+                "fallback_notice": fallback_notice,
             })
             .to_string()
         }
@@ -1154,6 +1209,7 @@ fn build_game_state() -> String {
                 error: None,
                 last_result: None,
                 showdown: None,
+                forced_fold_count: 0,
             })
             .unwrap_or_else(|_| r#"{"error":"serialize failed"}"#.to_string());
         };
@@ -1169,8 +1225,8 @@ fn build_game_state() -> String {
 
         // A completed hand is a real showdown only when 2+ seats are still in
         // the hand (all-ins included); a river fold-out has exactly one.
-        let is_showdown = phase_val == SessionPhase::HandComplete
-            && table.seats.active_in_hand().len() >= 2;
+        let is_showdown =
+            phase_val == SessionPhase::HandComplete && table.seats.active_in_hand().len() >= 2;
         let street = street_from_board(table.board.len(), is_showdown);
         let board: Vec<String> = table.board.iter().map(card_to_str).collect();
 
@@ -1184,18 +1240,13 @@ fn build_game_state() -> String {
         // minimum valid total is table.bet + increment.  Bet on a fresh street
         // has table.bet == 0, so the formula still gives the right answer (1 BB).
         let min_raise = table.bet + table.min_raise();
-        let hero_chips = table
-            .seats
-            .get_seat(0)
-            .map_or(0, |s| s.player.chips);
+        let hero_chips = table.seats.get_seat(0).map_or(0, |s| s.player.chips);
         let max_bet = hero_chips;
 
         let legal_actions = derive_legal_actions(to_call, hero_chips, table.bet);
 
         // Hero view — always show hole cards.
-        let hero_view = seat_to_player_view(
-            table, 0, dealer_seat, sb_seat, bb_seat, true,
-        );
+        let hero_view = seat_to_player_view(table, 0, dealer_seat, sb_seat, bb_seat, true);
 
         // Bot views — reveal hole cards at HandComplete/Showdown for in-hand bots.
         // In Arena (all-bot spectator) mode there is no one to hide from, so every
@@ -1226,6 +1277,7 @@ fn build_game_state() -> String {
         let last_error = LAST_ERROR.with(|e| e.borrow_mut().take());
         let last_result = LAST_HAND_RESULT.with(|r| r.borrow_mut().take());
         let showdown = LAST_SHOWDOWN.with(|r| r.borrow_mut().take());
+        let forced_fold_count = FORCED_FOLD_COUNT.with(|c| *c.borrow());
 
         let state = GameState {
             hand_number: session.hand_number,
@@ -1248,6 +1300,7 @@ fn build_game_state() -> String {
             error: last_error,
             last_result,
             showdown,
+            forced_fold_count,
         };
 
         serde_json::to_string(&state)
@@ -1275,7 +1328,12 @@ fn seat_to_player_view(
         if cards.is_empty() { None } else { Some(cards) }
     } else {
         // For bots when not at showdown, indicate cards are face-down (2 blanks).
-        let dealt = s.cards.as_slice().iter().filter(|c| **c != Card::BLANK).count();
+        let dealt = s
+            .cards
+            .as_slice()
+            .iter()
+            .filter(|c| **c != Card::BLANK)
+            .count();
         if dealt > 0 && is_in_hand(&s.player.state) {
             Some(vec!["__".to_string(); dealt])
         } else {
@@ -1337,6 +1395,45 @@ fn derive_legal_actions(to_call: usize, hero_chips: usize, current_bet: usize) -
     }
 }
 
+fn make_bot_seat(profile: BotProfile) -> BotSeat {
+    let decider: Box<dyn BotDecider> = if profile.name == "joker" {
+        Box::new(JokerDecider::default())
+    } else {
+        Box::new(RuleBasedDecider)
+    };
+    BotSeat { profile, decider }
+}
+
+fn notify_bots_new_hand() {
+    RNG.with(|r| {
+        let mut rng = r.borrow_mut();
+        BOTS.with(|b| {
+            for bot in b.borrow_mut().iter_mut() {
+                bot.decider.on_new_hand_with_rng(&mut *rng);
+            }
+        });
+    });
+}
+
+fn action_label(action: &PlayerAction, call_amount: usize, allin_chips: usize) -> String {
+    match action {
+        PlayerAction::Fold => "folds".to_string(),
+        PlayerAction::Check => "checks".to_string(),
+        PlayerAction::Call => format!("calls ${call_amount}"),
+        PlayerAction::Bet(n) => format!("bets ${n}"),
+        PlayerAction::Raise(n) => format!("raises to ${n}"),
+        PlayerAction::AllIn => format!("goes all-in ${allin_chips}"),
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn console_warn(msg: &str) {
+    web_sys::console::warn_1(&JsValue::from_str(msg));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn console_warn(_msg: &str) {}
+
 fn street_from_board(board_len: usize, is_showdown: bool) -> String {
     match board_len {
         0 => "Preflop",
@@ -1383,7 +1480,11 @@ fn is_in_hand(state: &PlayerState) -> bool {
 /// Relies on pkcore's derived `Card: Ord` (rank-primary in the Cactus-Kev
 /// u32); a descending sort is Ace-high first. Suit is a minor tiebreak.
 fn sorted_hand(cards: &[Card]) -> Vec<Card> {
-    let mut v: Vec<Card> = cards.iter().copied().filter(|c| *c != Card::BLANK).collect();
+    let mut v: Vec<Card> = cards
+        .iter()
+        .copied()
+        .filter(|c| *c != Card::BLANK)
+        .collect();
     v.sort_unstable_by(|a, b| b.cmp(a)); // descending: Ace-high first
     v
 }
@@ -1411,17 +1512,17 @@ fn error_state(msg: &str) -> String {
 
 fn hand_rank_name_to_str(name: HandRankName) -> Option<String> {
     match name {
-        HandRankName::StraightFlush  => Some("Straight Flush".to_string()),
-        HandRankName::FourOfAKind    => Some("Four of a Kind".to_string()),
-        HandRankName::FullHouse      => Some("Full House".to_string()),
-        HandRankName::Flush          => Some("Flush".to_string()),
-        HandRankName::Straight       => Some("Straight".to_string()),
-        HandRankName::ThreeOfAKind   => Some("Three of a Kind".to_string()),
-        HandRankName::TwoPair        => Some("Two Pair".to_string()),
-        HandRankName::Pair           => Some("Pair".to_string()),
-        HandRankName::HighCard       => Some("High Card".to_string()),
-        HandRankName::RazzLow        => Some("Razz Low".to_string()),
-        HandRankName::Invalid        => None,
+        HandRankName::StraightFlush => Some("Straight Flush".to_string()),
+        HandRankName::FourOfAKind => Some("Four of a Kind".to_string()),
+        HandRankName::FullHouse => Some("Full House".to_string()),
+        HandRankName::Flush => Some("Flush".to_string()),
+        HandRankName::Straight => Some("Straight".to_string()),
+        HandRankName::ThreeOfAKind => Some("Three of a Kind".to_string()),
+        HandRankName::TwoPair => Some("Two Pair".to_string()),
+        HandRankName::Pair => Some("Pair".to_string()),
+        HandRankName::HighCard => Some("High Card".to_string()),
+        HandRankName::RazzLow => Some("Razz Low".to_string()),
+        HandRankName::Invalid => None,
     }
 }
 
@@ -1471,11 +1572,91 @@ mod sort_tests {
 
     #[test]
     fn already_sorted_stays_sorted() {
-        let hand = [
-            Card::from_str("Ah").unwrap(),
-            Card::from_str("Kd").unwrap(),
-        ];
+        let hand = [Card::from_str("Ah").unwrap(), Card::from_str("Kd").unwrap()];
         assert_eq!(codes(&hand), vec!["Ah", "Kd"]);
     }
 }
 
+#[cfg(test)]
+mod decider_path_parity_tests {
+    use super::*;
+
+    fn hero_action(session: &PokerSession) -> PlayerAction {
+        let to_call = session.table.to_call(0);
+        let chips = session
+            .table
+            .seats
+            .get_seat(0)
+            .map_or(0, |s| s.player.chips);
+        if to_call == 0 {
+            PlayerAction::Check
+        } else if chips >= to_call {
+            PlayerAction::Call
+        } else {
+            PlayerAction::AllIn
+        }
+    }
+
+    fn run_bot_sequence(use_profile_convenience: bool) -> Vec<PlayerAction> {
+        let profile = BotProfile::default_profiles()
+            .into_iter()
+            .find(|p| p.name != "joker")
+            .expect("expected at least one non-joker profile");
+
+        let seats = Seats::new(vec![
+            Seat::new(Player::new_with_chips("You".to_string(), 10_000)),
+            Seat::new(Player::new_with_chips(profile.name.clone(), 10_000)),
+        ]);
+        let table = Table::nlh_from_seats(seats, ForcedBets::new(50, 100));
+        let mut session = PokerSession::new(table);
+        session.start_hand().expect("failed to start first hand");
+
+        let mut rng = SmallRng::seed_from_u64(42);
+        let rule = RuleBasedDecider;
+        let mut actions = Vec::new();
+        let mut hands_completed = 0usize;
+
+        while hands_completed < 4 {
+            match session.next_actor() {
+                None => {
+                    session.end_hand().expect("failed to end hand");
+                    session.eliminate_busted();
+                    if session.count_funded() < 2 {
+                        break;
+                    }
+                    session.table.button_up();
+                    session.start_hand().expect("failed to start next hand");
+                    hands_completed += 1;
+                }
+                Some(0) => {
+                    let action = hero_action(&session);
+                    session
+                        .apply_action(0, action)
+                        .expect("hero action should always apply");
+                }
+                Some(1) => {
+                    let action = if use_profile_convenience {
+                        profile.decide(&session.table, 1, &mut rng)
+                    } else {
+                        let snapshot = TableSnapshot::from_table(&session.table, 1);
+                        rule.decide_seeded(&profile, &snapshot, &mut rng)
+                    };
+                    actions.push(action.clone());
+                    session
+                        .apply_action(1, action)
+                        .expect("bot action should apply");
+                }
+                Some(other) => panic!("unexpected seat in two-player test: {other}"),
+            }
+        }
+
+        actions
+    }
+
+    #[test]
+    fn non_joker_rule_based_matches_convenience_decide() {
+        let old_path = run_bot_sequence(true);
+        let new_path = run_bot_sequence(false);
+        assert_eq!(old_path, new_path);
+    }
+}

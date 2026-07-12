@@ -192,6 +192,7 @@
         // Opponents' hole cards stay hidden during play — they are revealed only
         // at showdown (see the showdown reveal block in the HandComplete handler).
         appendHandLog(`${result.name}: ${result.action_label}`);
+        if (result.fallback_notice) appendHandLog(`⚠ ${result.fallback_notice}`);
         setActionLabel(result.seat, result.action_label);
         const state = JSON.parse(_playMod.get_state());
         renderTableVisuals(state);
@@ -292,6 +293,18 @@
           import('../pkg/pkarena0_web.js?tab=play').then(async m  => { await m.default(); return m; }),
           import('../pkg/pkarena0_web.js?tab=arena').then(async m => { await m.default(); return m; }),
         ]);
+        // Lightweight test/debug hooks used by Playwright to read raw engine state
+        // without depending on visibility of the settings/debug controls.
+        window.__PK0__ = {
+          play: {
+            getState: () => JSON.parse(_playMod.get_state()),
+            getStateRaw: () => _playMod.get_state(),
+          },
+          arena: {
+            getState: () => JSON.parse(_arenaMod.get_state()),
+            getStateRaw: () => _arenaMod.get_state(),
+          },
+        };
         document.getElementById('sc-version').textContent = 'v' + _playMod.version();
         const restored = await restoreFromUrl();
         if (!restored) {
@@ -1181,6 +1194,7 @@
               ? ` ${cardsToLogStr(result.hole_cards)}`
               : '';
             appendHandLog(`${result.name}${foldCards}: ${result.action_label}`);
+            if (result.fallback_notice) appendHandLog(`⚠ ${result.fallback_notice}`);
           }
           renderTableVisuals(state);   // not renderState — avoids triggering play-mode hand flow
           updateArenaStatus(state);

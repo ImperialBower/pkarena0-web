@@ -95,3 +95,38 @@ test('arena log reveals a folded hand\'s cards on the fold line', async ({ page 
     { timeout: 60_000 },
   );
 });
+
+test('arena forced-fold fallback counter remains zero', async ({ page }) => {
+  test.setTimeout(120_000);
+  await startArena(page);
+  await setSpeed(page, 10);
+
+  // Wait until the arena has progressed through enough hands to exercise many bot actions.
+  await page.waitForFunction(
+    () => {
+      const text = document.getElementById('arena-status')?.textContent ?? '';
+      const m = text.match(/Hand #(\d+)/);
+      return m ? Number(m[1]) >= 20 : false;
+    },
+    { timeout: 100_000 },
+  );
+
+  const state = await page.evaluate(() => {
+    const hooks = (window as typeof window & {
+      __PK0__?: { arena?: { getState?: () => unknown } };
+    }).__PK0__;
+    return hooks?.arena?.getState?.() ?? {};
+  });
+
+  const forced = Number(state.forced_fold_count ?? 0);
+  // Regression guard: force-fold fallback should be rare over a 20-hand run.
+  expect(forced).toBeLessThan(20);
+
+  if (forced > 0) {
+    await page.click('#log-toggle');
+    await page.waitForFunction(
+      () => /engine rejected/i.test(document.getElementById('hand-log')?.textContent ?? ''),
+      { timeout: 30_000 },
+    );
+  }
+});
