@@ -530,7 +530,10 @@
       const bb = state.big_blind > 0 ? Math.round(chips / state.big_blind) : 0;
       const pos = state.dealer_seat != null
         ? POS_TAGS[((0 - state.dealer_seat) % 9 + 9) % 9] : '';
-      title.textContent = `You${pos ? ' · ' + pos : ''} · $${chips.toLocaleString()} (${bb} BB)`;
+      // Name comes from the engine: "You" for the play hero, the bot's name in
+      // arena (seat 0 is a bot there, so "You" would be wrong).
+      const who = hero.name || 'You';
+      title.textContent = `${who}${pos ? ' · ' + pos : ''} · $${chips.toLocaleString()} (${bb} BB)`;
       const toCall = state.to_call ?? 0;
       // pkcore's `pot` excludes live (uncommitted) street bets, so fold them back
       // in for realistic pot-odds/SPR — otherwise preflop reads POT ODDS 100%.
@@ -1171,7 +1174,13 @@
               verb, amount, pot_after: 0, to_call_after: 0,
             });
             // Mirror play mode's per-action scrollback entry (see stepBotsUntilHuman).
-            appendHandLog(`${result.name}: ${result.action_label}`);
+            // Arena reveals every hand, but a fold mucks the cards immediately —
+            // step_bot() captures them pre-fold, so show them inline on the fold
+            // line (the one moment they'd otherwise never reach the log).
+            const foldCards = result.action_label === 'folds' && result.hole_cards?.length
+              ? ` ${cardsToLogStr(result.hole_cards)}`
+              : '';
+            appendHandLog(`${result.name}${foldCards}: ${result.action_label}`);
           }
           renderTableVisuals(state);   // not renderState — avoids triggering play-mode hand flow
           updateArenaStatus(state);

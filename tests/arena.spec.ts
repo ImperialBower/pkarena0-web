@@ -67,3 +67,31 @@ test('arena writes bot actions and hand outcomes to the hand log', async ({ page
     { timeout: 60_000 },
   );
 });
+
+test('arena hero dock shows the seat-0 bot name, not "You"', async ({ page }) => {
+  test.setTimeout(60_000);
+  await startArena(page);
+
+  // The hero dock (seat 0's cards + label) must name the bot in that seat, since
+  // in arena there is no human. "You" belongs to play mode only.
+  await page.waitForFunction(
+    () => (document.getElementById('hero-title')?.textContent ?? '').length > 0,
+    { timeout: 20_000 },
+  );
+  const title = (await page.locator('#hero-title').textContent()) ?? '';
+  expect(title.startsWith('You')).toBe(false);
+  expect(title).toMatch(/\$[\d,]+/); // still shows the stack, e.g. "Larry · BTN · $10,000 (100 BB)"
+});
+
+test('arena log reveals a folded hand\'s cards on the fold line', async ({ page }) => {
+  test.setTimeout(90_000);
+  await startArena(page);
+  await page.click('#log-toggle');
+  await setSpeed(page, 10);                   // Turbo — folds happen within a hand or two
+
+  // A fold line must carry the folder's cards, e.g. "Loose Larry [7♠ 2♦]: folds".
+  await page.waitForFunction(
+    () => /\[[^\]]+\]: folds/.test(document.getElementById('hand-log')?.textContent ?? ''),
+    { timeout: 60_000 },
+  );
+});
