@@ -1146,36 +1146,49 @@ pub fn step_bot() -> String {
             };
 
             let attempted_label = action_label(&action, call_amount, allin_chips);
-            let mut action_label = attempted_label.clone();
+            let mut label = attempted_label.clone();
             let mut fallback_notice: Option<String> = None;
 
-            let err = SESSION.with(|s| {
+            let outcome = SESSION.with(|s| {
                 s.borrow_mut()
                     .as_mut()
-                    .and_then(|sess| sess.apply_action(seat, action.clone()).err())
+                    .map(|sess| apply_bot_action(sess, seat, &action))
+                    .unwrap_or(ActionOutcome::ForcedFold {
+                        rejected_err: "no active session".to_string(),
+                    })
             });
-            if let Some(err) = err {
-                FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() += 1);
-                let warning = format!(
-                    "Bot action rejected at seat {seat}: attempted `{attempted_label}`; forcing fold ({err})"
-                );
-                console_warn(&warning);
-                fallback_notice = Some(format!(
-                    "engine rejected {attempted_label} for {name}; folded"
-                ));
-                let _ = SESSION.with(|s| {
-                    s.borrow_mut()
-                        .as_mut()
-                        .and_then(|sess| sess.apply_action(seat, PlayerAction::Fold).err())
-                });
-                action_label = "folds".to_string();
+
+            match outcome {
+                ActionOutcome::Applied => {}
+                ActionOutcome::Repaired { applied } => {
+                    // A rejected bet/raise was clamped to a legal amount (or
+                    // downgraded to call/check) so the bot keeps playing the
+                    // hand instead of folding it — NOT a forced fold, so the
+                    // counter stays reserved for genuinely unrepairable errors.
+                    let applied_label = action_label(&applied, call_amount, allin_chips);
+                    fallback_notice = Some(format!(
+                        "adjusted {attempted_label} for {name} → {applied_label}"
+                    ));
+                    label = applied_label;
+                }
+                ActionOutcome::ForcedFold { rejected_err } => {
+                    FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() += 1);
+                    console_warn(&format!(
+                        "Bot action rejected at seat {seat}: attempted `{attempted_label}`; \
+                         no legal repair, forcing fold ({rejected_err})"
+                    ));
+                    fallback_notice = Some(format!(
+                        "engine rejected {attempted_label} for {name}; folded"
+                    ));
+                    label = "folds".to_string();
+                }
             }
 
             serde_json::json!({
                 "done": false,
                 "seat": seat,
                 "name": name,
-                "action_label": action_label,
+                "action_label": label,
                 "hole_cards": hole_cards,
                 "fallback_notice": fallback_notice,
             })
@@ -1427,6 +1440,71 @@ fn action_label(action: &PlayerAction, call_amount: usize, allin_chips: usize) -
         PlayerAction::Bet(n) => format!("bets ${n}"),
         PlayerAction::Raise(n) => format!("raises to ${n}"),
         PlayerAction::AllIn => format!("goes all-in ${allin_chips}"),
+    }
+}
+
+/// Result of feeding a bot's chosen action to the engine.
+#[cfg_attr(test, derive(Debug, PartialEq))]
+enum ActionOutcome {
+    /// The bot's action was legal and applied as-is.
+    Applied,
+    /// The bot's action was rejected but repaired to a legal alternative
+    /// (a min-sized bet/raise, or a call/check/all-in) which was applied.
+    Repaired { applied: PlayerAction },
+    /// No legal alternative applied; the bot was force-folded. This is the
+    /// genuine "safety net fired" signal that `FORCED_FOLD_COUNT` tracks.
+    ForcedFold { rejected_err: String },
+}
+
+/// Applies a bot's chosen `action`, repairing engine-rejected actions instead
+/// of silently folding wherever possible.
+///
+/// `RuleBasedDecider` routinely sizes a raise below the NLHE minimum increment
+/// (rejected as `InsufficientIncrement`). Rather than discard the hand the bot
+/// wanted to raise, we walk an escalating ladder that preserves as much of the
+/// aggressive intent as the engine allows, and only fold as a last resort:
+///
+/// 1. clamp an under-sized `Bet`/`Raise` up to `min_raise_to()` (same variant);
+/// 2. call the outstanding bet (or check if there is none);
+/// 3. go all-in (covers the short stack that cannot afford a min-raise or call);
+/// 4. fold.
+///
+/// Each candidate is validated by the engine; a rejected candidate is a no-op
+/// (validation precedes mutation in pkcore), so the ladder is safe to try in
+/// sequence. Only step 4 counts as a forced fold.
+fn apply_bot_action(session: &mut PokerSession, seat: u8, action: &PlayerAction) -> ActionOutcome {
+    match session.apply_action(seat, *action) {
+        Ok(()) => ActionOutcome::Applied,
+        Err(e) => {
+            let rejected_err = e.to_string();
+
+            // 1. Clamp an under-sized bet/raise to the minimum legal amount,
+            //    preserving the original variant.
+            let min_to = session.table.min_raise_to();
+            let mut ladder: Vec<PlayerAction> = match action {
+                PlayerAction::Bet(_) => vec![PlayerAction::Bet(min_to)],
+                PlayerAction::Raise(_) => vec![PlayerAction::Raise(min_to)],
+                _ => Vec::new(),
+            };
+            // 2. Passive continuation: call if facing a bet, else check.
+            if session.table.to_call(seat) > 0 {
+                ladder.push(PlayerAction::Call);
+            } else {
+                ladder.push(PlayerAction::Check);
+            }
+            // 3. Short-stack continuation (can't cover a min-raise or the call).
+            ladder.push(PlayerAction::AllIn);
+
+            for candidate in ladder {
+                if session.apply_action(seat, candidate).is_ok() {
+                    return ActionOutcome::Repaired { applied: candidate };
+                }
+            }
+
+            // 4. Last resort — fold is legal for any player facing action.
+            let _ = session.apply_action(seat, PlayerAction::Fold);
+            ActionOutcome::ForcedFold { rejected_err }
+        }
     }
 }
 
@@ -1730,5 +1808,63 @@ mod decider_path_parity_tests {
             "joker should exhibit at least two distinct aggression profiles across \
              hands, but only saw {aggression_factors:?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod repair_ladder_tests {
+    use super::*;
+
+    /// A heads-up 50/100 NL session advanced to the first preflop decision, so
+    /// the actor faces an outstanding bet and a voluntary raise is legal. This
+    /// is the exact state that provokes `RuleBasedDecider`'s under-sized raise
+    /// in production (see `docs/EPIC-46_Decider_Integration.md`).
+    fn heads_up_at_first_action() -> (PokerSession, u8) {
+        let seats = Seats::new(vec![
+            Seat::new(Player::new_with_chips("A".to_string(), 10_000)),
+            Seat::new(Player::new_with_chips("B".to_string(), 10_000)),
+        ]);
+        let table = Table::nlh_from_seats(seats, ForcedBets::new(50, 100));
+        let mut session = PokerSession::new(table);
+        session.start_hand().expect("failed to start hand");
+        let seat = session.next_actor().expect("a seat should be to act preflop");
+        (session, seat)
+    }
+
+    /// EPIC-46 (repair ladder): a raise sized below the NLHE minimum increment
+    /// is `InsufficientIncrement`-rejected by the engine. Rather than discard the
+    /// bot's aggressive intent with a fold, `apply_bot_action` clamps it *up* to
+    /// `min_raise_to()` and applies that, reporting `Repaired` — so the raise
+    /// still happens and `FORCED_FOLD_COUNT` is not touched.
+    #[test]
+    fn undersized_raise_is_clamped_up_to_the_minimum() {
+        let (mut session, seat) = heads_up_at_first_action();
+        let min_to = session.table.min_raise_to();
+        // One chip under the minimum legal raise-to: a legal-*intent* raise with
+        // an illegal *amount* — the category-3 rejection the ladder exists for.
+        //
+        // If the rejected raise were *not* a true no-op (pkcore validates before
+        // it mutates), the clamp candidate below would see a shifted
+        // `min_raise_to()` and this assertion's expected amount would be wrong —
+        // so this test also guards that invariant.
+        let undersized = PlayerAction::Raise(min_to - 1);
+
+        let outcome = apply_bot_action(&mut session, seat, &undersized);
+        assert_eq!(
+            outcome,
+            ActionOutcome::Repaired {
+                applied: PlayerAction::Raise(min_to)
+            },
+            "under-sized raise should clamp up to Raise(min_raise_to), not fold"
+        );
+    }
+
+    /// A legal action passes straight through as `Applied` and is unmodified —
+    /// the ladder must never perturb a bot whose action the engine accepts.
+    #[test]
+    fn legal_action_applies_unchanged() {
+        let (mut session, seat) = heads_up_at_first_action();
+        let outcome = apply_bot_action(&mut session, seat, &PlayerAction::Call);
+        assert_eq!(outcome, ActionOutcome::Applied);
     }
 }
