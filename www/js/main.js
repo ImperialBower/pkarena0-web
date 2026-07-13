@@ -304,6 +304,13 @@
             getState: () => JSON.parse(_arenaMod.get_state()),
             getStateRaw: () => _arenaMod.get_state(),
           },
+          // Test-only: drop the human-facing pacing delays to zero so headless
+          // specs that drive many hands run at CPU speed instead of being gated
+          // by real-time setTimeout pauses (BOT_ACTION_MS is still 75ms at the
+          // Turbo slider preset). A call-down can play hundreds of bot actions;
+          // at 75ms each that approaches the spec timeout and flakes under
+          // parallel load. Same delays fastForwardToHand() already zeroes.
+          setInstant: () => { BOT_ACTION_MS = 0; HAND_COMPLETE_MS = 0; },
         };
         document.getElementById('sc-version').textContent = 'v' + _playMod.version();
         const restored = await restoreFromUrl();

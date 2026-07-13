@@ -96,7 +96,7 @@ test('arena log reveals a folded hand\'s cards on the fold line', async ({ page 
   );
 });
 
-test('arena forced-fold fallback counter remains zero', async ({ page }) => {
+test('arena forced-fold fallback counter stays below bound', async ({ page }) => {
   test.setTimeout(120_000);
   await startArena(page);
   await setSpeed(page, 10);
