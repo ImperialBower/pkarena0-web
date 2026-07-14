@@ -7,6 +7,7 @@ use std::cell::RefCell;
 
 use pkcore::analysis::eval::Eval;
 use pkcore::analysis::name::HandRankName;
+use pkcore::analysis::player_stats::StatsRegistry;
 use pkcore::arrays::seven::Seven;
 use pkcore::bot::decider::{BotDecider, JokerDecider, RuleBasedDecider};
 use pkcore::bot::profile::BotProfile;
@@ -21,7 +22,9 @@ use pkcore::casino::state::PlayerState;
 use pkcore::casino::table::{Player, Seat, Seats, Table};
 use pkcore::casino::winnings::Winnings;
 use pkcore::games::GamePhase;
-use pkcore::hand_history::{Action as HhAction, ActionType, HandCollection, HandHistory, Outcome};
+use pkcore::hand_history::{
+    Action as HhAction, ActionType, HandCollection, HandHistory, Outcome, PlayerSnapshot,
+};
 use pkcore::suit::Suit;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
@@ -58,6 +61,12 @@ thread_local! {
     static HAND_START_CHIPS: RefCell<Vec<(u8, usize)>> = const { RefCell::new(Vec::new()) };
     /// Accumulated hand histories for the session; exported via get_session_yaml().
     static COLLECTION: RefCell<HandCollection> = RefCell::new(HandCollection::new());
+    /// Session-scoped opponent stats (EPIC-47 Phase 1). Fed one `HandHistory`
+    /// per completed hand, keyed by `Player` `Uuid`. Reset per session alongside
+    /// `COLLECTION`. Populated but not yet read — later phases
+    /// (injection/adaptation/HUD) consume it. `StatsRegistry::new()` is not
+    /// `const`, so this mirrors `COLLECTION`'s non-const initializer.
+    static REGISTRY: RefCell<StatsRegistry> = RefCell::new(StatsRegistry::new());
     /// One-shot error message surfaced to the UI without locking the game.
     static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
     /// One-shot hand result populated by next_hand(), consumed by build_game_state().
@@ -124,6 +133,7 @@ pub fn init_game(rand_seed: f64) -> String {
         .collect();
     HAND_START_CHIPS.with(|h| *h.borrow_mut() = start_chips);
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
+    REGISTRY.with(|r| *r.borrow_mut() = StatsRegistry::new());
     FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() = 0);
 
     let table = Table::nlh_from_seats(Seats::new(seats_vec), ForcedBets::new(50, 100));
@@ -173,6 +183,7 @@ pub fn init_bot_game(rand_seed: f64) -> String {
         .collect();
     HAND_START_CHIPS.with(|h| *h.borrow_mut() = start_chips);
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
+    REGISTRY.with(|r| *r.borrow_mut() = StatsRegistry::new());
     FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() = 0);
 
     let table = Table::nlh_from_seats(Seats::new(seats_vec), ForcedBets::new(50, 100));
@@ -275,7 +286,7 @@ pub fn next_hand() -> String {
         forced: ForcedBets,
         board_str: String,
         event_log: Vec<TableAction>,
-        player_snapshot: Vec<(u8, String, usize, Option<String>)>,
+        player_snapshot: Vec<PlayerSnapshot>,
         shuffled_deck_str: Option<String>,
         showdown: Option<Vec<ShowdownPlayer>>,
     }
@@ -309,7 +320,7 @@ pub fn next_hand() -> String {
                             .join(" ");
                         if s.is_empty() { None } else { Some(s) }
                     });
-                    Some((seat_num, seat.player.handle.clone(), starting, hole_str))
+                    Some((seat_num, seat.player.handle.clone(), starting, hole_str, Some(seat.player.id)))
                 })
                 .collect();
 
@@ -417,7 +428,7 @@ pub fn next_hand() -> String {
                 // Skip hand history and winner display when the chip audit failed;
                 // the winnings are either absent or unreliable.
                 if !had_audit_failure {
-                    let hh = HandHistory::from_table_state(
+                    let hh = HandHistory::from_table_state_with_ids(
                         s.hand_num,
                         0, // ts_secs — no wall clock in WASM
                         s.button,
@@ -430,6 +441,10 @@ pub fn next_hand() -> String {
                         "pkarena0",
                         s.shuffled_deck_str,
                     );
+                    // Ingest BEFORE push: HandCollection::push takes `hh` by
+                    // value (moves it), so the stats registry must borrow it
+                    // first. Registry is inert until a later phase reads it.
+                    REGISTRY.with(|r| r.borrow_mut().ingest_hand(&hh));
                     COLLECTION.with(|c| c.borrow_mut().push(hh));
 
                     // Build per-pot winner summary for the UI.
@@ -445,8 +460,8 @@ pub fn next_hand() -> String {
                                 .map(|&seat| {
                                     s.player_snapshot
                                         .iter()
-                                        .find(|(sn, _, _, _)| *sn == seat)
-                                        .map(|(_, name, _, _)| name.clone())
+                                        .find(|(sn, _, _, _, _)| *sn == seat)
+                                        .map(|(_, name, _, _, _)| name.clone())
                                         .unwrap_or_default()
                                 })
                                 .collect();
@@ -1097,53 +1112,63 @@ pub fn step_bot() -> String {
                 (seat as usize).saturating_sub(1)
             };
 
-            let (call_amount, allin_chips, name, hole_cards, snapshot) = SESSION.with(|s| {
+            let (action, call_amount, allin_chips, name, hole_cards) = SESSION.with(|s| {
                 let session_ref = s.borrow();
-                if let Some(session) = session_ref.as_ref() {
-                    let call_amt = session.table.to_call(seat);
-                    let chips = session
+                let Some(session) = session_ref.as_ref() else {
+                    return (PlayerAction::Fold, 0usize, 0usize, String::new(), Vec::new());
+                };
+                let call_amt = session.table.to_call(seat);
+                let chips = session
+                    .table
+                    .seats
+                    .get_seat(seat)
+                    .map_or(0, |s| s.player.chips);
+                let name = session
+                    .table
+                    .seats
+                    .get_seat(seat)
+                    .map(|s| s.player.handle.clone())
+                    .unwrap_or_default();
+                let hole_cards: Vec<String> =
+                    session
                         .table
                         .seats
                         .get_seat(seat)
-                        .map_or(0, |s| s.player.chips);
-                    let name = session
-                        .table
-                        .seats
-                        .get_seat(seat)
-                        .map(|s| s.player.handle.clone())
-                        .unwrap_or_default();
-                    let hole_cards: Vec<String> =
-                        session
-                            .table
-                            .seats
-                            .get_seat(seat)
-                            .map_or_else(Vec::new, |s| {
-                                sorted_hand(s.cards.as_slice())
-                                    .iter()
-                                    .map(card_to_str)
-                                    .collect()
-                            });
-                    let snapshot = TableSnapshot::from_table(&session.table, seat);
-                    (call_amt, chips, name, hole_cards, Some(snapshot))
-                } else {
-                    (0, 0, String::new(), Vec::new(), None)
-                }
-            });
+                        .map_or_else(Vec::new, |s| {
+                            sorted_hand(s.cards.as_slice())
+                                .iter()
+                                .map(card_to_str)
+                                .collect()
+                        });
 
-            let action = if let Some(snapshot) = snapshot {
-                BOTS.with(|b| {
-                    RNG.with(|r| {
-                        let mut bots = b.borrow_mut();
-                        let mut rng = r.borrow_mut();
-                        bots.get_mut(bot_idx).map_or(PlayerAction::Fold, |bot| {
-                            bot.decider
-                                .decide_seeded(&bot.profile, &snapshot, &mut *rng)
+                // Build the decider's snapshot WITH opponent stats attached
+                // (EPIC-47 Phase 2). The snapshot borrows the registry, so it
+                // must be built and consumed inside the REGISTRY borrow — hence
+                // the nested scopes rather than moving the snapshot out to a
+                // separate decide step. `RuleBasedDecider` ignores the stats
+                // today (verified by `stats_bearing_snapshot_does_not_change_*`);
+                // Phase 3 wraps deciders to actually read them.
+                let action = REGISTRY.with(|reg| {
+                    BOTS.with(|b| {
+                        RNG.with(|r| {
+                            let registry = reg.borrow();
+                            let snapshot = TableSnapshot::from_table_with_stats(
+                                &session.table,
+                                seat,
+                                &registry,
+                            );
+                            let mut bots = b.borrow_mut();
+                            let mut rng = r.borrow_mut();
+                            bots.get_mut(bot_idx).map_or(PlayerAction::Fold, |bot| {
+                                bot.decider
+                                    .decide_seeded(&bot.profile, &snapshot, &mut *rng)
+                            })
                         })
                     })
-                })
-            } else {
-                PlayerAction::Fold
-            };
+                });
+
+                (action, call_amt, chips, name, hole_cards)
+            });
 
             let attempted_label = action_label(&action, call_amount, allin_chips);
             let mut label = attempted_label.clone();
@@ -1866,5 +1891,270 @@ mod repair_ladder_tests {
         let (mut session, seat) = heads_up_at_first_action();
         let outcome = apply_bot_action(&mut session, seat, &PlayerAction::Call);
         assert_eq!(outcome, ActionOutcome::Applied);
+    }
+}
+
+#[cfg(test)]
+mod stats_plumbing_tests {
+    use super::*;
+
+    /// EPIC-47 Phase 1 acceptance 1d. Drives real hands, ingesting each into a
+    /// `StatsRegistry` keyed by the seats' real `Player` Uuids exactly as
+    /// production `next_hand()` will (5-tuple snapshot +
+    /// `from_table_state_with_ids` + `ingest_hand`). Asserts the registry
+    /// correlated every identity. We assert plumbing invariants, NOT VPIP
+    /// values: `PokerSession::start_hand` reshuffles from the entropy RNG (not
+    /// our seeded `SmallRng`), so specific magnitudes would flake — the same
+    /// deal-independence rationale as `convenience_and_decider_paths_agree_*`.
+    #[test]
+    fn stats_registry_correlates_players_by_identity() {
+        let profile = BotProfile::default_profiles()
+            .into_iter()
+            .find(|p| p.name != "joker")
+            .expect("expected at least one non-joker profile");
+
+        let seats = Seats::new(vec![
+            Seat::new(Player::new_with_chips("You".to_string(), 10_000)),
+            Seat::new(Player::new_with_chips(profile.name.clone(), 10_000)),
+        ]);
+        let table = Table::nlh_from_seats(seats, ForcedBets::new(50, 100));
+        let mut session = PokerSession::new(table);
+        session.start_hand().expect("failed to start first hand");
+
+        // Capture ids once; they must stay stable across every hand.
+        let hero_id = session.table.seats.0[0].player.id;
+        let bot_id = session.table.seats.0[1].player.id;
+        assert_ne!(hero_id, bot_id, "distinct seats must have distinct ids");
+        assert!(
+            !hero_id.is_nil() && !bot_id.is_nil(),
+            "real players must have non-nil ids"
+        );
+
+        let mut registry = StatsRegistry::new();
+        let mut rng = SmallRng::seed_from_u64(42);
+        let rule = RuleBasedDecider;
+        let mut hands_completed = 0usize;
+
+        while hands_completed < 6 {
+            match session.next_actor() {
+                None => {
+                    // Mirror production next_hand(): snapshot BEFORE end_hand,
+                    // build an id-threaded HandHistory, ingest, then advance.
+                    let event_log = session.table.event_log.clone();
+                    let button = session.table.button;
+                    let snapshot: Vec<PlayerSnapshot> = session
+                        .table
+                        .seats
+                        .0
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, seat)| {
+                            if seat.is_empty() {
+                                return None;
+                            }
+                            Some((
+                                i as u8,
+                                seat.player.handle.clone(),
+                                10_000,
+                                None,
+                                Some(seat.player.id),
+                            ))
+                        })
+                        .collect();
+
+                    session.end_hand().expect("failed to end hand");
+
+                    let ending: Vec<(u8, usize)> = session
+                        .table
+                        .seats
+                        .0
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, s)| !s.is_empty())
+                        .map(|(i, s)| (i as u8, s.player.chips))
+                        .collect();
+
+                    let hh = HandHistory::from_table_state_with_ids(
+                        hands_completed,
+                        0,
+                        button,
+                        &ForcedBets::new(50, 100),
+                        &snapshot,
+                        "",
+                        &Winnings::default(),
+                        &event_log,
+                        &ending,
+                        "test",
+                        None,
+                    );
+                    registry.ingest_hand(&hh);
+
+                    session.eliminate_busted();
+                    if session.count_funded() < 2 {
+                        break;
+                    }
+                    session.table.button_up();
+                    session.start_hand().expect("failed to start next hand");
+                    hands_completed += 1;
+                }
+                Some(0) => {
+                    // Minimal legal hero action (inlined — the sibling test
+                    // module's `hero_action` helper is module-private).
+                    let to_call = session.table.to_call(0);
+                    let chips = session
+                        .table
+                        .seats
+                        .get_seat(0)
+                        .map_or(0, |s| s.player.chips);
+                    let action = if to_call == 0 {
+                        PlayerAction::Check
+                    } else if chips >= to_call {
+                        PlayerAction::Call
+                    } else {
+                        PlayerAction::AllIn
+                    };
+                    session
+                        .apply_action(0, action)
+                        .expect("hero action should always apply");
+                }
+                Some(1) => {
+                    let snapshot = TableSnapshot::from_table(&session.table, 1);
+                    let action = rule.decide_seeded(&profile, &snapshot, &mut rng);
+                    if session.apply_action(1, action).is_err() {
+                        session
+                            .apply_action(1, PlayerAction::Fold)
+                            .expect("forced fold should always apply");
+                    }
+                }
+                Some(other) => panic!("unexpected seat in two-player test: {other}"),
+            }
+        }
+
+        // Ids stayed stable across every hand.
+        assert_eq!(
+            session.table.seats.0[0].player.id, hero_id,
+            "hero id changed across hands"
+        );
+        assert_eq!(
+            session.table.seats.0[1].player.id, bot_id,
+            "bot id changed across hands"
+        );
+
+        // Plumbing invariant: the registry correlated each identity.
+        assert!(
+            registry.get(hero_id).is_some(),
+            "registry should have stats for the hero id"
+        );
+        let bot_stats = registry
+            .get(bot_id)
+            .expect("registry should have stats for the bot id");
+        if let Some(v) = bot_stats.vpip() {
+            assert!((0.0..=1.0).contains(&v), "vpip out of range: {v}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod stats_injection_tests {
+    use super::*;
+
+    /// EPIC-47 Phase 2 acceptance 2b: making stats *reachable* by the decider
+    /// (production `step_bot` now builds `TableSnapshot::from_table_with_stats`
+    /// instead of `from_table`) must NOT change what `RuleBasedDecider` does —
+    /// the shipped decider ignores `opponent_stats`; adaptation is Phase 3.
+    ///
+    /// We prove it directly: with a *populated* registry attached, the decider's
+    /// action on identical state (and a clone of the same RNG) is byte-identical
+    /// to the no-stats path. Single state + cloned RNG ⇒ deal-independent, never
+    /// flaky. pkcore locks this upstream via
+    /// `rule_based_decider_ignores_opponent_stats`; this guards *our* seam — that
+    /// we pass `&bot.profile` unchanged and never accidentally wrap the decider.
+    #[test]
+    fn stats_bearing_snapshot_does_not_change_rule_based_action() {
+        let profile = BotProfile::default_profiles()
+            .into_iter()
+            .find(|p| p.name != "joker")
+            .expect("expected at least one non-joker profile");
+
+        let seats = Seats::new(vec![
+            Seat::new(Player::new_with_chips("You".to_string(), 10_000)),
+            Seat::new(Player::new_with_chips(profile.name.clone(), 10_000)),
+        ]);
+        let table = Table::nlh_from_seats(seats, ForcedBets::new(50, 100));
+        let mut session = PokerSession::new(table);
+        session.start_hand().expect("failed to start first hand");
+
+        let hero_id = session.table.seats.0[0].player.id;
+        let bot_id = session.table.seats.0[1].player.id;
+
+        // Populate the registry so the stats path is genuinely non-empty for
+        // both seats — an empty registry would make the assertion vacuous.
+        let mut registry = StatsRegistry::new();
+        let synthetic: Vec<PlayerSnapshot> = vec![
+            (0, "You".to_string(), 10_000, None, Some(hero_id)),
+            (1, profile.name.clone(), 10_000, None, Some(bot_id)),
+        ];
+        let hh = HandHistory::from_table_state_with_ids(
+            0,
+            0,
+            0,
+            &ForcedBets::new(50, 100),
+            &synthetic,
+            "",
+            &Winnings::default(),
+            &[],
+            &[(0, 10_000), (1, 10_000)],
+            "test",
+            None,
+        );
+        registry.ingest_hand(&hh);
+        assert!(
+            registry.get(bot_id).is_some(),
+            "registry must be populated for the bot for a meaningful comparison"
+        );
+
+        // Advance to the bot's (seat 1) first decision.
+        loop {
+            match session.next_actor() {
+                Some(1) => break,
+                Some(0) => {
+                    let to_call = session.table.to_call(0);
+                    let chips = session
+                        .table
+                        .seats
+                        .get_seat(0)
+                        .map_or(0, |s| s.player.chips);
+                    let action = if to_call == 0 {
+                        PlayerAction::Check
+                    } else if chips >= to_call {
+                        PlayerAction::Call
+                    } else {
+                        PlayerAction::AllIn
+                    };
+                    session
+                        .apply_action(0, action)
+                        .expect("hero action should always apply");
+                }
+                other => panic!("expected to reach the bot's decision, got {other:?}"),
+            }
+        }
+
+        let rule = RuleBasedDecider;
+        let snap_plain = TableSnapshot::from_table(&session.table, 1);
+        let snap_stats = TableSnapshot::from_table_with_stats(&session.table, 1, &registry);
+        assert!(
+            snap_stats.opponent_stats.is_some(),
+            "from_table_with_stats should attach the registry borrow"
+        );
+
+        let base = SmallRng::seed_from_u64(99);
+        let action_plain = rule.decide_seeded(&profile, &snap_plain, &mut base.clone());
+        let action_stats = rule.decide_seeded(&profile, &snap_stats, &mut base.clone());
+
+        assert_eq!(
+            action_plain, action_stats,
+            "attaching opponent stats changed RuleBasedDecider's action — the \
+             injection seam must be behavior-neutral until Phase 3"
+        );
     }
 }
