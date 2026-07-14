@@ -41,8 +41,8 @@ EPIC-48 Phase 0.
 
 | EPIC | Title | Depends on | Status |
 |---|---|---|---|
-| [EPIC-46](EPIC-46_Decider_Integration.md) | Full BotDecider Integration | — | Planned |
-| [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) | Adaptive Bots — Player Stats & Exploitative Play | 46 | Planned |
+| [EPIC-46](EPIC-46_Decider_Integration.md) | Full BotDecider Integration | — | Done |
+| [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) | Adaptive Bots — Player Stats & Exploitative Play | 46 | Phases 1–3 done; Phase 4 (HUD) remaining |
 | [EPIC-48](EPIC-48_Real_Equity_WASM.md) | Real Equity in the Browser | 46; upstream pkcore EPIC-36 | Planned (Phase 0 unblocked) |
 | [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47/48) | Planned |
 

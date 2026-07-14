@@ -1064,6 +1064,27 @@
       if (!audioEnabled) voice?.cancel();
     });
 
+    // EPIC-47 Phase 3: adaptive (exploitative) bots toggle. Default on to match
+    // the WASM default; the value is read when a lineup is built, so a change
+    // applies on the next New Game / Start Arena, not mid-session. Pushed to
+    // both WASM instances (play + arena) since each owns its own decider pool.
+    const adaptiveStored = localStorage.getItem('adaptiveEnabled');
+    let adaptiveEnabled = adaptiveStored === null ? true : adaptiveStored === 'true';
+    const applyAdaptive = (on) => {
+      _playMod?.set_adaptive?.(on);
+      _arenaMod?.set_adaptive?.(on);
+    };
+    applyAdaptive(adaptiveEnabled);
+    const adaptiveToggleEl = document.getElementById('adaptive-toggle');
+    if (adaptiveToggleEl) {
+      adaptiveToggleEl.checked = adaptiveEnabled;
+      adaptiveToggleEl.addEventListener('change', () => {
+        adaptiveEnabled = adaptiveToggleEl.checked;
+        localStorage.setItem('adaptiveEnabled', adaptiveEnabled);
+        applyAdaptive(adaptiveEnabled);
+      });
+    }
+
     document.getElementById('reset-pnl-btn').addEventListener('click', () => {
       if (!confirm('Reset lifetime P&L to $0? This cannot be undone.')) return;
       lifetimePnl = 0;

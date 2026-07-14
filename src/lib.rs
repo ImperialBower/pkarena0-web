@@ -10,6 +10,8 @@ use pkcore::analysis::name::HandRankName;
 use pkcore::analysis::player_stats::StatsRegistry;
 use pkcore::arrays::seven::Seven;
 use pkcore::bot::decider::{BotDecider, JokerDecider, RuleBasedDecider};
+use pkcore::bot::exploit::ExploitConfig;
+use pkcore::bot::exploitative_decider::ExploitativeDecider;
 use pkcore::bot::profile::BotProfile;
 use pkcore::bot::table_snapshot::TableSnapshot;
 use pkcore::card::Card;
@@ -76,6 +78,12 @@ thread_local! {
     static LAST_SHOWDOWN: RefCell<Option<Vec<ShowdownPlayer>>> = const { RefCell::new(None) };
     /// When true, seat 0 is a bot (Arena mode); step_bot() never sets WaitingForHuman.
     static IS_ALL_BOT: RefCell<bool> = const { RefCell::new(false) };
+    /// EPIC-47 Phase 3: when true, bot deciders are wrapped in
+    /// `ExploitativeDecider` so they adapt to observed opponent stats. Read at
+    /// bot-construction time (`init_game` / `init_bot_game`); changing it via
+    /// `set_adaptive()` takes effect on the next New Game / Start Arena. Default
+    /// on for both modes; the Settings toggle flips it.
+    static ADAPTIVE: RefCell<bool> = const { RefCell::new(true) };
     /// Count of bot actions rejected by the engine and force-converted to Fold.
     /// This is EXPECTED to be nonzero, not just a bug tripwire: `RuleBasedDecider`
     /// routinely sizes a raise below the NLHE minimum increment, which the engine
@@ -98,6 +106,25 @@ pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// EPIC-47 Phase 3: enable/disable adaptive (exploitative) bots.
+///
+/// When enabled, each bot's decider is wrapped in `ExploitativeDecider` at the
+/// start of the next hand-lineup build, so it deviates from its baseline
+/// profile based on the largest opponent's observed stats. The change is read
+/// when the lineup is constructed, so it takes effect on the next `init_game`
+/// / `init_bot_game` (New Game / Start Arena), not mid-session.
+#[wasm_bindgen]
+pub fn set_adaptive(enabled: bool) {
+    ADAPTIVE.with(|a| *a.borrow_mut() = enabled);
+}
+
+/// Current adaptive-bots preference (see `set_adaptive`). Lets the UI restore
+/// the Settings toggle to its true state on load.
+#[wasm_bindgen]
+pub fn adaptive_enabled() -> bool {
+    ADAPTIVE.with(|a| *a.borrow())
+}
+
 /// Initialise a new session with 9 players (seat 0 = human, seats 1-8 = bots).
 ///
 /// Seeds the RNG from `rand_seed`, deals the first hand, and advances bots
@@ -113,10 +140,11 @@ pub fn init_game(rand_seed: f64) -> String {
     let mut profile_pool = BotProfile::default_profiles();
     profile_pool.push(BotProfile::joker());
     RNG.with(|r| profile_pool.shuffle(&mut *r.borrow_mut()));
+    let adaptive = ADAPTIVE.with(|a| *a.borrow());
     let bots: Vec<BotSeat> = profile_pool
         .into_iter()
         .take(8)
-        .map(make_bot_seat)
+        .map(|p| make_bot_seat(p, adaptive))
         .collect();
     let bot_names: Vec<String> = bots.iter().map(|b| b.profile.name.clone()).collect();
 
@@ -164,10 +192,11 @@ pub fn init_bot_game(rand_seed: f64) -> String {
     let mut profile_pool = BotProfile::default_profiles();
     profile_pool.push(BotProfile::joker());
     RNG.with(|r| profile_pool.shuffle(&mut *r.borrow_mut()));
+    let adaptive = ADAPTIVE.with(|a| *a.borrow());
     let bots: Vec<BotSeat> = profile_pool
         .into_iter()
         .take(9)
-        .map(make_bot_seat)
+        .map(|p| make_bot_seat(p, adaptive))
         .collect();
     let bot_names: Vec<String> = bots.iter().map(|b| b.profile.name.clone()).collect();
 
@@ -1145,9 +1174,10 @@ pub fn step_bot() -> String {
                 // (EPIC-47 Phase 2). The snapshot borrows the registry, so it
                 // must be built and consumed inside the REGISTRY borrow — hence
                 // the nested scopes rather than moving the snapshot out to a
-                // separate decide step. `RuleBasedDecider` ignores the stats
-                // today (verified by `stats_bearing_snapshot_does_not_change_*`);
-                // Phase 3 wraps deciders to actually read them.
+                // separate decide step. A bare `RuleBasedDecider` ignores the
+                // stats; when adaptivity is on (Phase 3) the decider here is an
+                // `ExploitativeDecider` wrapper that reads them and adjusts the
+                // profile before deciding. Either way this call site is unchanged.
                 let action = REGISTRY.with(|reg| {
                     BOTS.with(|b| {
                         RNG.with(|r| {
@@ -1437,11 +1467,26 @@ fn derive_legal_actions(to_call: usize, hero_chips: usize, current_bet: usize) -
     }
 }
 
-fn make_bot_seat(profile: BotProfile) -> BotSeat {
-    let decider: Box<dyn BotDecider> = if profile.name == "joker" {
-        Box::new(JokerDecider::default())
-    } else {
-        Box::new(RuleBasedDecider)
+/// Builds a seat's decider. `joker` seats morph each hand via `JokerDecider`;
+/// everyone else plays `RuleBasedDecider`. When `adaptive` (EPIC-47 Phase 3),
+/// the base decider is wrapped in `ExploitativeDecider` with the canonical
+/// `ExploitConfig` so it deviates from its baseline profile using the largest
+/// opponent's observed stats. The wrapper is a no-op until the registry has
+/// enough hands to clear `ExploitConfig`'s min-hands gates, so early hands are
+/// identical to the unwrapped path.
+fn make_bot_seat(profile: BotProfile, adaptive: bool) -> BotSeat {
+    let is_joker = profile.name == "joker";
+    let decider: Box<dyn BotDecider> = match (is_joker, adaptive) {
+        (true, false) => Box::new(JokerDecider::default()),
+        (false, false) => Box::new(RuleBasedDecider),
+        (true, true) => Box::new(ExploitativeDecider::wrap_with_config(
+            JokerDecider::default(),
+            ExploitConfig::default(),
+        )),
+        (false, true) => Box::new(ExploitativeDecider::wrap_with_config(
+            RuleBasedDecider,
+            ExploitConfig::default(),
+        )),
     };
     BotSeat { profile, decider }
 }
@@ -2155,6 +2200,188 @@ mod stats_injection_tests {
             action_plain, action_stats,
             "attaching opponent stats changed RuleBasedDecider's action — the \
              injection seam must be behavior-neutral until Phase 3"
+        );
+    }
+}
+
+#[cfg(test)]
+mod adaptive_wrapping_tests {
+    use super::*;
+    use pkcore::bot::exploit::{ExploitConfig, adjust_profile};
+    use pkcore::bot::table_snapshot::SeatInfo;
+    use pkcore::games::GamePhase;
+    use pkcore::games::betting_structure::{BetTier, BettingStructure};
+
+    /// Builds a `StatsRegistry` in which `opp_id` reads as a loose-passive
+    /// calling station (VPIP high, PFR zero) by ingesting one authored hand:
+    /// heads-up, the villain limp-calls preflop. That is enough for the
+    /// EPIC-27 station rule (`vpip > threshold && pfr < passive_threshold`) to
+    /// fire once the min-hands gate is dropped — the rule rewrites
+    /// `preferred_bet_sizes`, so the adjusted profile is materially different
+    /// regardless of the baseline's `bluff_frequency`.
+    fn station_registry(opp_id: uuid::Uuid, bot_id: uuid::Uuid) -> StatsRegistry {
+        // Villain = seat 0 (button/SB, acts first heads-up), Hero = seat 1 (BB).
+        let event_log = vec![
+            TableAction::ForcedBetSmallBlind(0, 50),
+            TableAction::ForcedBetBigBlind(1, 100),
+            TableAction::Call(0, 100), // villain voluntarily puts in chips → VPIP, no raise → PFR 0
+            TableAction::Check(1),     // hero checks the option
+        ];
+        let snapshot: Vec<PlayerSnapshot> = vec![
+            (0, "Villain".to_string(), 10_000, None, Some(opp_id)),
+            (1, "Hero".to_string(), 10_000, None, Some(bot_id)),
+        ];
+        let hh = HandHistory::from_table_state_with_ids(
+            0,
+            0,
+            0,
+            &ForcedBets::new(50, 100),
+            &snapshot,
+            "",
+            &Winnings::default(),
+            &event_log,
+            &[(0, 9_900), (1, 10_000)],
+            "test",
+            None,
+        );
+        let mut registry = StatsRegistry::new();
+        registry.ingest_hand(&hh);
+        registry
+    }
+
+    /// A fixed flop decision point for the bot (seat 1), first to act with the
+    /// option to bet or check. Deal-independent: every field is authored, so
+    /// the RNG seed is the only source of variation — no entropy shuffle, no
+    /// flakiness. `opponent_stats` is attached iff `registry` is `Some`.
+    fn flop_snapshot<'a>(
+        opp_id: uuid::Uuid,
+        bot_id: uuid::Uuid,
+        registry: Option<&'a StatsRegistry>,
+    ) -> TableSnapshot<'a> {
+        TableSnapshot {
+            seat: 1,
+            phase: GamePhase::Flop,
+            board: "Ks 7h 2c".parse().expect("valid board"),
+            hole_cards: "Ad Kd".parse().expect("valid hole cards"),
+            pot: 300,
+            to_call: 0,
+            current_bet: 0,
+            min_raise: 100,
+            my_chips: 9_800,
+            stacks: vec![
+                SeatInfo {
+                    id: opp_id,
+                    seat: 0,
+                    name: "Villain".to_string(),
+                    chips: 9_800,
+                    bet: 0,
+                    is_active: true,
+                },
+                SeatInfo {
+                    id: bot_id,
+                    seat: 1,
+                    name: "Hero".to_string(),
+                    chips: 9_800,
+                    bet: 0,
+                    is_active: true,
+                },
+            ],
+            big_blind: 100,
+            betting_structure: BettingStructure::NoLimit,
+            bet_tier: BetTier::Small,
+            checked_this_street: false,
+            dealer_button: Some(0),
+            seat_count: 2,
+            logical_seat: Some(1),
+            opponent_stats: registry,
+        }
+    }
+
+    /// An `ExploitConfig` whose min-hands gates are dropped to 1 so the single
+    /// ingested hand clears them. Thresholds are the canonical defaults — the
+    /// authored villain (VPIP 1.0, PFR 0.0) genuinely crosses the
+    /// calling-station and loose-passive lines; only the sample-size gate is
+    /// relaxed for the unit test.
+    fn open_gate_config() -> ExploitConfig {
+        ExploitConfig {
+            min_hands_light: 1,
+            min_hands_heavy: 1,
+            ..ExploitConfig::default()
+        }
+    }
+
+    /// EPIC-47 Phase 3 acceptance 3c. With adaptivity on (an `ExploitativeDecider`
+    /// wrapper, exactly what `make_bot_seat(_, true)` builds) and the opponent's
+    /// stats past the gate, at least one decision differs from the unwrapped
+    /// baseline; with no stats attached the wrapper is a byte-for-byte no-op.
+    #[test]
+    fn adaptive_wrapping_diverges_after_gate_and_is_neutral_without_stats() {
+        let opp_id = Player::new_with_chips("Villain".to_string(), 10_000).id;
+        let bot_id = Player::new_with_chips("Hero".to_string(), 10_000).id;
+        let registry = station_registry(opp_id, bot_id);
+
+        // Sanity: the authored villain really is a loose-passive station.
+        let stats = registry.get(opp_id).expect("villain must be tracked");
+        assert_eq!(stats.vpip(), Some(1.0), "villain limp-called → VPIP 1.0");
+        assert_eq!(stats.pfr(), Some(0.0), "villain never raised → PFR 0.0");
+
+        let cfg = open_gate_config();
+        let snap_stats = flop_snapshot(opp_id, bot_id, Some(&registry));
+
+        // Pick a profile the station rule actually moves (its baseline
+        // preferred_bet_sizes differ from the rule's value bet sizing).
+        let profile = BotProfile::default_profiles()
+            .into_iter()
+            .find(|p| adjust_profile(p, &snap_stats, &cfg) != *p)
+            .expect("at least one default profile must be exploitably adjusted");
+        let adjusted = adjust_profile(&profile, &snap_stats, &cfg);
+        assert_ne!(
+            adjusted, profile,
+            "the exploit config must materially adjust the chosen profile"
+        );
+
+        let bare = RuleBasedDecider;
+        let wrapped = ExploitativeDecider::wrap_with_config(RuleBasedDecider, cfg.clone());
+        let empty = StatsRegistry::new();
+        let snap_no_stats = flop_snapshot(opp_id, bot_id, Some(&empty));
+
+        let mut diverged = false;
+        for seed in 0u64..256 {
+            // Routing: the wrapper feeds the ADJUSTED profile to the inner
+            // decider — its action equals the bare decider on the adjusted
+            // profile, on identical state and an identically-seeded RNG.
+            let via_wrapper =
+                wrapped.decide_seeded(&profile, &snap_stats, &mut SmallRng::seed_from_u64(seed));
+            let via_adjusted =
+                bare.decide_seeded(&adjusted, &snap_stats, &mut SmallRng::seed_from_u64(seed));
+            assert_eq!(
+                via_wrapper, via_adjusted,
+                "wrapper must decide via the stat-adjusted profile (seed {seed})"
+            );
+
+            // Divergence: adapted decision vs the unwrapped baseline.
+            let baseline =
+                bare.decide_seeded(&profile, &snap_stats, &mut SmallRng::seed_from_u64(seed));
+            if via_wrapper != baseline {
+                diverged = true;
+            }
+
+            // Neutrality: with the gate un-cleared (empty registry) the wrapper
+            // is indistinguishable from the bare decider.
+            let neutral =
+                wrapped.decide_seeded(&profile, &snap_no_stats, &mut SmallRng::seed_from_u64(seed));
+            let neutral_baseline =
+                bare.decide_seeded(&profile, &snap_no_stats, &mut SmallRng::seed_from_u64(seed));
+            assert_eq!(
+                neutral, neutral_baseline,
+                "adaptivity must be a no-op when no opponent stats are present (seed {seed})"
+            );
+        }
+
+        assert!(
+            diverged,
+            "adaptation on must change at least one decision once the opponent's \
+             stats clear the min-hands gate"
         );
     }
 }

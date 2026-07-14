@@ -9,14 +9,16 @@
 
 | Component | Status |
 |---|---|
-| Enable `player-stats` feature in `Cargo.toml` | Planned |
-| Identity threading: `from_table_state_with_ids` + 5-tuple snapshot | Planned |
-| `StatsRegistry` thread_local; `ingest_hand` per completed hand | Planned |
-| `TableSnapshot::from_table_with_stats` in `step_bot` | Planned |
-| Wrap bot deciders in `ExploitativeDecider` (EPIC-27) | Planned |
-| Ship an EPIC-28 trained `ExploitConfig` as embedded YAML | Planned |
-| Per-seat HUD badges (VPIP/PFR/AF + `Confidence` gate) | Planned |
-| Adaptivity toggle in setup UI (off = today's behavior) | Planned |
+| Enable `player-stats` feature in `Cargo.toml` | Done (`Cargo.toml:18`) |
+| Identity threading: `from_table_state_with_ids` + 5-tuple snapshot | Done (`src/lib.rs:431`) |
+| `StatsRegistry` thread_local; `ingest_hand` per completed hand | Done (`src/lib.rs:69,447`) |
+| `TableSnapshot::from_table_with_stats` in `step_bot` | Done (`src/lib.rs:1155`) |
+| Rust tests: identity attribution + unwrapped-decider no-op regression | Done (`src/lib.rs:1910,2073`) |
+| Wrap bot deciders in `ExploitativeDecider` (EPIC-27) | Done (`make_bot_seat`, `src/lib.rs:1477`) |
+| Adaptivity toggle (`set_adaptive` export + Settings checkbox) | Done (`src/lib.rs:117`, `www/index.html`, `www/js/main.js`) |
+| Rust test: adaptation diverges post-gate, neutral without stats | Done (`src/lib.rs` `adaptive_wrapping_tests`) |
+| Ship an EPIC-28 trained `ExploitConfig` as embedded YAML | Deferred — using `ExploitConfig::default()`; no trained artifact exists yet (training is offline/native) |
+| Per-seat HUD badges (VPIP/PFR/AF + `Confidence` gate) | Planned (Phase 4) |
 
 **Depends on:** [EPIC-46](EPIC-46_Decider_Integration.md) (decider-per-seat
 architecture — required to wrap deciders and inject stats).
@@ -150,27 +152,37 @@ JSON; SVG element ids follow the existing `seat-{n}-…` convention.
 
 ## Work Items
 
-### Phase 1 — Plumbing (no behavior change)
-- [ ] 1a. Add `player-stats` to the pkcore features in `Cargo.toml`.
-- [ ] 1b. Identity threading: 5-tuple snapshot + `from_table_state_with_ids`.
-- [ ] 1c. `REGISTRY` thread_local; ingest per hand; reset per session.
-- [ ] 1d. Test: after N seeded hands, `registry.get(bot_id)` returns stats
-  with plausible VPIP for a loose vs tight archetype.
+### Phase 1 — Plumbing (no behavior change) ✅
+- [x] 1a. Add `player-stats` to the pkcore features in `Cargo.toml`.
+- [x] 1b. Identity threading: 5-tuple snapshot + `from_table_state_with_ids`.
+- [x] 1c. `REGISTRY` thread_local; ingest per hand; reset per session.
+- [x] 1d. Test: after N seeded hands, `registry.get(bot_id)` returns stats
+  with plausible VPIP for a loose vs tight archetype
+  (`stats_registry_correlates_players_by_identity`, `src/lib.rs:1910`).
 
-### Phase 2 — Stats reach the deciders
-- [ ] 2a. `from_table_with_stats` in `step_bot` (EPIC-46 seam).
-- [ ] 2b. Regression: unwrapped `RuleBasedDecider` ignores stats (pkcore locks
-  this via `rule_based_decider_ignores_opponent_stats`) — seeded action
-  sequences unchanged by Phase 1+2a alone.
+### Phase 2 — Stats reach the deciders ✅
+- [x] 2a. `from_table_with_stats` in `step_bot` (EPIC-46 seam).
+- [x] 2b. Regression: unwrapped `RuleBasedDecider` ignores stats — seeded
+  action sequences unchanged by Phase 1+2a alone
+  (`stats_bearing_snapshot_does_not_change_rule_based_action`, `src/lib.rs:2073`).
 
-### Phase 3 — Adaptation on
-- [ ] 3a. Wrap deciders in `ExploitativeDecider::wrap_with_config` behind a
-  setup-screen toggle (default: on for arena mode, off for play mode?
-  see Open Questions).
-- [ ] 3b. Embed a trained `ExploitConfig` YAML; fall back to
-  `ExploitConfig::default()` on parse failure (console warn).
-- [ ] 3c. Seeded arena test: with adaptation on, at least one decision differs
-  after the min-hands gate clears; with it off, sequences are identical.
+### Phase 3 — Adaptation on ✅
+- [x] 3a. Wrap deciders in `ExploitativeDecider::wrap_with_config` behind a
+  Settings toggle (`set_adaptive` / `adaptive_enabled` WASM exports +
+  `#adaptive-toggle` checkbox). Default **on for both modes** (resolved from
+  the Open Question); the value is read when the lineup is built, so a change
+  applies on the next New Game / Start Arena. `make_bot_seat(profile, adaptive)`
+  wraps `RuleBasedDecider` / `JokerDecider` alike.
+- [~] 3b. **Deferred.** Landed with `ExploitConfig::default()` — the doc's
+  "start with the default config, swap in a trained one after arena validation"
+  path. Embedding a trained YAML (with `default()` parse-failure fallback) waits
+  on an actual EPIC-28 artifact; the `wrap_with_config` seam already accepts one.
+- [x] 3c. Seeded, deal-independent test
+  (`adaptive_wrapping_diverges_after_gate_and_is_neutral_without_stats`): a
+  fixed flop spot with an authored calling-station registry. Asserts (1) the
+  wrapper routes decisions through the stat-adjusted profile, (2) ≥1 decision
+  differs from the unwrapped baseline once the min-hands gate clears, and (3)
+  the wrapper is a byte-for-byte no-op when no stats are attached.
 
 ### Phase 4 — HUD
 - [ ] 4a. Serialize per-seat `{vpip, pfr, af, confidence}` in `get_state()`.
@@ -213,9 +225,11 @@ builds and the game loop's per-step latency is visually unchanged.
 
 ## Open Questions
 
-- **Default-on where?** Arena mode (bots-only) is a safe default-on
-  showcase; for play mode, adaptive bots raise difficulty — tie the default
-  to EPIC-49's difficulty selector?
+- **Default-on where?** ~~Resolved (Phase 3): **on for both modes** by
+  default, overridable via the Settings toggle.~~ Adaptation is gated by the
+  registry's min-hands thresholds, so early hands play identically to today
+  regardless. If EPIC-49 ships a difficulty selector, it can drive
+  `set_adaptive` (and later a per-lineup `ExploitConfig`) as one of its levers.
 - **Registry persistence across sessions** via localStorage
   (`StatsRegistry` is serde-able)? Deferred — session-scoped is enough to
   demonstrate adaptation, and cross-session stats raise "it remembers me"
