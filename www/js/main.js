@@ -313,6 +313,12 @@
           setInstant: () => { BOT_ACTION_MS = 0; HAND_COMPLETE_MS = 0; },
         };
         document.getElementById('sc-version').textContent = 'v' + _playMod.version();
+        // Push the stored adaptive-bots preference into both WASM instances now
+        // that they exist, and before restoreFromUrl() can build a game — the
+        // settings block wires the toggle synchronously but runs while these
+        // modules are still loading, so this is the first point the preference
+        // can actually reach the engine.
+        applyAdaptive(adaptiveEnabled);
         const restored = await restoreFromUrl();
         if (!restored) {
           setStatus('Click "New Game" to start.');
@@ -1070,11 +1076,14 @@
     // both WASM instances (play + arena) since each owns its own decider pool.
     const adaptiveStored = localStorage.getItem('adaptiveEnabled');
     let adaptiveEnabled = adaptiveStored === null ? true : adaptiveStored === 'true';
+    // Guard on the module being loaded (a toggle change can race an in-flight
+    // boot), but call set_adaptive unguarded so a renamed/removed export throws
+    // loudly instead of silently no-opping. The initial push to WASM happens in
+    // boot() once the modules resolve — see applyAdaptive() call there.
     const applyAdaptive = (on) => {
-      _playMod?.set_adaptive?.(on);
-      _arenaMod?.set_adaptive?.(on);
+      if (_playMod) _playMod.set_adaptive(on);
+      if (_arenaMod) _arenaMod.set_adaptive(on);
     };
-    applyAdaptive(adaptiveEnabled);
     const adaptiveToggleEl = document.getElementById('adaptive-toggle');
     if (adaptiveToggleEl) {
       adaptiveToggleEl.checked = adaptiveEnabled;
