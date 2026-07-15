@@ -46,6 +46,7 @@ EPIC-48 Phase 0.
 | [EPIC-48](EPIC-48_Real_Equity_WASM.md) | Real Equity in the Browser | 46; upstream pkcore EPIC-36 | Planned (Phase 0 unblocked) |
 | [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47/48) | Planned |
 | [EPIC-50](EPIC-50_Learning_Mode.md) | Learning Mode — Drills & Achievements | 46, 48 (consumes 47/49); Phases 0–1 standalone | Planned |
+| [EPIC-51](EPIC-51_Player_Mode_Table_Setup.md) | Player-Mode Table Setup — Opponent Count & Bot Selection | — (standalone; setup panel later shared by 49) | Planned |
 
 Suggested order: **46 → 47 (Phases 1–2) → 48 Phase 0 → 49 Phase 1–2**, then
 converge on 47 Phase 3–4 / 48 / 49 Phase 3 as upstream EPIC-36 lands.
