@@ -18,7 +18,7 @@
 | Adaptivity toggle (`set_adaptive` export + Settings checkbox) | Done (`src/lib.rs:117`, `www/index.html`, `www/js/main.js`) |
 | Rust test: adaptation diverges post-gate, neutral without stats | Done (`src/lib.rs` `adaptive_wrapping_tests`) |
 | Ship an EPIC-28 trained `ExploitConfig` as embedded YAML | Deferred — using `ExploitConfig::default()`; no trained artifact exists yet (training is offline/native) |
-| Per-seat HUD badges (VPIP/PFR/AF + `Confidence` gate) | Planned (Phase 4) |
+| Per-seat HUD badges (VPIP/PFR/AF, dimmed while low-confidence) | Done (`HudStats` in `get_state`; `renderHud` in `www/js/table.js`) |
 
 **Depends on:** [EPIC-46](EPIC-46_Decider_Integration.md) (decider-per-seat
 architecture — required to wrap deciders and inject stats).
@@ -144,9 +144,17 @@ default config; swap in an EPIC-28 trained one after arena validation.
 
 ### HUD (Phase 4 — carried over from FEATURE_player_stats.md)
 
-Per-seat badges (VPIP / PFR / AF), rendered only when
-`stats.confidence() >= Confidence::Low`; serialize through `get_state()`
-JSON; SVG element ids follow the existing `seat-{n}-…` convention.
+Per-seat badges (VPIP / PFR / AF) serialized through `get_state()` JSON
+(`stats: { vpip, pfr, af, confidence, hands }` on each `PlayerView`) and
+rendered into the existing `.seat-hud` / `.list-hud` elements
+(`data-seat="{n}"` convention).
+
+**Gating (as built, correcting the original sketch):** `Confidence::Low` is the
+*lowest/default* tier (0–49 hands), so a `>= Confidence::Low` test is always
+true. The badge is instead gated on **stats existing at all** — `stats` is
+`None` until the seat's identity has a completed hand in the registry, which is
+what keeps it absent at hand 1. `confidence` then drives *styling*, not
+presence: `hud-low` badges are dimmed to flag a small-sample read.
 
 ---
 
@@ -184,11 +192,20 @@ JSON; SVG element ids follow the existing `seat-{n}-…` convention.
   differs from the unwrapped baseline once the min-hands gate clears, and (3)
   the wrapper is a byte-for-byte no-op when no stats are attached.
 
-### Phase 4 — HUD
-- [ ] 4a. Serialize per-seat `{vpip, pfr, af, confidence}` in `get_state()`.
-- [ ] 4b. UI badges with `Confidence` gating.
-- [ ] 4c. Playwright: badges absent at hand 1, present for active bots after
-  ~20 Turbo-speed hands.
+### Phase 4 — HUD ✅
+- [x] 4a. Serialize per-seat `{vpip, pfr, af, confidence, hands}` in
+  `get_state()` (`HudStats`, `src/lib.rs`). Emitted only when the seat's
+  identity has ≥1 completed hand (`hands_dealt > 0`), so it is absent at hand 1.
+  The hero seat carries its own stats too (the "human stats in the HUD" nicety).
+- [x] 4b. UI badges (`renderHud` in `www/js/table.js`), formatted `VPIP/PFR/AF`
+  (percent/percent/ratio; `·` for an as-yet-uncomputable stat). Gating note:
+  `Confidence::Low` is the *default/lowest* tier (0–49 hands), so `>= Low`
+  is always true — the real "no badge yet" gate is *stats existence*
+  (empty registry until a hand completes). Confidence instead drives styling:
+  `hud-low` badges are dimmed to mark a small-sample read as provisional.
+- [x] 4c. Playwright (`tests/hud.spec.ts`): zero visible badges on a fresh
+  play-mode boot (hand 1); after an instant-speed arena run, active bots show a
+  three-field `VPIP/PFR/AF` badge.
 
 ---
 

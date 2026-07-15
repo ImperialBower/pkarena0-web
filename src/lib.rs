@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 use pkcore::analysis::eval::Eval;
 use pkcore::analysis::name::HandRankName;
-use pkcore::analysis::player_stats::StatsRegistry;
+use pkcore::analysis::player_stats::{Confidence, PlayerStats, StatsRegistry};
 use pkcore::arrays::seven::Seven;
 use pkcore::bot::decider::{BotDecider, JokerDecider, RuleBasedDecider};
 use pkcore::bot::exploit::ExploitConfig;
@@ -1106,6 +1106,25 @@ struct PlayerView {
     is_dealer: bool,
     is_sb: bool,
     is_bb: bool,
+    /// EPIC-47 Phase 4 HUD. `None` until this seat's identity has at least one
+    /// completed hand in the `StatsRegistry` (so absent at hand 1); the UI
+    /// renders a VPIP/PFR/AF badge when present, dimmed while `confidence` is
+    /// `"low"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stats: Option<HudStats>,
+}
+
+/// Per-seat opponent-model summary surfaced to the HUD (EPIC-47 Phase 4).
+/// `vpip`/`pfr` are fractions in `0.0..=1.0`; `af` is the postflop aggression
+/// factor (bets+raises / calls), `None` when there were no postflop calls.
+#[derive(Serialize)]
+struct HudStats {
+    vpip: Option<f64>,
+    pfr: Option<f64>,
+    af: Option<f64>,
+    /// `"low"` (<50 hands) | `"medium"` (50–199) | `"high"` (200+).
+    confidence: String,
+    hands: u64,
 }
 
 // ── Bot stepping ──────────────────────────────────────────────────────────────
@@ -1317,9 +1336,6 @@ fn build_game_state() -> String {
 
         let legal_actions = derive_legal_actions(to_call, hero_chips, table.bet);
 
-        // Hero view — always show hole cards.
-        let hero_view = seat_to_player_view(table, 0, dealer_seat, sb_seat, bb_seat, true);
-
         // Bot views — reveal hole cards at HandComplete/Showdown for in-hand bots.
         // In Arena (all-bot spectator) mode there is no one to hide from, so every
         // in-hand seat is face-up at all times; play mode reveals only at a
@@ -1327,23 +1343,38 @@ fn build_game_state() -> String {
         let reveal_bot_cards = IS_ALL_BOT.with(|f| *f.borrow())
             || (phase_val == SessionPhase::HandComplete && table.board.len() == 5);
 
-        let players: Vec<PlayerView> = (1..table.seats.0.len())
-            .map(|i| {
-                let seat = i as u8;
-                let in_hand = table
-                    .seats
-                    .get_seat(seat)
-                    .map_or(false, |s| is_in_hand(&s.player.state));
-                seat_to_player_view(
-                    table,
-                    seat,
-                    dealer_seat,
-                    sb_seat,
-                    bb_seat,
-                    reveal_bot_cards && in_hand,
-                )
-            })
-            .collect();
+        // Attach EPIC-47 Phase 4 HUD stats from the session registry. Borrowed
+        // once for hero + every bot view; a fresh session's registry is empty,
+        // so `stats` stays `None` (no badges) until hands complete.
+        let (hero_view, players) = REGISTRY.with(|reg| {
+            let registry = reg.borrow();
+            let reg_ref = Some(&*registry);
+
+            // Hero view — always show hole cards.
+            let hero_view =
+                seat_to_player_view(table, 0, dealer_seat, sb_seat, bb_seat, true, reg_ref);
+
+            let players: Vec<PlayerView> = (1..table.seats.0.len())
+                .map(|i| {
+                    let seat = i as u8;
+                    let in_hand = table
+                        .seats
+                        .get_seat(seat)
+                        .is_some_and(|s| is_in_hand(&s.player.state));
+                    seat_to_player_view(
+                        table,
+                        seat,
+                        dealer_seat,
+                        sb_seat,
+                        bb_seat,
+                        reveal_bot_cards && in_hand,
+                        reg_ref,
+                    )
+                })
+                .collect();
+
+            (hero_view, players)
+        });
 
         // Consume any one-shot values so they surface to the UI exactly once.
         let last_error = LAST_ERROR.with(|e| e.borrow_mut().take());
@@ -1380,6 +1411,26 @@ fn build_game_state() -> String {
     })
 }
 
+/// Maps a `PlayerStats` entry to the HUD payload, or `None` when the seat's
+/// identity has no completed hands yet (keeps the badge absent at hand 1).
+fn hud_stats(s: &PlayerStats) -> Option<HudStats> {
+    if s.hands_dealt == 0 {
+        return None;
+    }
+    let confidence = match s.confidence() {
+        Confidence::Low => "low",
+        Confidence::Medium => "medium",
+        Confidence::High => "high",
+    };
+    Some(HudStats {
+        vpip: s.vpip(),
+        pfr: s.pfr(),
+        af: s.aggression_factor(),
+        confidence: confidence.to_string(),
+        hands: s.hands_dealt,
+    })
+}
+
 fn seat_to_player_view(
     table: &Table,
     seat: u8,
@@ -1387,6 +1438,7 @@ fn seat_to_player_view(
     sb_seat: u8,
     bb_seat: u8,
     show_cards: bool,
+    registry: Option<&StatsRegistry>,
 ) -> PlayerView {
     let Some(s) = table.seats.get_seat(seat) else {
         return empty_player_view(seat);
@@ -1413,6 +1465,8 @@ fn seat_to_player_view(
         }
     };
 
+    let stats = registry.and_then(|r| r.get(s.player.id)).and_then(hud_stats);
+
     PlayerView {
         seat,
         name: s.player.handle.clone(),
@@ -1423,6 +1477,7 @@ fn seat_to_player_view(
         is_dealer: seat == dealer_seat,
         is_sb: seat == sb_seat,
         is_bb: seat == bb_seat,
+        stats,
     }
 }
 
@@ -1437,6 +1492,7 @@ fn empty_player_view(seat: u8) -> PlayerView {
         is_dealer: false,
         is_sb: false,
         is_bb: false,
+        stats: None,
     }
 }
 
