@@ -5,6 +5,7 @@
 
 use std::cell::RefCell;
 
+use pkcore::analysis::equity::{EquityOptions, EquityRequest, Method, PlayerSpec};
 use pkcore::analysis::eval::Eval;
 use pkcore::analysis::name::HandRankName;
 use pkcore::analysis::player_stats::{Confidence, PlayerStats, StatsRegistry};
@@ -123,6 +124,78 @@ pub fn set_adaptive(enabled: bool) {
 #[wasm_bindgen]
 pub fn adaptive_enabled() -> bool {
     ADAPTIVE.with(|a| *a.borrow())
+}
+
+// ── EPIC-48 Phase 0 probe (TEMPORARY) ──────────────────────────────────────────
+// Diagnostic only: measures pkcore's `equity::compute` running single-threaded
+// in the browser (rayon serial-fallback on threadless wasm). Drives a hero vs
+// `seats-1` random villains on a fixed flop. `force_mc` picks the sample path:
+//   - true  → `exact_threshold: 0`, `max_samples: samples` (Monte Carlo)
+//   - false → default threshold (flop runouts enumerate → exact)
+// JS times a batch of `iterations` calls with `performance.now()`. REMOVE this
+// export when the real equity wiring lands (EPIC-48 Phase 1 / upstream EPIC-36).
+#[wasm_bindgen]
+pub fn equity_probe(seats: u32, samples: u32, iterations: u32, force_mc: bool) -> String {
+    use pkcore::play::board::Board;
+
+    let hero = match "As Ks".parse::<pkcore::arrays::two::Two>() {
+        Ok(h) => h,
+        Err(e) => return format!(r#"{{"error":"hero parse: {e:?}"}}"#),
+    };
+    let board: Board = match "Qd 7h 2c".parse() {
+        Ok(b) => b,
+        Err(e) => return format!(r#"{{"error":"board parse: {e:?}"}}"#),
+    };
+
+    let mut checksum = 0.0f64;
+    let mut last: Vec<f64> = Vec::new();
+    let mut method = "";
+    for i in 0..iterations.max(1) {
+        let mut players = Vec::with_capacity(seats as usize);
+        players.push(PlayerSpec::Exact(hero));
+        for _ in 1..seats {
+            players.push(PlayerSpec::Random);
+        }
+        let opts = if force_mc {
+            EquityOptions {
+                exact_threshold: 0,
+                max_samples: samples as u64,
+                seed: Some(u64::from(i)),
+            }
+        } else {
+            EquityOptions {
+                seed: Some(u64::from(i)),
+                ..EquityOptions::default()
+            }
+        };
+        let req = EquityRequest {
+            players,
+            board,
+            opts,
+        };
+        match req.compute() {
+            Ok(r) => {
+                last = r.players.iter().map(|p| p.equity).collect();
+                checksum += last.iter().sum::<f64>();
+                method = match r.method {
+                    Method::Exact => "exact",
+                    Method::MonteCarlo => "mc",
+                    _ => "hup",
+                };
+            }
+            Err(e) => return format!(r#"{{"error":"compute: {e:?}"}}"#),
+        }
+    }
+
+    serde_json::json!({
+        "seats": seats,
+        "samples": samples,
+        "iterations": iterations,
+        "method": method,
+        "equity": last,
+        "checksum": checksum,
+    })
+    .to_string()
 }
 
 /// Initialise a new session with 9 players (seat 0 = human, seats 1-8 = bots).

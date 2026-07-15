@@ -9,9 +9,9 @@
 
 | Component | Status |
 |---|---|
-| Enable `equity` feature in `Cargo.toml` (wasm compile pre-verified) | Planned |
-| Phase 0 spike: `compute(EquityRequest)` runtime behavior in-browser | Planned |
-| Latency budget: MC sample count vs per-decision wall time (incl. Turbo) | Planned |
+| Enable `equity` feature in `Cargo.toml` (wasm compile pre-verified) | Done (`Cargo.toml:17`) |
+| Phase 0 spike: `compute(EquityRequest)` runtime behavior in-browser | Done — no panic, rayon serial-fallback confirmed (`equity_probe`) |
+| Latency budget: MC sample count vs per-decision wall time (incl. Turbo) | Done — **`fast` = 500 MC samples** (2.8 ms HU / 5.7 ms 4-way) |
 | Upstream: pkcore EPIC-36 `DecisionConfig` (`decision:` YAML knobs) | **Blocked — Planned upstream** |
 | Adopt `decision: { equity: fast, outs: on, pot_odds: … }` profiles | Planned (post EPIC-36) |
 | Embedded HUP preflop odds (`hup_cache::lookup_odds`, wasm-safe) evaluation | Planned |
@@ -110,15 +110,61 @@ meet the latency budget).
 
 ## Work Items
 
-### Phase 0 — Spike (do first; informs everything)
-- [ ] 0a. Enable `equity` in `Cargo.toml`; `make build`.
-- [ ] 0b. Temporary wasm-exposed probe: run `compute()` for a heads-up and a
-  4-way flop spot at samples ∈ {500, 2000, 10000}; log wall-time via
-  `performance.now()`. Confirm serial-fallback (no panic) and record numbers
-  in this doc.
-- [ ] 0c. Decide the browser sample budget (target: ≤10ms per decision at
-  Turbo; bot steps are JS-timer-driven so even ~50ms may be invisible at
-  normal speed — measure, don't guess).
+### Phase 0 — Spike (do first; informs everything) ✅
+- [x] 0a. Enable `equity` in `Cargo.toml`; `make build`. (Feature on; wasm
+  bundle builds green.)
+- [x] 0b. Temporary wasm-exposed probe (`equity_probe` in `src/lib.rs`) runs
+  `compute()` for a hero (`AsKs`) vs `seats-1` random villains on a fixed flop
+  (`Qd 7h 2c`), forced to Monte Carlo (`exact_threshold: 0`). Driven headless,
+  batched, timed with `performance.now()`. **No panic; rayon serial-fallback
+  confirmed.** Numbers below.
+- [x] 0c. Browser sample budget chosen: **`fast` = 500 MC samples** (see
+  "Budget decision" below).
+
+#### 0b results — per-`compute()` latency
+
+Median of 3 batched runs (15 computes each), headless Chromium on the dev
+machine (desktop; treat as a **fast-hardware floor** — mid-range mobile is
+plausibly 2–5× slower):
+
+| MC samples | heads-up (2) | 4-way |
+|---|---:|---:|
+| 500 | **2.8 ms** | **5.7 ms** |
+| 2 000 | 11.2 ms | 22.7 ms |
+| 10 000 | 56.4 ms | 113.4 ms |
+
+Latency is ~linear in samples and ~linear in seat count. Equity estimates were
+sane and stable (HU `AsKs` vs random on `Qd7h2c` ≈ 0.56 / 0.55 / 0.54 at
+500 / 2 000 / 10 000 — the 500-sample read is within ~2% of the 10k read).
+
+**Structural finding (de-risks the "exact could be seconds serial" worry):**
+with unknown villains (`PlayerSpec::Random`) the engine is *never* all-exact, so
+it **always** takes the Monte-Carlo path regardless of `exact_threshold`. Exact
+enumeration only triggers when every seat has known cards — not the live
+decision shape. So the browser doesn't need to *defensively* force `fast`; the
+realistic query is MC by construction. (An all-known flop spot would enumerate
+`C(45,2)=990` runouts — cheap — so even deliberate exact calls on the flop are
+fine; only preflop all-known enumeration would be large, and that still falls
+back to MC above the default threshold.)
+
+#### Budget decision (0c)
+
+Adopt **`equity: fast` with 500 MC samples** as the browser default:
+
+- 5.7 ms worst-case here (4-way) leaves headroom under the 10 ms/decision Turbo
+  target even at a 2× mobile penalty; ~11 ms at a harsh 2× 4-way is still
+  invisible at normal speed (≥1 s/action) and marginal at Turbo (75 ms/action).
+- 500 samples already gives ±~2% equity — ample for call/raise gating.
+- Bot steps are JS-timer-throttled, so a single ~3–6 ms compute per decision is
+  imperceptible. **Caveat to carry into Phase 1:** if one decision issues
+  *several* equity calls (e.g. outs + pot-odds + hand strength), keep the
+  *combined* budget ≤ ~10 ms — i.e. don't call `compute()` more than ~2× per
+  decision at 500 samples, or drop to 250–300 samples if a decision fans out.
+- Revisit only if a real device blows the budget → options in Open Questions
+  (lower samples per street; equity only on flop+; workers).
+
+> The `equity_probe` export is **temporary** and stays only until Phase 1 wires
+> real equity in (blocked on upstream pkcore EPIC-36); remove it then.
 
 ### Phase 1 — Upstream adoption (blocked on pkcore EPIC-36)
 - [ ] 1a. Track EPIC-36; review its `DecisionConfig` schema against wasm
