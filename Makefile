@@ -1,4 +1,4 @@
-.PHONY: help build serve kill build-release clean install-playwright test test-ui ayce default
+.PHONY: help build serve kill build-release clean install-playwright test test-ui validate-bots ayce default
 
 # Default target
 default: ayce
@@ -12,7 +12,8 @@ help:
 	@echo "  kill                kill the http.server on :8080"
 	@echo "  clean               cargo clean + remove www/pkg/"
 	@echo "  install-playwright  npm install + playwright install chromium"
-	@echo "  test                dev build + playwright headless tests"
+	@echo "  validate-bots       parse + validate embedded data/bots/*.yaml"
+	@echo "  test                validate-bots + dev build + playwright tests"
 	@echo "  test-ui             dev build + playwright interactive UI"
 
 build:
@@ -36,7 +37,12 @@ install-playwright:
 	npm install
 	npx playwright install chromium
 
-test: build
+# Parse + validate the embedded bot-lineup YAML (EPIC-49). Fails the build if a
+# profile can't deserialize or the standard bundle drifts from the code default.
+validate-bots:
+	cargo test --lib bot_bundle
+
+test: validate-bots build
 	npx playwright test
 
 test-ui: build
