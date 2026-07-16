@@ -1174,6 +1174,10 @@ struct GameState {
     #[serde(skip_serializing_if = "Option::is_none")]
     showdown: Option<Vec<ShowdownPlayer>>,
     forced_fold_count: u32,
+    /// Live value of the `ADAPTIVE` engine flag (see `set_adaptive`). Surfaced so
+    /// the UI/tests can confirm the persisted preference actually reached WASM —
+    /// the toggle's checkbox state alone can silently diverge from the engine.
+    adaptive: bool,
 }
 
 #[derive(Serialize)]
@@ -1383,6 +1387,7 @@ fn build_game_state() -> String {
                 last_result: None,
                 showdown: None,
                 forced_fold_count: 0,
+                adaptive: ADAPTIVE.with(|a| *a.borrow()),
             })
             .unwrap_or_else(|_| r#"{"error":"serialize failed"}"#.to_string());
         };
@@ -1486,6 +1491,7 @@ fn build_game_state() -> String {
             last_result,
             showdown,
             forced_fold_count,
+            adaptive: ADAPTIVE.with(|a| *a.borrow()),
         };
 
         serde_json::to_string(&state)

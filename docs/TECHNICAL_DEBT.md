@@ -18,15 +18,15 @@ _(empty — nothing human-authored yet)_
 
 Ordered roughly by consequence.
 
-- [ ] 🤖 **Saved "adaptive bots" preference never reaches WASM on page load** —
-  `applyAdaptive(adaptiveEnabled)` runs at module top level while `_playMod` /
-  `_arenaMod` are only assigned inside the async `boot()`, so
-  `_playMod?.set_adaptive?.(on)` optional-chains into a silent no-op. The
-  checkbox renders unchecked but every game on that page load runs with the Rust
-  default `ADAPTIVE = true` until the user re-toggles it. **Verified by hand,
-  not just by the reviewer.** Suggested: move the call into `boot()` after the
-  modules are assigned, and drop the `?.` so a future ordering regression fails
-  loudly. (`www/js/main.js:1077`, module assignment at `www/js/main.js:292-295`)
+- [x] ~~🤖 **Saved "adaptive bots" preference never reaches WASM on page
+  load**~~ — **FIXED 2026-07-15.** `applyAdaptive` moved into `boot()` after the
+  modules resolve (and before `restoreFromUrl()`), with a load-guard replacing
+  the `?.` no-op so a renamed export now throws loudly. Regression-guarded:
+  `get_state()` now surfaces the live `ADAPTIVE` flag (`GameState.adaptive`) and
+  `tests/settings.spec.ts` asserts engine and UI agree on load. Was: a top-level
+  `applyAdaptive(adaptiveEnabled)` call optional-chained into a silent no-op
+  while `_playMod`/`_arenaMod` were still `null`, so games ran adaptive-on
+  regardless of the stored preference. (`www/js/main.js`, `src/lib.rs`)
 
 - [ ] 🤖 **No `cargo test` coverage for any `#[wasm_bindgen]` export** — the
   tests drive `PokerSession`/`RuleBasedDecider` directly and never call the
