@@ -9,14 +9,17 @@
 
 | Component | Status |
 |---|---|
-| Per-seat `BotSeat { profile, decider }` replacing the profile pool | Done (`src/lib.rs:47`) |
-| `on_new_hand_with_rng` called at each `start_hand` | Done (`src/lib.rs:1429`) |
-| `JokerDecider` actually constructed for the joker seat | Done (`src/lib.rs:1415`) |
-| Web builds `TableSnapshot` itself and calls `decider.decide_seeded(...)` | Done (`src/lib.rs:1126,1140`) |
-| Rejected-action fallback surfaced (log + counter) instead of silent `Fold` | Done (`src/lib.rs:1152`) |
-| Rejected bet/raise *repaired* (clamp→call→all-in) instead of folded | Done — pulled forward from follow-up (`apply_bot_action`, `src/lib.rs:1475`) |
-| Rust unit tests: decider-path parity, joker morph, repair ladder | Done (`src/lib.rs:1662,1812`) |
-| Playwright regression: arena multi-hand run, forced-fold counter bounded | Done — 5/5 arena specs pass (`tests/arena.spec.ts`, incl. `:99`) |
+| Per-seat `BotSeat { profile, decider }` replacing the profile pool | **Complete** (`src/lib.rs:52`; pool `BOTS`, `src/lib.rs:70`) |
+| `on_new_hand_with_rng` called at each `start_hand` | **Complete** (`notify_bots_new_hand`, `src/lib.rs:1727,1732`) |
+| `JokerDecider` actually constructed for the joker seat | **Complete** (`make_bot_seat`, `src/lib.rs:1710,1713`) |
+| Web builds `TableSnapshot` itself and calls `decider.decide_seeded(...)` | **Complete** (`src/lib.rs:1323,1332` — `from_table_with_stats` since EPIC-47) |
+| Rejected-action fallback surfaced (log + counter) instead of silent `Fold` | **Complete** (`FORCED_FOLD_COUNT`, `src/lib.rs:103,1368`) |
+| Rejected bet/raise *repaired* (clamp→call→all-in) instead of folded | **Complete** — pulled forward from follow-up (`apply_bot_action`, `src/lib.rs:1778`) |
+| Rust unit tests: decider-path parity, joker morph, repair ladder | **Complete** (`decider_path_parity_tests`, `src/lib.rs:2432`; `repair_ladder_tests`, `src/lib.rs:2584`) |
+| Playwright regression: arena multi-hand run, forced-fold counter bounded | **Complete** — 5/5 arena specs pass (`tests/arena.spec.ts`, incl. `:99`) |
+
+**Closed 2026-07-16** (branch `EPIC-46`, at `c6e855f`) — all phases shipped; see
+the [corrigendum](#implementation-corrigendum-2026-07-16-branch-epic-46).
 
 **EPIC number:** allocated from the shared ImperialBower sequence
 (pkdealer holds EPIC-44/45; 46 was the next free number).
@@ -79,7 +82,7 @@ Category 3 was **routine, not exceptional**: measured at ~2 forced folds per
 20-hand arena run (range 0–6; see `docs/known-issues.md`) *before* this EPIC.
 
 Folding is the worst substitution for a rejected raise. Rather than defer it,
-this EPIC pulled the fix forward: `apply_bot_action` (`src/lib.rs:1475`) now
+this EPIC pulled the fix forward: `apply_bot_action` (`src/lib.rs:1778`) now
 walks a repair ladder — clamp an under-sized `Bet`/`Raise` up to
 `min_raise_to()`, else call/check, else all-in — and only folds as a last
 resort. A repaired action does **not** increment `FORCED_FOLD_COUNT`.
@@ -169,22 +172,25 @@ This is the single change that makes the joker actually morph per hand.
 
 ## Work Items
 
-### Phase 1 — Decider-per-seat
-- [x] 1a. Introduce `BotSeat { profile, decider }`; build pools with
-  `RuleBasedDecider` for the eight archetypes, `JokerDecider` for joker
-  (`make_bot_seat`, `src/lib.rs:1415`).
-- [x] 1b. Refactor `step_bot` to snapshot + `decide_seeded`
-  (`src/lib.rs:1126,1140`).
+### Phase 1 — Decider-per-seat ✅
+- [x] 1a. Introduce `BotSeat { profile, decider }` (`src/lib.rs:52`); build
+  pools with `RuleBasedDecider` for the eight archetypes, `JokerDecider` for
+  joker (`make_bot_seat`, `src/lib.rs:1710,1713`).
+- [x] 1b. Refactor `step_bot` (`src/lib.rs:1257`) to snapshot + `decide_seeded`
+  (`src/lib.rs:1323,1332`).
 - [x] 1c. Fire `on_new_hand_with_rng` for every bot at hand start
-  (`src/lib.rs:1429`).
+  (`notify_bots_new_hand`, `src/lib.rs:1727,1732`).
 
-### Phase 2 — Observability & regression safety
+### Phase 2 — Observability & regression safety ✅
 - [x] 2a. Surface the forced-Fold fallback (hand log + console + counter);
   repair rejected bet/raise sizings instead of folding them
-  (`apply_bot_action`, `src/lib.rs:1475`).
-- [x] 2b. Rust unit tests: per-decision parity for a non-joker seat, joker
-  style-morph over N hands, and repair-ladder clamp/passthrough
-  (`src/lib.rs:1662,1812`).
+  (`apply_bot_action`, `src/lib.rs:1778`; counter `src/lib.rs:1368`).
+- [x] 2b. Rust unit tests: per-decision parity for a non-joker seat
+  (`convenience_and_decider_paths_agree_at_every_decision`, `src/lib.rs:2469`),
+  joker style-morph over N hands (`joker_morphs_style_across_hands`,
+  `src/lib.rs:2558`), and repair-ladder clamp/passthrough
+  (`undersized_raise_is_clamped_up_to_the_minimum`, `src/lib.rs:2609`;
+  `legal_action_applies_unchanged`, `src/lib.rs:2634`).
 - [x] 2c. Playwright spec: arena mode multi-hand run completes; forced-Fold
   counter stays below a loose bound (not exactly 0 — see acceptance #3).
   (Use Turbo speed per `docs/known-issues.md` conventions.) Verified:
@@ -194,11 +200,18 @@ This is the single change that makes the joker actually morph per hand.
 
 ## Key Files
 
+Line references are as of close (`c6e855f`, 2026-07-16); the `## Context` and
+`## Design` sections above deliberately keep their *audit-time* (2026-07-12,
+pre-EPIC) coordinates — see corrigendum §4.
+
 | File | Role |
 |---|---|
-| `src/lib.rs:93-96,146-149` | bot pool construction (play/arena) |
-| `src/lib.rs:1044-1126` | `step_bot` — snapshot + decide_seeded |
-| `src/lib.rs:1109-1114` | forced-Fold fallback → observable |
+| `src/lib.rs:52,70` | `BotSeat` type + `BOTS` pool `thread_local!` |
+| `src/lib.rs:1710` | `make_bot_seat` — per-seat decider construction |
+| `src/lib.rs:1257,1323,1332` | `step_bot` — snapshot + `decide_seeded` |
+| `src/lib.rs:1727` | `notify_bots_new_hand` — `on_new_hand_with_rng` fan-out |
+| `src/lib.rs:1778` | `apply_bot_action` — repair ladder |
+| `src/lib.rs:103,1368` | `FORCED_FOLD_COUNT` — unrepairable-rejection counter |
 | pkcore `src/bot/decider.rs:69,144,330` | `BotDecider` trait, `RuleBasedDecider`, `JokerDecider` |
 | pkcore `src/bot/table_snapshot.rs:193` | `TableSnapshot::from_table` |
 
@@ -232,7 +245,66 @@ loose bound avoids flaking on any residual unrepairable edge case
 
 ---
 
+## Implementation corrigendum (2026-07-16, branch `EPIC-46`)
+
+Both phases shipped. Verified at close: `cargo test` → **20 passed, 0 failed,
+5 ignored** (the 5 are EPIC-49's `#[ignore]`d fixture generators and
+entropy-dealt benches, not skipped EPIC-46 work); `npx playwright test
+arena.spec.ts` → 5/5.
+
+1. **The repair ladder was pulled into scope, not deferred.** The EPIC opened
+   scoping category-3 rejections (a `Raise` sized below the NLHE minimum
+   increment) as *observable* — log, warn, count — with the fix left to a
+   follow-up. Folding is the worst possible substitution for a rejected raise,
+   and the category was routine rather than exceptional (~2 forced folds per
+   20-hand run), so `apply_bot_action` (`src/lib.rs:1778`) landed here instead
+   (`6c6fbf0`): clamp an under-sized `Bet`/`Raise` up to `min_raise_to()`, else
+   call/check, else all-in, and only then fold.
+2. **So `FORCED_FOLD_COUNT`'s meaning changed, and acceptance #3 with it.** The
+   counter no longer measures sizing rejections — those are repaired and
+   deliberately *not* counted — only genuinely unrepairable ones (a pkcore
+   decider bug or a web-side state mismatch), which should trend to zero. The
+   original acceptance target was calibrated against the ~2/run baseline; the
+   shipped gate is a loose `< 20` (`tests/arena.spec.ts`) as a gross-breakage
+   guard. Asserting exactly `0` is now a fair stretch goal, held back only to
+   avoid flaking on a residual edge case.
+3. **Byte-identical full-game parity was unimplementable; per-decision parity
+   replaced it.** Goal 4 ("keep behavior byte-identical for the eight non-joker
+   archetypes") cannot be tested end-to-end: the joker now draws from the shared
+   `RNG` (`src/lib.rs:71`) each hand, and pkcore's `start_hand` shuffles from the
+   entropy thread-local, so there is no seeded deck to replay. The gate is
+   instead per-decision agreement on identical state
+   (`convenience_and_decider_paths_agree_at_every_decision`, `src/lib.rs:2469`).
+   EPIC-49 independently re-hit this same no-seeded-deck constraint (its
+   corrigendum §3) and resolved it statistically.
+4. **Citation coordinates are split by design.** `## Context` and `## Design`
+   keep their audit-time (2026-07-12) line numbers — including
+   `bot.decide(&table, seat, rng)` at `src/lib.rs:1087`, the choke point this
+   EPIC *deleted*. Those cite code that no longer exists and repointing them
+   would corrupt the record. `## Status`, `## Work Items`, and `## Key Files`
+   were refreshed to close-time (`c6e855f`); EPIC-47/48/49 grew `src/lib.rs`
+   past 3,800 lines and displaced every original target by 300–1,300 lines.
+5. **The `make_bot_seat` seam took an extra parameter.** The design sketched
+   per-seat construction as a function of the profile alone; EPIC-47 needed
+   adaptivity at construction time, so the shipped signature is
+   `make_bot_seat(profile, adaptive)` (`src/lib.rs:1710`). Likewise the
+   `on_new_hand_with_rng` loop lives in its own `notify_bots_new_hand()`
+   (`src/lib.rs:1727`) rather than inline at the `start_hand` call sites.
+6. **Inherited debt / handoffs:** both Open Questions below remain open —
+   neither blocked the close. The `decide_seeded` seam (`src/lib.rs:1332`)
+   delivered on its purpose: EPIC-47 injected `opponent_stats` through it and
+   EPIC-49 injected configured profiles, neither needing to reopen this EPIC.
+
+| Phase | Status at close |
+|---|---|
+| Phase 1 — decider-per-seat | **Complete** |
+| Phase 2 — observability & regression safety | **Complete** (repair ladder pulled forward into scope) |
+
+---
+
 ## Open Questions
+
+*(Both still open at close — see corrigendum §6.)*
 
 - Should the joker's per-hand style be surfaced in the UI (e.g. a subtle
   indicator), or stay hidden as a gameplay surprise?

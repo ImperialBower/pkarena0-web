@@ -12,12 +12,19 @@ this repo consumes even less of it.
 
 ## The gap map
 
-Every bot action in this app flows through **one call** —
-`bot.decide(&table, seat, rng)` at `src/lib.rs:1087` — which hardcodes
-pkcore's `RuleBasedDecider` on its weakest settings. What that leaves on the
+> **Historical — this is the 2026-07-12 audit snapshot that motivated the set,
+> not current state.** Every gap below except the EPIC-36-blocked row has since
+> closed; all four EPICs are closed as of 2026-07-16. The "Used by web bots?"
+> column and the `src/lib.rs:1087` coordinate describe the code *before*
+> EPIC-46 — that call site no longer exists. See the per-EPIC Status tables for
+> what is true now.
+
+At audit time, every bot action in this app flowed through **one call** —
+`bot.decide(&table, seat, rng)` at `src/lib.rs:1087` — which hardcoded
+pkcore's `RuleBasedDecider` on its weakest settings. What that left on the
 table, given pkcore 0.2.1's shipped capabilities:
 
-| pkcore capability | Upstream status | Used by web bots? | Gap → EPIC |
+| pkcore capability | Upstream status | Used by web bots? *(audit, 2026-07-12)* | Gap → EPIC |
 |---|---|---|---|
 | `BotDecider` trait, `on_new_hand` lifecycle, `JokerDecider` | Complete | ✗ (trait bypassed; joker plays as static GTO) | [EPIC-46](EPIC-46_Decider_Integration.md) |
 | `PlayerStats` / `StatsRegistry` (EPIC-26) | Complete | ✗ (`player-stats` feature off; hand histories carry no UUIDs) | [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) |
@@ -33,16 +40,17 @@ table, given pkcore 0.2.1's shipped capabilities:
 
 Key wasm fact (verified 2026-07-12): pkcore 0.2.1 **compiles cleanly for
 `wasm32-unknown-unknown`** with `bot-profiles, hand-histories, equity,
-player-stats` — the gaps are wiring, not platform blockers. The one open
-runtime question (rayon serial fallback + equity latency in-browser) is
-EPIC-48 Phase 0.
+player-stats` — the gaps were wiring, not platform blockers. All four features
+ship enabled today (`Cargo.toml:14-19`). The open runtime question (rayon
+serial fallback + equity latency in-browser) was **answered** by EPIC-48
+Phase 0: no panic, serial fallback confirmed, budget set at 500 MC samples.
 
 ## The EPICs
 
 | EPIC | Title | Depends on | Status |
 |---|---|---|---|
-| [EPIC-46](EPIC-46_Decider_Integration.md) | Full BotDecider Integration | — | Done |
-| [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) | Adaptive Bots — Player Stats & Exploitative Play | 46 | Done (Phases 1–4; trained-`ExploitConfig` YAML deferred until an EPIC-28 artifact exists) |
+| [EPIC-46](EPIC-46_Decider_Integration.md) | Full BotDecider Integration | — | **Closed 2026-07-16** — both phases complete; repair ladder pulled forward into scope |
+| [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) | Adaptive Bots — Player Stats & Exploitative Play | 46 | **Closed 2026-07-16** — Phases 1–4 complete; trained-`ExploitConfig` YAML deferred until an EPIC-28 artifact exists |
 | [EPIC-48](EPIC-48_Real_Equity_WASM.md) | Real Equity in the Browser | 46; upstream pkcore EPIC-36 | **Closed 2026-07-16** — Phase 0 delivered (500-sample MC budget, probe removed); Phases 1–2 deferred, reopen as a follow-up EPIC when upstream EPIC-36 ships |
 | [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47) | **Closed 2026-07-16** — Phases 1–3 complete (three parity-gated bundles, position awareness for all, difficulty selector, chips/100 bench `make bench-tiers`); EPIC-36 knob adoption deferred with EPIC-48's follow-up |
 
