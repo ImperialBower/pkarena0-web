@@ -43,11 +43,13 @@ EPIC-48 Phase 0.
 |---|---|---|---|
 | [EPIC-46](EPIC-46_Decider_Integration.md) | Full BotDecider Integration | — | Done |
 | [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) | Adaptive Bots — Player Stats & Exploitative Play | 46 | Done (Phases 1–4; trained-`ExploitConfig` YAML deferred until an EPIC-28 artifact exists) |
-| [EPIC-48](EPIC-48_Real_Equity_WASM.md) | Real Equity in the Browser | 46; upstream pkcore EPIC-36 | Phase 0 done (500-sample MC budget); Phases 1–2 blocked on upstream EPIC-36 |
-| [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47/48) | Phase 1 done (YAML lineup); Phases 2–3 remaining |
+| [EPIC-48](EPIC-48_Real_Equity_WASM.md) | Real Equity in the Browser | 46; upstream pkcore EPIC-36 | **Closed 2026-07-16** — Phase 0 delivered (500-sample MC budget, probe removed); Phases 1–2 deferred, reopen as a follow-up EPIC when upstream EPIC-36 ships |
+| [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47) | **Closed 2026-07-16** — Phases 1–3 complete (three parity-gated bundles, position awareness for all, difficulty selector, chips/100 bench `make bench-tiers`); EPIC-36 knob adoption deferred with EPIC-48's follow-up |
 
-Suggested order: **46 → 47 (Phases 1–2) → 48 Phase 0 → 49 Phase 1–2**, then
-converge on 47 Phase 3–4 / 48 / 49 Phase 3 as upstream EPIC-36 lands.
+Suggested order — **completed as planned**: 46 → 47 → 48 Phase 0 →
+49 Phases 1–3. The one remaining thread is upstream pkcore EPIC-36: when it
+ships, a follow-up EPIC picks up EPIC-48 Phases 1–2 (equity adoption) and
+lands the `decision:` knobs in EPIC-49's bundles.
 
 ## Relationship to existing docs
 

@@ -319,6 +319,7 @@
         // modules are still loading, so this is the first point the preference
         // can actually reach the engine.
         applyAdaptive(adaptiveEnabled);
+        applyDifficulty(difficulty);
         const restored = await restoreFromUrl();
         if (!restored) {
           setStatus('Click "New Game" to start.');
@@ -1094,6 +1095,28 @@
       });
     }
 
+    // EPIC-49 Phase 3: bot difficulty selector (weak / standard / strong).
+    // Same lifecycle as the adaptive toggle: persisted to localStorage, pushed
+    // to both WASM instances, read when a lineup is built — so it applies on
+    // the next New Game / Start Arena. The initial push to WASM happens in
+    // boot() (see applyDifficulty call there).
+    const difficultyStored = localStorage.getItem('difficulty');
+    let difficulty = ['weak', 'standard', 'strong'].includes(difficultyStored)
+      ? difficultyStored : 'standard';
+    const applyDifficulty = (level) => {
+      if (_playMod) _playMod.set_difficulty(level);
+      if (_arenaMod) _arenaMod.set_difficulty(level);
+    };
+    const difficultySelectEl = document.getElementById('difficulty-select');
+    if (difficultySelectEl) {
+      difficultySelectEl.value = difficulty;
+      difficultySelectEl.addEventListener('change', () => {
+        difficulty = difficultySelectEl.value;
+        localStorage.setItem('difficulty', difficulty);
+        applyDifficulty(difficulty);
+      });
+    }
+
     document.getElementById('reset-pnl-btn').addEventListener('click', () => {
       if (!confirm('Reset lifetime P&L to $0? This cannot be undone.')) return;
       lifetimePnl = 0;
@@ -1250,6 +1273,20 @@
           document.getElementById('arena-status').textContent =
             `Session over! Winner: ${winner.name} — ${state.hand_number} hands played.`;
           document.getElementById('arena-start-btn').textContent = 'New Arena';
+          // EPIC-49 Phase 3: session chips/100 report (also in the exported
+          // STATE JSON as state.session_report).
+          if (state.session_report?.length) {
+            appendHandLog('— Session report (chips/100) —');
+            [...state.session_report]
+              .sort((a, b) => b.chips_per_100 - a.chips_per_100)
+              .forEach(r => {
+                const sign = v => (v >= 0 ? '+' : '');
+                appendHandLog(
+                  `${r.name}: ${sign(r.net_chips)}$${Math.abs(r.net_chips).toLocaleString()} ` +
+                  `(${sign(r.chips_per_100)}${Math.round(r.chips_per_100).toLocaleString()}/100 ` +
+                  `over ${r.hands_played} hands)`);
+              });
+          }
           arenaRunning = false;
           return;
         }

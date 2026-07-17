@@ -5,7 +5,6 @@
 
 use std::cell::RefCell;
 
-use pkcore::analysis::equity::{EquityOptions, EquityRequest, Method, PlayerSpec};
 use pkcore::analysis::eval::Eval;
 use pkcore::analysis::name::HandRankName;
 use pkcore::analysis::player_stats::{Confidence, PlayerStats, StatsRegistry};
@@ -102,6 +101,48 @@ thread_local! {
     /// rejects with `InsufficientIncrement`. Baseline is ~2 per 20-hand arena run
     /// (range 0–6). See `docs/known-issues.md`; do not assert this equals 0.
     static FORCED_FOLD_COUNT: RefCell<u32> = const { RefCell::new(0) };
+    /// EPIC-49 Phase 3: difficulty tier for the NEXT lineup build. Selects the
+    /// profile bundle and gates adaptivity (weak: off, standard: the
+    /// `ADAPTIVE` toggle, strong: forced on). Like `ADAPTIVE`, read at
+    /// `init_game` / `init_bot_game`, so a change applies on the next New
+    /// Game / Start Arena.
+    static DIFFICULTY: RefCell<Difficulty> = const { RefCell::new(Difficulty::Standard) };
+    /// Chip counts at session start, one entry per originally seated player
+    /// (seat, name, chips). Unlike `HAND_START_CHIPS` this never advances, so
+    /// the session chips/100 report can net busted seats (EPIC-49 Phase 3).
+    static SESSION_START_CHIPS: RefCell<Vec<(u8, String, usize)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// EPIC-49 Phase 3 difficulty tiers. `Weak` plays the dampened bundle with
+/// adaptation off; `Standard` plays the standard bundle; `Strong` plays the
+/// sharpened bundle (`strengthen`) — the interim "strong" lever until
+/// upstream pkcore EPIC-36 ships real capability knobs. Standard and strong
+/// both honor the EPIC-47 adaptive toggle (see `effective_adaptive`).
+#[derive(Clone, Copy, Default, PartialEq)]
+enum Difficulty {
+    Weak,
+    #[default]
+    Standard,
+    Strong,
+}
+
+impl Difficulty {
+    fn parse(level: &str) -> Option<Self> {
+        match level {
+            "weak" => Some(Self::Weak),
+            "standard" => Some(Self::Standard),
+            "strong" => Some(Self::Strong),
+            _ => None,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Weak => "weak",
+            Self::Standard => "standard",
+            Self::Strong => "strong",
+        }
+    }
 }
 
 // ── WASM entry point ──────────────────────────────────────────────────────────
@@ -137,77 +178,40 @@ pub fn adaptive_enabled() -> bool {
     ADAPTIVE.with(|a| *a.borrow())
 }
 
-// ── EPIC-48 Phase 0 probe (TEMPORARY) ──────────────────────────────────────────
-// Diagnostic only: measures pkcore's `equity::compute` running single-threaded
-// in the browser (rayon serial-fallback on threadless wasm). Drives a hero vs
-// `seats-1` random villains on a fixed flop. `force_mc` picks the sample path:
-//   - true  → `exact_threshold: 0`, `max_samples: samples` (Monte Carlo)
-//   - false → default threshold (flop runouts enumerate → exact)
-// JS times a batch of `iterations` calls with `performance.now()`. REMOVE this
-// export when the real equity wiring lands (EPIC-48 Phase 1 / upstream EPIC-36).
+/// EPIC-49 Phase 3: select the difficulty tier (`"weak"` / `"standard"` /
+/// `"strong"`) for the next lineup build. Like `set_adaptive`, the value is
+/// read when a lineup is constructed, so it applies on the next New Game /
+/// Start Arena. Unknown levels are rejected with a console warning and the
+/// current tier is kept. Returns `true` when the level was accepted.
 #[wasm_bindgen]
-pub fn equity_probe(seats: u32, samples: u32, iterations: u32, force_mc: bool) -> String {
-    use pkcore::play::board::Board;
-
-    let hero = match "As Ks".parse::<pkcore::arrays::two::Two>() {
-        Ok(h) => h,
-        Err(e) => return format!(r#"{{"error":"hero parse: {e:?}"}}"#),
-    };
-    let board: Board = match "Qd 7h 2c".parse() {
-        Ok(b) => b,
-        Err(e) => return format!(r#"{{"error":"board parse: {e:?}"}}"#),
-    };
-
-    let mut checksum = 0.0f64;
-    let mut last: Vec<f64> = Vec::new();
-    let mut method = "";
-    for i in 0..iterations.max(1) {
-        let mut players = Vec::with_capacity(seats as usize);
-        players.push(PlayerSpec::Exact(hero));
-        for _ in 1..seats {
-            players.push(PlayerSpec::Random);
+pub fn set_difficulty(level: &str) -> bool {
+    match Difficulty::parse(level) {
+        Some(d) => {
+            DIFFICULTY.with(|c| *c.borrow_mut() = d);
+            true
         }
-        let opts = if force_mc {
-            EquityOptions {
-                exact_threshold: 0,
-                max_samples: samples as u64,
-                seed: Some(u64::from(i)),
-            }
-        } else {
-            EquityOptions {
-                seed: Some(u64::from(i)),
-                ..EquityOptions::default()
-            }
-        };
-        let req = EquityRequest {
-            players,
-            board,
-            opts,
-        };
-        match req.compute() {
-            Ok(r) => {
-                last = r.players.iter().map(|p| p.equity).collect();
-                checksum += last.iter().sum::<f64>();
-                method = match r.method {
-                    Method::Exact => "exact",
-                    Method::MonteCarlo => "mc",
-                    _ => "hup",
-                };
-            }
-            Err(e) => return format!(r#"{{"error":"compute: {e:?}"}}"#),
+        None => {
+            console_warn(&format!(
+                "unknown difficulty {level:?}; keeping current tier"
+            ));
+            false
         }
     }
-
-    serde_json::json!({
-        "seats": seats,
-        "samples": samples,
-        "iterations": iterations,
-        "method": method,
-        "equity": last,
-        "checksum": checksum,
-    })
-    .to_string()
 }
+
+/// Current difficulty tier (see `set_difficulty`). Lets the UI restore the
+/// Settings selector to its true state on load.
+#[wasm_bindgen]
+pub fn difficulty_level() -> String {
+    DIFFICULTY.with(|d| d.borrow().as_str().to_string())
+}
+
+// EPIC-48 note: the Phase 0 `equity_probe` export (in-browser latency spike
+// for pkcore's equity engine) was removed when the EPIC closed — its numbers
+// are recorded in docs/EPIC-48_Real_Equity_WASM.md and the probe lives in git
+// history (`git log -S equity_probe`). The `equity` cargo feature stays on so
+// the wasm build keeps pre-verifying the engine compiles for the day upstream
+// pkcore EPIC-36 wires it into the decider.
 
 /// Initialise a new session with 9 players (seat 0 = human, seats 1-8 = bots).
 ///
@@ -219,11 +223,14 @@ pub fn init_game(rand_seed: f64) -> String {
     // Seed RNG.
     RNG.with(|r| *r.borrow_mut() = SmallRng::seed_from_u64(rand_seed.to_bits()));
 
-    // Build 9-player table: hero at seat 0, bots at seats 1-8.
-    // Shuffle the embedded lineup (EPIC-49) and pick 8 so it varies each game.
-    let mut profile_pool = standard_profiles();
+    // Build the table: hero at seat 0, bots after. The difficulty tier picks
+    // the embedded lineup bundle (EPIC-49 Phase 3); shuffled so it varies each
+    // game. The weak pool has 8 profiles (no joker), others 9 — take(8) seats
+    // whatever is available.
+    let difficulty = DIFFICULTY.with(|d| *d.borrow());
+    let mut profile_pool = profiles_for(difficulty);
     RNG.with(|r| profile_pool.shuffle(&mut *r.borrow_mut()));
-    let adaptive = ADAPTIVE.with(|a| *a.borrow());
+    let adaptive = effective_adaptive(difficulty);
     let bots: Vec<BotSeat> = profile_pool
         .into_iter()
         .take(8)
@@ -243,6 +250,7 @@ pub fn init_game(rand_seed: f64) -> String {
         .map(|(i, s)| (i as u8, s.player.chips))
         .collect();
     HAND_START_CHIPS.with(|h| *h.borrow_mut() = start_chips);
+    record_session_start(&seats_vec);
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
     REGISTRY.with(|r| *r.borrow_mut() = StatsRegistry::new());
     FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() = 0);
@@ -271,10 +279,12 @@ pub fn init_bot_game(rand_seed: f64) -> String {
     IS_ALL_BOT.with(|f| *f.borrow_mut() = true);
     RNG.with(|r| *r.borrow_mut() = SmallRng::seed_from_u64(rand_seed.to_bits()));
 
-    // Pick 9 bot profiles so every seat has a bot (seat 0 included).
-    let mut profile_pool = standard_profiles();
+    // Fill every seat with a bot (seat 0 included). The difficulty tier picks
+    // the bundle (EPIC-49 Phase 3): 9 seats standard/strong, 8 weak (no joker).
+    let difficulty = DIFFICULTY.with(|d| *d.borrow());
+    let mut profile_pool = profiles_for(difficulty);
     RNG.with(|r| profile_pool.shuffle(&mut *r.borrow_mut()));
-    let adaptive = ADAPTIVE.with(|a| *a.borrow());
+    let adaptive = effective_adaptive(difficulty);
     let bots: Vec<BotSeat> = profile_pool
         .into_iter()
         .take(9)
@@ -293,6 +303,7 @@ pub fn init_bot_game(rand_seed: f64) -> String {
         .map(|(i, s)| (i as u8, s.player.chips))
         .collect();
     HAND_START_CHIPS.with(|h| *h.borrow_mut() = start_chips);
+    record_session_start(&seats_vec);
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
     REGISTRY.with(|r| *r.borrow_mut() = StatsRegistry::new());
     FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() = 0);
@@ -1178,6 +1189,28 @@ struct GameState {
     /// the UI/tests can confirm the persisted preference actually reached WASM —
     /// the toggle's checkbox state alone can silently diverge from the engine.
     adaptive: bool,
+    /// Live value of the difficulty tier (see `set_difficulty`), same
+    /// rationale as `adaptive`: the UI selector alone can silently diverge
+    /// from the engine.
+    difficulty: String,
+    /// EPIC-49 Phase 3: per-seat session performance (net chips and chips/100
+    /// over completed hands). Empty until a session exists; busted seats stay
+    /// in the report with their full loss.
+    session_report: Vec<SeatReport>,
+}
+
+/// One seat's session performance (EPIC-49 Phase 3). `chips_per_100` is the
+/// arena-bench metric: net chips per 100 completed hands. Caveat carried from
+/// the EPIC: tournament-style elimination biases chips/100 (busted seats stop
+/// accumulating hands); treat cross-seat comparisons over long runs
+/// accordingly.
+#[derive(Serialize, Clone)]
+struct SeatReport {
+    seat: u8,
+    name: String,
+    net_chips: i64,
+    hands_played: u32,
+    chips_per_100: f64,
 }
 
 #[derive(Serialize)]
@@ -1388,6 +1421,8 @@ fn build_game_state() -> String {
                 showdown: None,
                 forced_fold_count: 0,
                 adaptive: ADAPTIVE.with(|a| *a.borrow()),
+                difficulty: DIFFICULTY.with(|d| d.borrow().as_str().to_string()),
+                session_report: Vec::new(),
             })
             .unwrap_or_else(|_| r#"{"error":"serialize failed"}"#.to_string());
         };
@@ -1469,6 +1504,14 @@ fn build_game_state() -> String {
         let showdown = LAST_SHOWDOWN.with(|r| r.borrow_mut().take());
         let forced_fold_count = FORCED_FOLD_COUNT.with(|c| *c.borrow());
 
+        // Completed hands for the chips/100 report: the current hand counts
+        // once it has finished (HandComplete covers SessionOver's final hand;
+        // next_hand() advances hand_number only when a new hand starts).
+        let completed_hands = match phase_val {
+            SessionPhase::HandComplete | SessionPhase::SessionOver => session.hand_number,
+            _ => session.hand_number.saturating_sub(1),
+        };
+
         let state = GameState {
             hand_number: session.hand_number,
             phase: phase_str.to_string(),
@@ -1492,10 +1535,56 @@ fn build_game_state() -> String {
             showdown,
             forced_fold_count,
             adaptive: ADAPTIVE.with(|a| *a.borrow()),
+            difficulty: DIFFICULTY.with(|d| d.borrow().as_str().to_string()),
+            session_report: session_report(table, completed_hands),
         };
 
         serde_json::to_string(&state)
             .unwrap_or_else(|_| r#"{"error":"serialize failed"}"#.to_string())
+    })
+}
+
+/// Records the session's original seating (seat, name, starting chips) so the
+/// chips/100 report can net every player — including busted seats the table
+/// has since emptied (EPIC-49 Phase 3).
+fn record_session_start(seats: &[Seat]) {
+    let entries: Vec<(u8, String, usize)> = seats
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (i as u8, s.player.handle.clone(), s.player.chips))
+        .collect();
+    SESSION_START_CHIPS.with(|c| *c.borrow_mut() = entries);
+}
+
+/// Builds the per-seat session report from original seating vs current
+/// stacks. `completed_hands` is the number of finished hands; a seat that
+/// busted keeps its full loss (current chips read as 0 once the seat empties).
+#[allow(clippy::cast_precision_loss)]
+fn session_report(table: &Table, completed_hands: u32) -> Vec<SeatReport> {
+    SESSION_START_CHIPS.with(|c| {
+        c.borrow()
+            .iter()
+            .map(|(seat, name, start)| {
+                let current = table
+                    .seats
+                    .get_seat(*seat)
+                    .filter(|s| !s.is_empty())
+                    .map_or(0, |s| s.player.chips);
+                let net_chips = current as i64 - *start as i64;
+                let chips_per_100 = if completed_hands == 0 {
+                    0.0
+                } else {
+                    net_chips as f64 * 100.0 / f64::from(completed_hands)
+                };
+                SeatReport {
+                    seat: *seat,
+                    name: name.clone(),
+                    net_chips,
+                    hands_played: completed_hands,
+                    chips_per_100,
+                }
+            })
+            .collect()
     })
 }
 
@@ -1731,13 +1820,13 @@ fn console_warn(msg: &str) {
 fn console_warn(_msg: &str) {}
 
 /// Embedded standard bot lineup (EPIC-49 Phase 1), generated from
-/// `default_profiles()` + `joker()` (see `generate_standard_bundle`).
+/// `builtin_standard_pool()` (see `generate_standard_bundle`).
 static BUNDLE_STANDARD: &str = include_str!("../data/bots/standard.yaml");
 
 /// Parses the embedded standard lineup into a shuffleable profile pool. Falls
-/// back to the built-in hardcoded pool if the YAML is ever unparseable — a bad
-/// edit must never brick the game. (The bundle is also parse-checked at test
-/// time by `standard_bundle_matches_default_pool`.)
+/// back to the built-in pool if the YAML is ever unparseable — a bad edit must
+/// never brick the game. (The bundle is also parse-checked at test time by
+/// `standard_bundle_matches_default_pool`.)
 fn standard_profiles() -> Vec<BotProfile> {
     match serde_yaml_bw::from_str::<BotBundle>(BUNDLE_STANDARD) {
         Ok(bundle) => bundle.profiles,
@@ -1745,11 +1834,455 @@ fn standard_profiles() -> Vec<BotProfile> {
             console_warn(&format!(
                 "bot lineup YAML failed to parse ({e}); using built-in defaults"
             ));
-            let mut profiles = BotProfile::default_profiles();
-            profiles.push(BotProfile::joker());
-            profiles
+            builtin_standard_pool()
         }
     }
+}
+
+/// Embedded weak bot lineup (EPIC-49 Phase 3), generated from
+/// `builtin_weak_pool()` (see `generate_weak_bundle`).
+static BUNDLE_WEAK: &str = include_str!("../data/bots/weak.yaml");
+
+/// Parses the embedded weak lineup, falling back to the built-in weak pool on
+/// parse failure (same never-brick contract as `standard_profiles`).
+fn weak_profiles() -> Vec<BotProfile> {
+    match serde_yaml_bw::from_str::<BotBundle>(BUNDLE_WEAK) {
+        Ok(bundle) => bundle.profiles,
+        Err(e) => {
+            console_warn(&format!(
+                "weak lineup YAML failed to parse ({e}); using built-in weak pool"
+            ));
+            builtin_weak_pool()
+        }
+    }
+}
+
+/// Embedded strong bot lineup (EPIC-49 Phase 3), generated from
+/// `builtin_strong_pool()` (see `generate_strong_bundle`).
+static BUNDLE_STRONG: &str = include_str!("../data/bots/strong.yaml");
+
+/// Parses the embedded strong lineup, falling back to the built-in strong
+/// pool on parse failure (same never-brick contract as `standard_profiles`).
+fn strong_profiles() -> Vec<BotProfile> {
+    match serde_yaml_bw::from_str::<BotBundle>(BUNDLE_STRONG) {
+        Ok(bundle) => bundle.profiles,
+        Err(e) => {
+            console_warn(&format!(
+                "strong lineup YAML failed to parse ({e}); using built-in strong pool"
+            ));
+            builtin_strong_pool()
+        }
+    }
+}
+
+/// The profile pool for a difficulty tier.
+fn profiles_for(difficulty: Difficulty) -> Vec<BotProfile> {
+    match difficulty {
+        Difficulty::Weak => weak_profiles(),
+        Difficulty::Standard => standard_profiles(),
+        Difficulty::Strong => strong_profiles(),
+    }
+}
+
+/// Whether the next lineup build wraps deciders in `ExploitativeDecider`:
+/// weak never adapts (beginner-friendly); standard and strong honor the
+/// Settings toggle. Adaptation is deliberately NOT the strong tier's lever:
+/// the matchup bench measured it as a chips/100 drag in long bot-vs-bot runs
+/// (its value is modeling *human* tendencies, which a bot bench can't see) —
+/// the strong tier's lever is its sharpened bundle (`strengthen`).
+fn effective_adaptive(difficulty: Difficulty) -> bool {
+    match difficulty {
+        Difficulty::Weak => false,
+        Difficulty::Standard | Difficulty::Strong => ADAPTIVE.with(|a| *a.borrow()),
+    }
+}
+
+// ── EPIC-49 Phase 3: the weak tier's dampened pool ────────────────────────────
+
+/// The weak-tier pool: every standard archetype pushed toward the
+/// loose-passive corner by `weaken`. The joker is deliberately absent —
+/// `JokerDecider` morphs into full-strength `default_profiles()` each hand,
+/// which would leak standard play into the weak tier.
+fn builtin_weak_pool() -> Vec<BotProfile> {
+    BotProfile::default_profiles()
+        .into_iter()
+        .map(weaken)
+        .collect()
+}
+
+/// Dampens a profile into its weak-tier form: the spewy beginner who bluffs
+/// far too often and never extracts value. Its chips flow out through
+/// frequent small bluffs into opponents who call correctly (the one steady
+/// profile-driven outflow this decider has), while its made hands earn
+/// almost nothing: `value_threshold` is pushed near 1.0 so it stops
+/// value-betting, aggression is floored so it stops raising for value, and
+/// it is position-blind (playbook stripped). Hand selection keeps the
+/// archetype's own preflop range so each personality stays recognizable.
+///
+/// Tuning provenance (measured, not vibes — see `difficulty_ordering_tests`):
+/// a wide-range "plays any two" fish gambles too much (all-in variance
+/// drowns the ordering signal), and an over-tight nit actually *profits*
+/// against these over-bluffing archetypes. Over-bluffing + no value is the
+/// form that loses reliably.
+fn weaken(mut profile: BotProfile) -> BotProfile {
+    use pkcore::analysis::gto::solver_config::BetSize;
+    use pkcore::bot::betting_strategy::BettingStrategy;
+
+    let mut strategy = BettingStrategy::new(5, 40, 2, vec![BetSize::half_pot()]);
+    strategy.value_threshold = Some(0.97);
+    profile.betting_strategy = strategy;
+    profile.playbook = None;
+    profile
+}
+
+// ── EPIC-49 Phase 3: the strong tier's disciplined pool ───────────────────────
+
+/// The strong-tier pool: every standard archetype sharpened by `strengthen`.
+/// Like the weak pool, the joker is absent — it morphs into standard-strength
+/// profiles, which would dilute the strong tier.
+fn builtin_strong_pool() -> Vec<BotProfile> {
+    builtin_standard_pool()
+        .into_iter()
+        .filter(|p| p.name != "joker")
+        .map(strengthen)
+        .collect()
+}
+
+/// Sharpens a profile into its strong-tier form: the disciplined regular.
+/// Hand selection tightens to a solid ~10% opening range (premiums get paid
+/// in this engine; junk cannot back up its postflop equity), bluffing — the
+/// one steady profile-driven chip *leak* this decider has (see `weaken`) —
+/// is clamped hard, and the value-bet threshold drops so made hands charge
+/// worse ones. Aggression keeps each archetype's own values and playbook
+/// position grades — a measured decision: lifting aggression across the
+/// board bought all-in variance, not edge. The same discipline is applied at
+/// the flat baseline and at every playbook position, since the decider
+/// resolves positional strategy first. Interim until upstream pkcore EPIC-36
+/// ships real capability knobs (equity, outs, pot-odds discipline); the
+/// strong tier also forces adaptation on (see `effective_adaptive`).
+/// Validated by the matchup harness (`difficulty_ordering_tests`), not
+/// vibes.
+fn strengthen(mut profile: BotProfile) -> BotProfile {
+    use pkcore::bot::betting_strategy::BettingStrategy;
+    use pkcore::bot::playbook::{Playbook, PlaybookEntry};
+    use pkcore::bot::positional_betting::PositionalBetting;
+    use pkcore::bot::range_strategy::RangeStrategy;
+    use pkcore::casino::position::Position;
+
+    fn discipline(s: &BettingStrategy) -> BettingStrategy {
+        let mut d = BettingStrategy::new(
+            s.aggression_factor.value(),
+            s.bluff_frequency.value().min(8),
+            s.check_raise_frequency.value(),
+            s.preferred_bet_sizes.clone(),
+        );
+        d.value_threshold = Some(0.5);
+        d
+    }
+
+    let ranges = &profile.range_strategy;
+    profile.range_strategy = RangeStrategy::new(
+        "44+, AJ+, KQ, KJs", // ~top 10% — pkcore's PERCENT_10 reference range
+        ranges.three_bet.clone(),
+        ranges.call_three_bet.clone(),
+        ranges.postflop_cbet_frequency.value(),
+    );
+
+    profile.betting_strategy = discipline(&profile.betting_strategy);
+    if let Some(playbook) = profile.playbook.take() {
+        let mut sharpened = Playbook::new();
+        for seats in [6u8, 9u8] {
+            let Some(entry) = playbook.for_seats(seats) else {
+                continue;
+            };
+            let positions: &[Position] = if seats == 6 {
+                &[
+                    Position::LJ,
+                    Position::HJ,
+                    Position::CO,
+                    Position::BTN,
+                    Position::SB,
+                    Position::BB,
+                ]
+            } else {
+                &[
+                    Position::UTG,
+                    Position::UTGP1,
+                    Position::EP,
+                    Position::LJ,
+                    Position::HJ,
+                    Position::CO,
+                    Position::BTN,
+                    Position::SB,
+                    Position::BB,
+                ]
+            };
+            let mut betting = PositionalBetting::new(profile.betting_strategy.clone());
+            for &pos in positions {
+                betting.insert(pos, discipline(entry.positional_betting.for_position(pos)));
+            }
+            sharpened.insert(
+                seats,
+                PlaybookEntry::new(entry.position_ranges.clone(), betting),
+            );
+        }
+        profile.playbook = Some(sharpened);
+    }
+    profile
+}
+
+// ── EPIC-49 Phase 2: position awareness for every archetype ───────────────────
+
+/// The built-in pool with position awareness completed: `default_profiles()` +
+/// `joker()`, with playbooks attached to the five archetypes pkcore ships flat
+/// (EPIC-49 Phase 2). Single source of truth for the standard bundle — the
+/// YAML generator serializes exactly this, the parity gate compares against
+/// it, and the runtime fallback returns it. The joker stays playbook-free:
+/// `JokerDecider` ignores its own profile and morphs into a (playbook-bearing)
+/// standard profile each hand.
+fn builtin_standard_pool() -> Vec<BotProfile> {
+    let mut profiles: Vec<BotProfile> = BotProfile::default_profiles()
+        .into_iter()
+        .map(attach_archetype_playbook)
+        .collect();
+    profiles.push(BotProfile::joker());
+    profiles
+}
+
+/// Attaches an authored [`Playbook`] to the five archetypes pkcore ships
+/// without one, and re-grades the two whose pkcore playbooks are positionally
+/// flat (tight_passive at both sizes, loose_aggressive at 9-max); gto — whose
+/// pkcore playbook is already fully graded — and joker pass through unchanged.
+///
+/// Design note: the decider consults `betting_for(seats, pos)` today, so the
+/// positional *betting* grades below change live behavior; the positional
+/// *ranges* are carried as data for upstream pkcore EPIC-36 (`ranges:
+/// position_aware`), which is why each archetype reuses the closest existing
+/// pkcore range chart rather than authoring new ones (upstreaming candidate).
+fn attach_archetype_playbook(profile: BotProfile) -> BotProfile {
+    use pkcore::bot::playbook::{Playbook, PlaybookEntry};
+    use pkcore::bot::position_ranges::PositionRanges;
+    use pkcore::casino::position::Position::{BB, BTN, CO, EP, HJ, LJ, SB, UTG, UTGP1};
+
+    // Positional aggression grades, anchored at each archetype's flat baseline
+    // (EP below it, BTN above it) so the style is preserved while position
+    // discipline emerges: (position, aggression, bluff, check_raise).
+    type Grade = (pkcore::casino::position::Position, u8, u8, u8);
+    let (six, nine): (&[Grade], &[Grade]) = match profile.name.as_str() {
+        // Baseline 70/20/15 — selective but forceful; opens up on the button.
+        "tight_aggressive" => (
+            &[
+                (LJ, 60, 15, 12),
+                (HJ, 64, 17, 13),
+                (CO, 68, 19, 14),
+                (BTN, 78, 24, 18),
+                (SB, 68, 18, 14),
+                (BB, 66, 18, 16),
+            ],
+            &[
+                (UTG, 55, 12, 10),
+                (UTGP1, 57, 13, 11),
+                (EP, 60, 15, 12),
+                (LJ, 62, 16, 12),
+                (HJ, 65, 17, 13),
+                (CO, 70, 19, 15),
+                (BTN, 78, 24, 18),
+                (SB, 66, 17, 13),
+                (BB, 66, 18, 16),
+            ],
+        ),
+        // Baseline 15/3/2 — passive everywhere, faint button uptick.
+        "loose_passive" => (
+            &[
+                (LJ, 12, 2, 2),
+                (HJ, 13, 2, 2),
+                (CO, 14, 3, 2),
+                (BTN, 20, 5, 3),
+                (SB, 14, 3, 2),
+                (BB, 13, 3, 2),
+            ],
+            &[
+                (UTG, 10, 2, 1),
+                (UTGP1, 10, 2, 1),
+                (EP, 11, 2, 2),
+                (LJ, 12, 2, 2),
+                (HJ, 13, 3, 2),
+                (CO, 15, 3, 2),
+                (BTN, 20, 5, 3),
+                (SB, 13, 3, 2),
+                (BB, 13, 3, 2),
+            ],
+        ),
+        // Baseline 90/55/30 — relentless, but even a maniac fears the gun.
+        "maniac" => (
+            &[
+                (LJ, 84, 48, 26),
+                (HJ, 86, 50, 27),
+                (CO, 88, 52, 28),
+                (BTN, 97, 62, 34),
+                (SB, 90, 55, 30),
+                (BB, 88, 54, 32),
+            ],
+            &[
+                (UTG, 80, 45, 24),
+                (UTGP1, 82, 46, 25),
+                (EP, 84, 48, 26),
+                (LJ, 85, 49, 26),
+                (HJ, 87, 51, 27),
+                (CO, 90, 54, 29),
+                (BTN, 97, 62, 34),
+                (SB, 89, 53, 28),
+                (BB, 88, 54, 32),
+            ],
+        ),
+        // Baseline 65/0/5 — by-the-book position discipline, still zero bluffs.
+        "abc" => (
+            &[
+                (LJ, 55, 0, 4),
+                (HJ, 58, 0, 4),
+                (CO, 62, 0, 5),
+                (BTN, 72, 0, 6),
+                (SB, 60, 0, 5),
+                (BB, 60, 0, 5),
+            ],
+            &[
+                (UTG, 48, 0, 3),
+                (UTGP1, 50, 0, 3),
+                (EP, 52, 0, 4),
+                (LJ, 55, 0, 4),
+                (HJ, 58, 0, 4),
+                (CO, 63, 0, 5),
+                (BTN, 72, 0, 6),
+                (SB, 58, 0, 4),
+                (BB, 60, 0, 5),
+            ],
+        ),
+        // Baseline 95/45/40 — push-or-fold with tighter early-position shoves.
+        "short_stack_ninja" => (
+            &[
+                (LJ, 88, 38, 34),
+                (HJ, 90, 40, 36),
+                (CO, 93, 43, 38),
+                (BTN, 100, 52, 44),
+                (SB, 95, 45, 40),
+                (BB, 94, 46, 42),
+            ],
+            &[
+                (UTG, 82, 34, 30),
+                (UTGP1, 84, 36, 32),
+                (EP, 86, 38, 33),
+                (LJ, 88, 39, 34),
+                (HJ, 90, 41, 36),
+                (CO, 93, 44, 38),
+                (BTN, 100, 52, 44),
+                (SB, 94, 44, 39),
+                (BB, 94, 46, 42),
+            ],
+        ),
+        // pkcore's own tight_passive/loose_aggressive playbooks carry flat
+        // (ungraded) positional betting for some table sizes — graded here so
+        // "every archetype plays position-differentiated poker" holds at both
+        // 6-max and the 9-max tables this app actually deals.
+        // Baseline 25/5/3 — pkcore ships it flat at BOTH sizes.
+        "tight_passive" => (
+            &[
+                (LJ, 21, 4, 3),
+                (HJ, 22, 4, 3),
+                (CO, 24, 5, 3),
+                (BTN, 32, 8, 5),
+                (SB, 24, 5, 3),
+                (BB, 23, 5, 4),
+            ],
+            &[
+                (UTG, 18, 3, 2),
+                (UTGP1, 19, 3, 2),
+                (EP, 20, 4, 2),
+                (LJ, 21, 4, 3),
+                (HJ, 22, 4, 3),
+                (CO, 24, 5, 3),
+                (BTN, 32, 8, 5),
+                (SB, 24, 5, 3),
+                (BB, 23, 5, 4),
+            ],
+        ),
+        // Baseline 75/35/20 — pkcore grades 6-max but ships 9-max flat; the
+        // 6-max grades mirror pkcore's own (loose_aggressive_six_max).
+        "loose_aggressive" => (
+            &[
+                (LJ, 65, 30, 18),
+                (HJ, 68, 33, 20),
+                (CO, 72, 36, 22),
+                (BTN, 80, 40, 25),
+                (SB, 70, 35, 20),
+                (BB, 68, 33, 25),
+            ],
+            &[
+                (UTG, 66, 28, 16),
+                (UTGP1, 68, 29, 17),
+                (EP, 70, 31, 18),
+                (LJ, 71, 32, 18),
+                (HJ, 73, 33, 19),
+                (CO, 76, 36, 20),
+                (BTN, 84, 42, 24),
+                (SB, 74, 34, 19),
+                (BB, 73, 34, 21),
+            ],
+        ),
+        // gto's playbook is already graded at both sizes; joker's profile is
+        // never consulted by its decider.
+        _ => return profile,
+    };
+
+    // Closest existing pkcore range chart per style (data for EPIC-36; the
+    // decider does not consult positional ranges yet).
+    let (ranges_six, ranges_nine) = match profile.name.as_str() {
+        // Same 6-max charts pkcore's own playbooks pair with these styles.
+        "loose_passive" | "maniac" | "loose_aggressive" => (
+            PositionRanges::loose_aggressive_six_max(),
+            PositionRanges::gto_nine_max(),
+        ),
+        "short_stack_ninja" | "tight_passive" => (
+            PositionRanges::tight_passive_six_max(),
+            PositionRanges::gto_nine_max(),
+        ),
+        _ => (PositionRanges::gto_six_max(), PositionRanges::gto_nine_max()),
+    };
+
+    let mut playbook = Playbook::new();
+    playbook.insert(
+        6,
+        PlaybookEntry::new(ranges_six, graded_betting(&profile.betting_strategy, six)),
+    );
+    playbook.insert(
+        9,
+        PlaybookEntry::new(ranges_nine, graded_betting(&profile.betting_strategy, nine)),
+    );
+    profile.with_playbook(playbook)
+}
+
+/// Builds a [`PositionalBetting`] whose default is the archetype's flat
+/// baseline and whose per-position entries apply the given aggression grades,
+/// keeping the archetype's preferred bet sizes at every position.
+fn graded_betting(
+    base: &pkcore::bot::betting_strategy::BettingStrategy,
+    grades: &[(pkcore::casino::position::Position, u8, u8, u8)],
+) -> pkcore::bot::positional_betting::PositionalBetting {
+    use pkcore::bot::betting_strategy::BettingStrategy;
+    use pkcore::bot::positional_betting::PositionalBetting;
+
+    let mut betting = PositionalBetting::new(base.clone());
+    for &(pos, aggression, bluff, check_raise) in grades {
+        betting.insert(
+            pos,
+            BettingStrategy::new(
+                aggression,
+                bluff,
+                check_raise,
+                base.preferred_bet_sizes.clone(),
+            ),
+        );
+    }
+    betting
 }
 
 fn street_from_board(board_len: usize, is_showdown: bool) -> String {
@@ -2557,18 +3090,16 @@ mod bot_bundle_fixture {
     use super::*;
 
     /// Fixture generator (run on demand): writes `data/bots/standard.yaml` from
-    /// today's hardcoded pool — `default_profiles()` + `joker()` — so the
-    /// embedded bundle is, by construction, behavior-identical to the pre-YAML
-    /// lineup. Re-run with:
+    /// the built-in pool — `default_profiles()` + `joker()` with every
+    /// archetype's playbook attached (EPIC-49 Phase 2) — so the embedded
+    /// bundle is, by construction, identical to the code pool. Re-run with:
     ///   cargo test --lib generate_standard_bundle -- --ignored --nocapture
     #[test]
     #[ignore = "fixture generator; run explicitly to regenerate data/bots/standard.yaml"]
     fn generate_standard_bundle() {
-        let mut profiles = BotProfile::default_profiles();
-        profiles.push(BotProfile::joker());
         let bundle = BotBundle {
             name: "standard".to_string(),
-            profiles,
+            profiles: builtin_standard_pool(),
         };
         let yaml = serde_yaml_bw::to_string(&bundle).expect("serialize bundle");
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/data/bots/standard.yaml");
@@ -2578,17 +3109,16 @@ mod bot_bundle_fixture {
         eprintln!("wrote {path}");
     }
 
-    /// EPIC-49 Phase 1 acceptance 1c + 1d. Validates that the embedded bundle
-    /// parses, and proves lineup equivalence: the YAML round-trips to *exactly*
-    /// today's hardcoded pool (`default_profiles()` + `joker()`), so switching
-    /// the pool source to YAML is behavior-preserving. `BotProfile: Eq`, so
-    /// this compares every range/betting/playbook field, not just names.
+    /// EPIC-49 Phase 1 acceptance 1c + 1d (updated for Phase 2). Validates that
+    /// the embedded bundle parses, and proves lineup parity: the YAML
+    /// round-trips to *exactly* the code pool (`builtin_standard_pool()`), so
+    /// the YAML and the runtime fallback can never drift apart. `BotProfile:
+    /// PartialEq`, so this compares every range/betting/playbook field, not
+    /// just names.
     #[test]
     fn standard_bundle_matches_default_pool() {
         let parsed = standard_profiles();
-
-        let mut expected = BotProfile::default_profiles();
-        expected.push(BotProfile::joker());
+        let expected = builtin_standard_pool();
 
         assert_eq!(
             parsed.len(),
@@ -2598,7 +3128,7 @@ mod bot_bundle_fixture {
         );
         assert_eq!(
             parsed, expected,
-            "embedded standard.yaml diverged from default_profiles() + joker(); \
+            "embedded standard.yaml diverged from builtin_standard_pool(); \
              regenerate with `cargo test --lib generate_standard_bundle -- --ignored`"
         );
 
@@ -2618,8 +3148,656 @@ mod bot_bundle_fixture {
         // corrupt the `include_str!`ed const at runtime, so this guards the
         // else-arm's shape stays in sync with the default pool).
         assert!(serde_yaml_bw::from_str::<BotBundle>("not: [valid").is_err());
-        let mut expected = BotProfile::default_profiles();
-        expected.push(BotProfile::joker());
-        assert_eq!(expected.len(), 9);
+        assert_eq!(builtin_standard_pool().len(), 9);
+    }
+
+    /// Fixture generator (run on demand): writes `data/bots/weak.yaml` from
+    /// the weak-tier pool (EPIC-49 Phase 3). Re-run with:
+    ///   cargo test --lib generate_weak_bundle -- --ignored --nocapture
+    #[test]
+    #[ignore = "fixture generator; run explicitly to regenerate data/bots/weak.yaml"]
+    fn generate_weak_bundle() {
+        let bundle = BotBundle {
+            name: "weak".to_string(),
+            profiles: builtin_weak_pool(),
+        };
+        let yaml = serde_yaml_bw::to_string(&bundle).expect("serialize bundle");
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/data/bots/weak.yaml");
+        std::fs::write(path, yaml).expect("write weak.yaml");
+        eprintln!("wrote {path}");
+    }
+
+    /// EPIC-49 Phase 3: the embedded weak bundle parses and round-trips to
+    /// exactly `builtin_weak_pool()` — same drift gate as the standard bundle.
+    #[test]
+    fn weak_bundle_matches_weakened_pool() {
+        let parsed = weak_profiles();
+        let expected = builtin_weak_pool();
+
+        assert_eq!(
+            parsed.len(),
+            expected.len(),
+            "embedded weak lineup should carry all {} profiles",
+            expected.len()
+        );
+        assert_eq!(
+            parsed, expected,
+            "embedded weak.yaml diverged from builtin_weak_pool(); regenerate \
+             with `cargo test --lib generate_weak_bundle -- --ignored`"
+        );
+
+        // The joker must NOT be in the weak pool: its decider morphs into
+        // full-strength default profiles, which would leak standard play
+        // into the weak tier.
+        assert!(
+            parsed.iter().all(|p| p.name != "joker"),
+            "joker must not appear in the weak lineup"
+        );
+        // And every profile is genuinely dampened and position-blind.
+        for p in &parsed {
+            assert!(
+                p.playbook.is_none(),
+                "{} should be position-blind in the weak tier",
+                p.name
+            );
+            assert!(
+                p.betting_strategy.aggression_factor < 26,
+                "{} aggression should be capped in the weak tier",
+                p.name
+            );
+        }
+    }
+
+    /// Fixture generator (run on demand): writes `data/bots/strong.yaml` from
+    /// the strong-tier pool (EPIC-49 Phase 3). Re-run with:
+    ///   cargo test --lib generate_strong_bundle -- --ignored --nocapture
+    #[test]
+    #[ignore = "fixture generator; run explicitly to regenerate data/bots/strong.yaml"]
+    fn generate_strong_bundle() {
+        let bundle = BotBundle {
+            name: "strong".to_string(),
+            profiles: builtin_strong_pool(),
+        };
+        let yaml = serde_yaml_bw::to_string(&bundle).expect("serialize bundle");
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/data/bots/strong.yaml");
+        std::fs::write(path, yaml).expect("write strong.yaml");
+        eprintln!("wrote {path}");
+    }
+
+    /// EPIC-49 Phase 3: the embedded strong bundle parses and round-trips to
+    /// exactly `builtin_strong_pool()` — same drift gate as the other bundles.
+    #[test]
+    fn strong_bundle_matches_strengthened_pool() {
+        let parsed = strong_profiles();
+        let expected = builtin_strong_pool();
+
+        assert_eq!(
+            parsed.len(),
+            expected.len(),
+            "embedded strong lineup should carry all {} profiles",
+            expected.len()
+        );
+        assert_eq!(
+            parsed, expected,
+            "embedded strong.yaml diverged from builtin_strong_pool(); regenerate \
+             with `cargo test --lib generate_strong_bundle -- --ignored`"
+        );
+
+        // Same joker rationale as the weak pool: it morphs into
+        // standard-strength profiles, diluting the tier.
+        assert!(
+            parsed.iter().all(|p| p.name != "joker"),
+            "joker must not appear in the strong lineup"
+        );
+        // Every profile is disciplined, and position awareness survives the
+        // sharpening (BTN still out-aggresses UTG at 9-max).
+        use pkcore::casino::position::Position;
+        for p in &parsed {
+            assert!(
+                p.betting_strategy.bluff_frequency < 9,
+                "{} bluff frequency should be clamped in the strong tier",
+                p.name
+            );
+            assert!(
+                p.playbook.is_some(),
+                "{} should stay position-aware in the strong tier",
+                p.name
+            );
+            let btn = p.betting_for(9, Position::BTN).aggression_factor;
+            let utg = p.betting_for(9, Position::UTG).aggression_factor;
+            assert!(
+                btn > utg,
+                "{}: strong-tier BTN aggression ({btn:?}) should still exceed UTG ({utg:?})",
+                p.name
+            );
+        }
+    }
+
+    /// EPIC-49 Phase 3: tier plumbing. `set_difficulty` gates both the pool
+    /// choice and the effective adaptivity; unknown levels are rejected.
+    #[test]
+    fn difficulty_selects_pool_and_gates_adaptivity() {
+        // Weak: dampened pool, adaptation off regardless of the toggle.
+        assert!(set_difficulty("weak"));
+        assert_eq!(difficulty_level(), "weak");
+        set_adaptive(true);
+        assert!(!effective_adaptive(Difficulty::Weak));
+        assert_eq!(profiles_for(Difficulty::Weak).len(), 8);
+
+        // Standard: standard pool, adaptation honors the toggle.
+        assert!(set_difficulty("standard"));
+        set_adaptive(false);
+        assert!(!effective_adaptive(Difficulty::Standard));
+        set_adaptive(true);
+        assert!(effective_adaptive(Difficulty::Standard));
+        assert_eq!(profiles_for(Difficulty::Standard).len(), 9);
+
+        // Strong: sharpened pool; adaptation honors the toggle (measured as a
+        // bot-vs-bot drag, so it is not forced — see effective_adaptive).
+        assert!(set_difficulty("strong"));
+        set_adaptive(false);
+        assert!(!effective_adaptive(Difficulty::Strong));
+        set_adaptive(true);
+        assert!(effective_adaptive(Difficulty::Strong));
+        assert_eq!(profiles_for(Difficulty::Strong).len(), 8);
+
+        // Unknown levels are rejected and the current tier survives.
+        assert!(!set_difficulty("nightmare"));
+        assert_eq!(difficulty_level(), "strong");
+
+        // Restore defaults for other tests sharing the thread-locals.
+        set_difficulty("standard");
+        set_adaptive(true);
+    }
+}
+
+#[cfg(test)]
+mod difficulty_ordering_tests {
+    use super::*;
+
+    /// One seat in a matchup: a profile, its decider (bare or adaptive), and
+    /// which side of the comparison it plays for.
+    struct MatchupSeat {
+        profile: BotProfile,
+        decider: Box<dyn BotDecider>,
+        group_a: bool,
+    }
+
+    fn bare(profile: BotProfile, group_a: bool) -> MatchupSeat {
+        MatchupSeat {
+            profile,
+            decider: Box::new(RuleBasedDecider),
+            group_a,
+        }
+    }
+
+    /// Kept (unused) as the probe that measured adaptation's bot-vs-bot
+    /// value: seat `adaptive(p)` vs `bare(p)` to reproduce the −2.7k/−3.8k
+    /// chips/100 drag recorded in `strong_tier_beats_standard_tier`'s doc
+    /// comment and the EPIC-49 corrigendum.
+    #[allow(dead_code)]
+    fn adaptive(profile: BotProfile, group_a: bool) -> MatchupSeat {
+        MatchupSeat {
+            profile,
+            decider: Box::new(ExploitativeDecider::wrap_with_config(
+                RuleBasedDecider,
+                ExploitConfig::default(),
+            )),
+            group_a,
+        }
+    }
+
+    /// Fixed-stack cash-game matchup bench (EPIC-49 Phase 3 acceptance, the
+    /// browser analogue of upstream EPIC-36's `SimTable` bench, using the
+    /// cash-mode reset that EPIC itself plans). Plays `hands` hands at fixed
+    /// 50/100 blinds and 100 BB stacks; after every hand each seat's result
+    /// is banked into its net and its stack resets to 100 BB, so every hand
+    /// is played under identical conditions. The reset is load-bearing: a
+    /// refill-only-when-short variant let winners' stacks grow without bound,
+    /// and the game's character drifted with depth — 12k-hand and 96k-hand
+    /// runs of the same matchup produced opposite signs. Opponent stats are
+    /// ingested per hand exactly as production `next_hand()` does, with
+    /// stable player identities across the whole run so adaptive seats can
+    /// clear `ExploitConfig`'s 30/50-hand gates.
+    ///
+    /// Returns (group A net chips, group B net chips). Chips are conserved,
+    /// so the two nets sum to ~0 (exactly 0 barring pkcore's known multiway
+    /// audit edge case, on which the hand's ingest is skipped).
+    ///
+    /// NOTE: pkcore's `start_hand` shuffles from the entropy RNG (no seeded
+    /// deck exists), so this bench is statistical, not seed-reproducible —
+    /// assertions must hold with margin over enough hands, the same
+    /// deal-independence constraint every other test in this crate documents.
+    fn run_matchup(mut seats: Vec<MatchupSeat>, hands: usize) -> (i64, i64) {
+        const STACK: usize = 10_000;
+
+        let seats_vec: Vec<Seat> = seats
+            .iter()
+            .enumerate()
+            .map(|(i, m)| {
+                Seat::new(Player::new_with_chips(
+                    format!("{}#{i}", m.profile.name),
+                    STACK,
+                ))
+            })
+            .collect();
+        let ids: Vec<uuid::Uuid> = seats_vec.iter().map(|s| s.player.id).collect();
+        let names: Vec<String> = seats_vec.iter().map(|s| s.player.handle.clone()).collect();
+        let table = Table::nlh_from_seats(Seats::new(seats_vec), ForcedBets::new(50, 100));
+        let mut session = PokerSession::new(table);
+
+        let mut registry = StatsRegistry::new();
+        let mut rng = SmallRng::seed_from_u64(0xEC49);
+        let mut nets = vec![0i64; seats.len()];
+
+        for hand_num in 0..hands {
+            session.start_hand().expect("start hand");
+
+            while let Some(seat) = session.next_actor() {
+                let action = {
+                    let snapshot = TableSnapshot::from_table_with_stats(
+                        &session.table,
+                        seat,
+                        &registry,
+                    );
+                    let m = &mut seats[seat as usize];
+                    m.decider
+                        .decide_seeded(&m.profile, &snapshot, &mut rng)
+                };
+                // Same escalating repair ladder as production step_bot().
+                apply_bot_action(&mut session, seat, &action);
+            }
+
+            // Mirror production next_hand(): snapshot BEFORE end_hand, build an
+            // id-threaded HandHistory, ingest into the registry.
+            let event_log = session.table.event_log.clone();
+            let button = session.table.button;
+            let snapshot: Vec<PlayerSnapshot> = ids
+                .iter()
+                .zip(&names)
+                .enumerate()
+                .map(|(i, (id, name))| (i as u8, name.clone(), STACK, None, Some(*id)))
+                .collect();
+
+            if session.end_hand().is_ok() {
+                let ending: Vec<(u8, usize)> = session
+                    .table
+                    .seats
+                    .0
+                    .iter()
+                    .enumerate()
+                    .map(|(i, s)| (i as u8, s.player.chips))
+                    .collect();
+                let hh = HandHistory::from_table_state_with_ids(
+                    hand_num,
+                    0,
+                    button,
+                    &ForcedBets::new(50, 100),
+                    &snapshot,
+                    "",
+                    &Winnings::default(),
+                    &event_log,
+                    &ending,
+                    "bench",
+                    None,
+                );
+                registry.ingest_hand(&hh);
+            }
+            session.table.event_log.clear();
+            session.table.button_up();
+
+            // Cash-mode reset: bank the hand's result, restore 100 BB.
+            for (i, net) in nets.iter_mut().enumerate() {
+                let seat = &mut session.table.seats.0[i];
+                *net += seat.player.chips as i64 - STACK as i64;
+                seat.player.chips = STACK;
+            }
+
+            // New-hand hook (the joker never plays here, but keep parity with
+            // production's notify_bots_new_hand()).
+            for m in &mut seats {
+                m.decider.on_new_hand_with_rng(&mut rng);
+            }
+        }
+
+        let mut net_a = 0i64;
+        let mut net_b = 0i64;
+        for (i, m) in seats.iter().enumerate() {
+            if m.group_a {
+                net_a += nets[i];
+            } else {
+                net_b += nets[i];
+            }
+        }
+        (net_a, net_b)
+    }
+
+    /// Four solid archetypes from the standard pool, used on both sides of
+    /// each matchup so only the tier lever under test differs.
+    fn core_profiles() -> Vec<BotProfile> {
+        let pool = builtin_standard_pool();
+        ["gto", "tight_aggressive", "loose_aggressive", "abc"]
+            .iter()
+            .map(|name| {
+                pool.iter()
+                    .find(|p| p.name == *name)
+                    .expect("core profile in pool")
+                    .clone()
+            })
+            .collect()
+    }
+
+    /// EPIC-49 Phase 3 acceptance: the standard tier beats the weak tier.
+    /// Seats alternate standard/weak(same archetype) to balance position.
+    ///
+    /// Statistical bench, run via `make bench-tiers` (release mode; ~2s):
+    /// measured edge ≈ +22k chips/100 with run-to-run σ ≈ 4k over four runs
+    /// at this volume (≈5σ) — comfortably beyond flake territory, but still
+    /// entropy-dealt (see `run_matchup` note), hence not part of the default
+    /// fast suite.
+    #[test]
+    #[ignore = "statistical bench (entropy-dealt); run via `make bench-tiers`"]
+    fn standard_tier_beats_weak_tier() {
+        let mut seats = Vec::new();
+        for p in core_profiles() {
+            seats.push(bare(p.clone(), true)); // standard
+            seats.push(bare(weaken(p), false)); // weak
+        }
+        let hands = 12_000;
+        let (standard_net, weak_net) = run_matchup(seats, hands);
+        eprintln!(
+            "standard {standard_net:+} vs weak {weak_net:+} over {hands} hands \
+             ({:+.0} chips/100 differential)",
+            (standard_net - weak_net) as f64 * 100.0 / hands as f64
+        );
+        assert!(
+            standard_net > weak_net,
+            "standard tier should out-earn the weak tier over {hands} hands, \
+             got standard {standard_net:+} vs weak {weak_net:+}"
+        );
+    }
+
+    /// EPIC-49 Phase 3 acceptance: the strong tier's bundle (`strengthen`)
+    /// beats bare standard. Same archetypes on both sides; only the bundle
+    /// lever differs — adaptation is off on both, matching what the tiers
+    /// themselves control (the adaptive toggle is an orthogonal EPIC-47 axis
+    /// on both standard and strong).
+    ///
+    /// Measured provenance: adaptation is NOT part of the strong lever —
+    /// on this same bench, adaptive-wrapped standard profiles vs bare ones
+    /// measured a consistent mild drag (−2.7k and −3.8k chips/100 over two
+    /// 96k-hand runs). Its value proposition is modeling *human* tendencies,
+    /// which a bot-vs-bot bench cannot see. Discipline (tight range + bluff
+    /// clamp + value threshold) is the lever that measures.
+    ///
+    /// Statistical bench, run via `make bench-tiers` (release mode; ~12s):
+    /// measured edge ≈ +24k chips/100 with run-to-run σ ≈ 2k over three runs
+    /// at this volume (≈12σ). Entropy-dealt (see `run_matchup` note), hence
+    /// not part of the default fast suite.
+    #[test]
+    #[ignore = "statistical bench (entropy-dealt); run via `make bench-tiers`"]
+    fn strong_tier_beats_standard_tier() {
+        let mut seats = Vec::new();
+        for p in core_profiles() {
+            seats.push(bare(strengthen(p.clone()), true)); // strong
+            seats.push(bare(p, false)); // standard
+        }
+        let hands = 96_000;
+        let (strong_net, standard_net) = run_matchup(seats, hands);
+        eprintln!(
+            "strong {strong_net:+} vs standard {standard_net:+} over {hands} hands \
+             ({:+.0} chips/100 differential)",
+            (strong_net - standard_net) as f64 * 100.0 / hands as f64
+        );
+        assert!(
+            strong_net > standard_net,
+            "strong tier should out-earn the standard tier over {hands} hands, \
+             got strong {strong_net:+} vs standard {standard_net:+}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod session_report_tests {
+    use super::*;
+
+    /// EPIC-49 Phase 3c: the chips/100 report nets every originally seated
+    /// player against their starting stack. Chips are conserved, so the report
+    /// must sum to zero; with no completed hands the rate is 0 rather than a
+    /// division by zero.
+    #[test]
+    fn session_report_is_zero_sum_and_rate_scaled() {
+        let seats_vec = vec![
+            Seat::new(Player::new_with_chips("A".to_string(), 10_000)),
+            Seat::new(Player::new_with_chips("B".to_string(), 10_000)),
+        ];
+        record_session_start(&seats_vec);
+        let table = Table::nlh_from_seats(Seats::new(seats_vec), ForcedBets::new(50, 100));
+        let mut session = PokerSession::new(table);
+        session.start_hand().expect("start hand");
+
+        // No completed hands yet: rates are 0, not NaN/inf.
+        let report = session_report(&session.table, 0);
+        assert_eq!(report.len(), 2);
+        assert!(report.iter().all(|r| r.chips_per_100 == 0.0));
+
+        // Play one hand to completion with minimal legal actions.
+        while let Some(seat) = session.next_actor() {
+            let to_call = session.table.to_call(seat);
+            let chips = session
+                .table
+                .seats
+                .get_seat(seat)
+                .map_or(0, |s| s.player.chips);
+            let action = if to_call == 0 {
+                PlayerAction::Check
+            } else if chips >= to_call {
+                PlayerAction::Call
+            } else {
+                PlayerAction::AllIn
+            };
+            session.apply_action(seat, action).expect("legal action");
+        }
+        session.end_hand().expect("end hand");
+
+        let report = session_report(&session.table, 1);
+        assert_eq!(report.len(), 2, "every original seat stays in the report");
+        let net_sum: i64 = report.iter().map(|r| r.net_chips).sum();
+        assert_eq!(net_sum, 0, "chips are conserved, so the report is zero-sum");
+        for r in &report {
+            assert_eq!(r.hands_played, 1);
+            #[allow(clippy::cast_precision_loss)]
+            let expected_rate = r.net_chips as f64 * 100.0;
+            assert!((r.chips_per_100 - expected_rate).abs() < f64::EPSILON);
+        }
+    }
+}
+
+#[cfg(test)]
+mod position_awareness_tests {
+    use super::*;
+    use pkcore::bot::table_snapshot::SeatInfo;
+    use pkcore::casino::position::Position;
+    use pkcore::games::GamePhase;
+    use pkcore::games::betting_structure::{BetTier, BettingStructure};
+
+    /// Archetypes made (or re-graded to be) position-aware by
+    /// `attach_archetype_playbook` (EPIC-49 Phase 2a): the five pkcore ships
+    /// flat, plus the two whose pkcore playbooks lacked positional grades at
+    /// the table sizes this app deals.
+    const GRADED_ARCHETYPES: [&str; 7] = [
+        "tight_aggressive",
+        "loose_passive",
+        "maniac",
+        "abc",
+        "short_stack_ninja",
+        "tight_passive",
+        "loose_aggressive",
+    ];
+
+    /// EPIC-49 Phase 2a: every non-joker profile in the pool carries a
+    /// playbook with 6-max and 9-max entries, and the positional betting
+    /// genuinely differentiates BTN from early position at both table sizes.
+    #[test]
+    fn every_archetype_is_position_aware() {
+        for profile in builtin_standard_pool() {
+            if profile.name == "joker" {
+                // JokerDecider ignores its own profile; it morphs into a
+                // (playbook-bearing) standard profile each hand.
+                assert!(profile.playbook.is_none());
+                continue;
+            }
+            let pb = profile
+                .playbook
+                .as_ref()
+                .unwrap_or_else(|| panic!("{} should carry a playbook", profile.name));
+            for seats in [6u8, 9u8] {
+                assert!(
+                    pb.for_seats(seats).is_some(),
+                    "{} playbook missing a {seats}-max entry",
+                    profile.name
+                );
+            }
+            // Data-level divergence: the button plays more aggressively than
+            // the earliest position at both table sizes.
+            let btn9 = profile.betting_for(9, Position::BTN).aggression_factor;
+            let utg9 = profile.betting_for(9, Position::UTG).aggression_factor;
+            assert!(
+                btn9 > utg9,
+                "{}: 9-max BTN aggression ({btn9:?}) should exceed UTG ({utg9:?})",
+                profile.name
+            );
+            let btn6 = profile.betting_for(6, Position::BTN).aggression_factor;
+            let lj6 = profile.betting_for(6, Position::LJ).aggression_factor;
+            assert!(
+                btn6 > lj6,
+                "{}: 6-max BTN aggression ({btn6:?}) should exceed LJ ({lj6:?})",
+                profile.name
+            );
+        }
+    }
+
+    /// EPIC-49 Phase 2b: every profile carries a non-empty `three_bet` range,
+    /// and every profile except `short_stack_ninja` a non-empty
+    /// `call_three_bet` (the ninja's empty call range is intentional upstream
+    /// — push-or-fold never flat-calls a 3-bet; pkcore has a test locking it).
+    /// The decider does not consult these yet (upstream pkcore EPIC-36 wires
+    /// them); carrying the data means the lineup lights up the moment it does.
+    #[test]
+    fn every_profile_carries_three_bet_ranges() {
+        for profile in builtin_standard_pool() {
+            assert!(
+                !profile.range_strategy.three_bet.trim().is_empty(),
+                "{} has an empty three_bet range",
+                profile.name
+            );
+            if profile.name != "short_stack_ninja" {
+                assert!(
+                    !profile.range_strategy.call_three_bet.trim().is_empty(),
+                    "{} has an empty call_three_bet range",
+                    profile.name
+                );
+            }
+        }
+    }
+
+    /// A fully authored 9-seat flop decision point — deal-independent (no
+    /// entropy shuffle), so the RNG seed is the only source of variation.
+    /// `logical_seat`/`dealer_button` are logical (button-relative) indices:
+    /// with the button at 0, logical seat 0 is BTN and logical seat 3 is UTG
+    /// (`Position::from_seat`, 9-max). `hole`/`to_call` shape which decider
+    /// branch runs (value-bet, bluff, or facing-a-bet).
+    fn nine_seat_snapshot(
+        logical_seat: u8,
+        hole: &str,
+        to_call: usize,
+        current_bet: usize,
+    ) -> TableSnapshot<'static> {
+        let stacks: Vec<SeatInfo> = (0..9u8)
+            .map(|i| SeatInfo {
+                id: uuid::Uuid::from_u128(u128::from(i) + 1),
+                seat: i,
+                name: format!("seat{i}"),
+                chips: 9_800,
+                bet: if i == 4 { current_bet } else { 0 },
+                is_active: true,
+            })
+            .collect();
+        TableSnapshot {
+            seat: logical_seat,
+            phase: GamePhase::Flop,
+            board: "Ks 7h 2c".parse().expect("valid board"),
+            hole_cards: hole.parse().expect("valid hole cards"),
+            pot: 300,
+            to_call,
+            current_bet,
+            min_raise: 100,
+            my_chips: 9_800,
+            stacks,
+            big_blind: 100,
+            betting_structure: BettingStructure::NoLimit,
+            bet_tier: BetTier::Small,
+            checked_this_street: false,
+            dealer_button: Some(0),
+            seat_count: 9,
+            logical_seat: Some(logical_seat),
+            opponent_stats: None,
+        }
+    }
+
+    /// EPIC-49 Phase 2c: for each newly position-aware archetype, the decider's
+    /// action stream as BTN differs from its stream as UTG on otherwise
+    /// identical state. Two authored spots cover the graded knobs: a weak hand
+    /// with no bet to face (bluff-frequency window) and a strong hand facing a
+    /// bet (raise-probability window — the path that moves abc, whose bluff
+    /// frequency is 0 everywhere). Seeded sweep ⇒ deterministic, never flaky.
+    #[test]
+    fn btn_and_utg_decisions_diverge_for_each_archetype() {
+        let pool = builtin_standard_pool();
+        let rule = RuleBasedDecider;
+
+        for name in GRADED_ARCHETYPES {
+            let profile = pool
+                .iter()
+                .find(|p| p.name == name)
+                .unwrap_or_else(|| panic!("{name} missing from pool"));
+
+            // Position::from_seat(9-max, button at logical 0): offset 0 = BTN,
+            // offset 3 = UTG.
+            let spots = [
+                ("weak hand, unopened pot", "4d 3s", 0usize, 0usize),
+                ("strong hand facing a bet", "Ad Kd", 100, 100),
+            ];
+
+            let mut diverged = false;
+            for (label, hole, to_call, current_bet) in spots {
+                let snap_btn = nine_seat_snapshot(0, hole, to_call, current_bet);
+                let snap_utg = nine_seat_snapshot(3, hole, to_call, current_bet);
+                assert_eq!(snap_btn.position(), Some(Position::BTN), "{label}");
+                assert_eq!(snap_utg.position(), Some(Position::UTG), "{label}");
+
+                let actions = |snap: &TableSnapshot| -> Vec<PlayerAction> {
+                    (0u64..512)
+                        .map(|seed| {
+                            rule.decide_seeded(
+                                profile,
+                                snap,
+                                &mut SmallRng::seed_from_u64(seed),
+                            )
+                        })
+                        .collect()
+                };
+                if actions(&snap_btn) != actions(&snap_utg) {
+                    diverged = true;
+                    break;
+                }
+            }
+
+            assert!(
+                diverged,
+                "{name}: BTN and UTG produced identical action streams in every \
+                 authored spot — position awareness is not reaching the decider"
+            );
+        }
     }
 }

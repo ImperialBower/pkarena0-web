@@ -128,11 +128,19 @@
           </label>
         </div>
         <div class="toggle-row">
-          <span title="Bots adapt to how you play once they've seen enough hands. Applies on the next New Game / Start Arena.">Adaptive bots</span>
+          <span title="Bots adapt to how you play once they've seen enough hands. Applies on the next New Game / Start Arena. On the Weak difficulty adaptation is always off.">Adaptive bots</span>
           <label class="toggle">
             <input type="checkbox" id="adaptive-toggle">
             <span class="toggle-track"></span>
           </label>
+        </div>
+        <div class="toggle-row">
+          <span title="Bot lineup strength. Weak: spewy bots that bluff too much and never press an edge. Standard: the full archetype lineup, position-aware. Strong: tight, disciplined regulars that punish loose play. Applies on the next New Game / Start Arena.">Bot difficulty</span>
+          <select id="difficulty-select">
+            <option value="weak">Weak</option>
+            <option value="standard" selected>Standard</option>
+            <option value="strong">Strong</option>
+          </select>
         </div>
         <button id="audio-test-btn" style="font-size:11px;padding:6px 10px;background:#1a2a3e;border:1px solid #4a90d9;color:#7ab8f5;border-radius:4px;cursor:pointer;">Test voice</button>
         <div id="audio-status" style="font-size:11px;color:#669;min-height:14px;"></div>

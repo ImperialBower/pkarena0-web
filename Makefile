@@ -1,4 +1,4 @@
-.PHONY: help build serve kill build-release clean install-playwright test test-ui validate-bots ayce default
+.PHONY: help build serve kill build-release clean install-playwright test test-ui validate-bots bench-tiers ayce default
 
 # Default target
 default: ayce
@@ -13,6 +13,7 @@ help:
 	@echo "  clean               cargo clean + remove www/pkg/"
 	@echo "  install-playwright  npm install + playwright install chromium"
 	@echo "  validate-bots       parse + validate embedded data/bots/*.yaml"
+	@echo "  bench-tiers         chips/100 ordering bench: weak < standard < strong"
 	@echo "  test                validate-bots + dev build + playwright tests"
 	@echo "  test-ui             dev build + playwright interactive UI"
 
@@ -38,9 +39,16 @@ install-playwright:
 	npx playwright install chromium
 
 # Parse + validate the embedded bot-lineup YAML (EPIC-49). Fails the build if a
-# profile can't deserialize or the standard bundle drifts from the code default.
+# profile can't deserialize or any bundle drifts from its code pool.
 validate-bots:
 	cargo test --lib bot_bundle
+
+# EPIC-49 Phase 3 acceptance bench: seeded-decider (entropy-dealt) matchups
+# asserting the chips/100 ordering weak < standard < strong with statistical
+# margin. Release mode; ~15s. Not in the default fast suite — the deal RNG is
+# entropy (pkcore has no seeded deck), so this is a bench, not a unit test.
+bench-tiers:
+	cargo test --release --lib difficulty_ordering -- --ignored --nocapture --test-threads=2
 
 test: validate-bots build
 	npx playwright test

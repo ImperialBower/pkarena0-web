@@ -17,48 +17,53 @@ profiles:
     - 1/1
   playbook:
     entries:
-      6:
+      9:
         position_ranges:
           ranges:
-            CO:
+            UTGP1:
               actions:
-                open_raise: 66+, A9s+, KTs+, QTs+, JTs, T9s, ATo+, KJo+
-                three_bet: QQ+, AQs+, AKo
-            LJ:
-              actions:
+                open_raise: TT+, AQs+, KQs, AKo
                 three_bet: QQ+, AKs
-                open_raise: TT+, AQs+, KQs, AQo+
-            BB:
+            HJ:
               actions:
+                open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
                 three_bet: QQ+, AQs+, AKo
-                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+, J9o+
             SB:
               actions:
-                open_raise: 33+, A4s+, K9s+, Q9s+, J9s+, T9s, A8o+, KJo+
-                three_bet: JJ+, AJs+, KQs, AQo+
-            HJ:
+                open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
+                three_bet: JJ+, AQs+, AQo+
+            EP:
+              actions:
+                open_raise: 99+, AJs+, KQs, AQo+
+                three_bet: QQ+, AKs, AKo
+            BB:
+              actions:
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
+                three_bet: QQ+, AKs, AKo
+            CO:
+              actions:
+                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
+                three_bet: QQ+, AQs+, AKo
+            BTN:
+              actions:
+                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
+                three_bet: QQ+, AJs+, KQs, AQo+
+            LJ:
               actions:
                 open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
                 three_bet: QQ+, AKs, AKo
-            BTN:
+            UTG:
               actions:
-                open_raise: 22+, A2s+, K9s+, Q9s+, J8s+, T8s+, 98s, A8o+, KTo+
-                three_bet: QQ+, AJs+, KQs, AQo+
+                open_raise: JJ+, AKs, AKo
+                three_bet: KK+
           default:
             actions: {}
         positional_betting:
           betting:
-            BTN:
-              aggression_factor: 60
-              bluff_frequency: 38
-              check_raise_frequency: 18
-              preferred_bet_sizes:
-              - 1/3
-              - 1/1
-            SB:
+            BB:
               aggression_factor: 50
-              bluff_frequency: 33
-              check_raise_frequency: 14
+              bluff_frequency: 30
+              check_raise_frequency: 20
               preferred_bet_sizes:
               - 1/3
               - 1/1
@@ -69,10 +74,97 @@ profiles:
               preferred_bet_sizes:
               - 1/3
               - 1/1
-            HJ:
+            UTG:
+              aggression_factor: 38
+              bluff_frequency: 22
+              check_raise_frequency: 8
+              preferred_bet_sizes:
+              - 1/3
+              - 1/1
+            EP:
+              aggression_factor: 42
+              bluff_frequency: 26
+              check_raise_frequency: 10
+              preferred_bet_sizes:
+              - 1/3
+              - 1/1
+            SB:
               aggression_factor: 48
               bluff_frequency: 30
               check_raise_frequency: 13
+              preferred_bet_sizes:
+              - 1/3
+              - 1/1
+            UTGP1:
+              aggression_factor: 40
+              bluff_frequency: 24
+              check_raise_frequency: 9
+              preferred_bet_sizes:
+              - 1/3
+              - 1/1
+            BTN:
+              aggression_factor: 60
+              bluff_frequency: 38
+              check_raise_frequency: 18
+              preferred_bet_sizes:
+              - 1/3
+              - 1/1
+            HJ:
+              aggression_factor: 47
+              bluff_frequency: 30
+              check_raise_frequency: 13
+              preferred_bet_sizes:
+              - 1/3
+              - 1/1
+            LJ:
+              aggression_factor: 44
+              bluff_frequency: 28
+              check_raise_frequency: 11
+              preferred_bet_sizes:
+              - 1/3
+              - 1/1
+          default:
+            aggression_factor: 50
+            bluff_frequency: 33
+            check_raise_frequency: 15
+            preferred_bet_sizes:
+            - 1/3
+            - 1/1
+      6:
+        position_ranges:
+          ranges:
+            SB:
+              actions:
+                open_raise: 33+, A4s+, K9s+, Q9s+, J9s+, T9s, A8o+, KJo+
+                three_bet: JJ+, AJs+, KQs, AQo+
+            CO:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 66+, A9s+, KTs+, QTs+, JTs, T9s, ATo+, KJo+
+            LJ:
+              actions:
+                open_raise: TT+, AQs+, KQs, AQo+
+                three_bet: QQ+, AKs
+            HJ:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+            BTN:
+              actions:
+                three_bet: QQ+, AJs+, KQs, AQo+
+                open_raise: 22+, A2s+, K9s+, Q9s+, J8s+, T8s+, 98s, A8o+, KTo+
+            BB:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+, J9o+
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            SB:
+              aggression_factor: 50
+              bluff_frequency: 33
+              check_raise_frequency: 14
               preferred_bet_sizes:
               - 1/3
               - 1/1
@@ -90,95 +182,10 @@ profiles:
               preferred_bet_sizes:
               - 1/3
               - 1/1
-          default:
-            aggression_factor: 50
-            bluff_frequency: 33
-            check_raise_frequency: 15
-            preferred_bet_sizes:
-            - 1/3
-            - 1/1
-      9:
-        position_ranges:
-          ranges:
-            UTG:
-              actions:
-                open_raise: JJ+, AKs, AKo
-                three_bet: KK+
-            UTGP1:
-              actions:
-                three_bet: QQ+, AKs
-                open_raise: TT+, AQs+, KQs, AKo
-            LJ:
-              actions:
-                three_bet: QQ+, AKs, AKo
-                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
             HJ:
-              actions:
-                open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
-                three_bet: QQ+, AQs+, AKo
-            SB:
-              actions:
-                three_bet: JJ+, AQs+, AQo+
-                open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
-            BB:
-              actions:
-                three_bet: QQ+, AKs, AKo
-                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
-            CO:
-              actions:
-                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
-                three_bet: QQ+, AQs+, AKo
-            EP:
-              actions:
-                three_bet: QQ+, AKs, AKo
-                open_raise: 99+, AJs+, KQs, AQo+
-            BTN:
-              actions:
-                three_bet: QQ+, AJs+, KQs, AQo+
-                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
-          default:
-            actions: {}
-        positional_betting:
-          betting:
-            EP:
-              aggression_factor: 42
-              bluff_frequency: 26
-              check_raise_frequency: 10
-              preferred_bet_sizes:
-              - 1/3
-              - 1/1
-            UTGP1:
-              aggression_factor: 40
-              bluff_frequency: 24
-              check_raise_frequency: 9
-              preferred_bet_sizes:
-              - 1/3
-              - 1/1
-            SB:
               aggression_factor: 48
               bluff_frequency: 30
               check_raise_frequency: 13
-              preferred_bet_sizes:
-              - 1/3
-              - 1/1
-            BB:
-              aggression_factor: 50
-              bluff_frequency: 30
-              check_raise_frequency: 20
-              preferred_bet_sizes:
-              - 1/3
-              - 1/1
-            UTG:
-              aggression_factor: 38
-              bluff_frequency: 22
-              check_raise_frequency: 8
-              preferred_bet_sizes:
-              - 1/3
-              - 1/1
-            BTN:
-              aggression_factor: 60
-              bluff_frequency: 38
-              check_raise_frequency: 18
               preferred_bet_sizes:
               - 1/3
               - 1/1
@@ -189,17 +196,10 @@ profiles:
               preferred_bet_sizes:
               - 1/3
               - 1/1
-            HJ:
-              aggression_factor: 47
-              bluff_frequency: 30
-              check_raise_frequency: 13
-              preferred_bet_sizes:
-              - 1/3
-              - 1/1
-            LJ:
-              aggression_factor: 44
-              bluff_frequency: 28
-              check_raise_frequency: 11
+            BTN:
+              aggression_factor: 60
+              bluff_frequency: 38
+              check_raise_frequency: 18
               preferred_bet_sizes:
               - 1/3
               - 1/1
@@ -226,17 +226,94 @@ profiles:
     - 1/2
   playbook:
     entries:
+      6:
+        position_ranges:
+          ranges:
+            SB:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: TT+, AQs+, AQo+
+            LJ:
+              actions:
+                open_raise: QQ+, AKs, AKo
+                three_bet: KK+
+            CO:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: TT+, AQs+, AQo+
+            BB:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: 22+, A2s+, K8s+, Q9s+, ATo+
+            HJ:
+              actions:
+                three_bet: KK+
+                open_raise: QQ+, AKs, AKo
+            BTN:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            BTN:
+              aggression_factor: 32
+              bluff_frequency: 8
+              check_raise_frequency: 5
+              preferred_bet_sizes:
+              - 1/2
+            SB:
+              aggression_factor: 24
+              bluff_frequency: 5
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
+            BB:
+              aggression_factor: 23
+              bluff_frequency: 5
+              check_raise_frequency: 4
+              preferred_bet_sizes:
+              - 1/2
+            CO:
+              aggression_factor: 24
+              bluff_frequency: 5
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
+            LJ:
+              aggression_factor: 21
+              bluff_frequency: 4
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
+            HJ:
+              aggression_factor: 22
+              bluff_frequency: 4
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
+          default:
+            aggression_factor: 25
+            bluff_frequency: 5
+            check_raise_frequency: 3
+            preferred_bet_sizes:
+            - 1/2
       9:
         position_ranges:
           ranges:
+            UTGP1:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: TT+, AQs+, KQs, AKo
+            LJ:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
             CO:
               actions:
-                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
                 three_bet: QQ+, AQs+, AKo
-            BTN:
-              actions:
-                three_bet: QQ+, AJs+, KQs, AQo+
-                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
+                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
             BB:
               actions:
                 open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
@@ -245,67 +322,80 @@ profiles:
               actions:
                 open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
                 three_bet: QQ+, AQs+, AKo
-            SB:
+            UTG:
               actions:
-                open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
-                three_bet: JJ+, AQs+, AQo+
-            UTGP1:
-              actions:
-                open_raise: TT+, AQs+, KQs, AKo
-                three_bet: QQ+, AKs
+                open_raise: JJ+, AKs, AKo
+                three_bet: KK+
             EP:
               actions:
                 open_raise: 99+, AJs+, KQs, AQo+
                 three_bet: QQ+, AKs, AKo
-            LJ:
-              actions:
-                three_bet: QQ+, AKs, AKo
-                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
-            UTG:
-              actions:
-                three_bet: KK+
-                open_raise: JJ+, AKs, AKo
-          default:
-            actions: {}
-        positional_betting:
-          betting: {}
-          default:
-            aggression_factor: 25
-            bluff_frequency: 5
-            check_raise_frequency: 3
-            preferred_bet_sizes:
-            - 1/2
-      6:
-        position_ranges:
-          ranges:
-            LJ:
-              actions:
-                open_raise: QQ+, AKs, AKo
-                three_bet: KK+
-            BB:
-              actions:
-                open_raise: 22+, A2s+, K8s+, Q9s+, ATo+
-                three_bet: QQ+, AKs
-            BTN:
-              actions:
-                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
-                three_bet: QQ+, AKs, AKo
             SB:
               actions:
-                three_bet: QQ+, AKs
-                open_raise: TT+, AQs+, AQo+
-            CO:
+                open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
+                three_bet: JJ+, AQs+, AQo+
+            BTN:
               actions:
-                three_bet: QQ+, AKs
-                open_raise: TT+, AQs+, AQo+
-            HJ:
-              actions:
-                three_bet: KK+
-                open_raise: QQ+, AKs, AKo
+                three_bet: QQ+, AJs+, KQs, AQo+
+                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
           default:
             actions: {}
         positional_betting:
-          betting: {}
+          betting:
+            LJ:
+              aggression_factor: 21
+              bluff_frequency: 4
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
+            EP:
+              aggression_factor: 20
+              bluff_frequency: 4
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            SB:
+              aggression_factor: 24
+              bluff_frequency: 5
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
+            BTN:
+              aggression_factor: 32
+              bluff_frequency: 8
+              check_raise_frequency: 5
+              preferred_bet_sizes:
+              - 1/2
+            HJ:
+              aggression_factor: 22
+              bluff_frequency: 4
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
+            UTG:
+              aggression_factor: 18
+              bluff_frequency: 3
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            BB:
+              aggression_factor: 23
+              bluff_frequency: 5
+              check_raise_frequency: 4
+              preferred_bet_sizes:
+              - 1/2
+            UTGP1:
+              aggression_factor: 19
+              bluff_frequency: 3
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            CO:
+              aggression_factor: 24
+              bluff_frequency: 5
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
           default:
             aggression_factor: 25
             bluff_frequency: 5
@@ -334,20 +424,16 @@ profiles:
           ranges:
             BB:
               actions:
-                three_bet: QQ+, AQs+, A5s, A4s, AQo+
                 open_raise: 22+, A2s+, K2s+, Q6s+, J7s+, T7s+, A2o+, K7o+, Q8o+
-            HJ:
+                three_bet: QQ+, AQs+, A5s, A4s, AQo+
+            BTN:
               actions:
-                three_bet: QQ+, AJs+, AQo+
-                open_raise: 44+, A9s+, K9s+, Q9s+, J9s+, T9s, ATo+, KJo+
+                three_bet: QQ+, AJs+, KQs, A5s, A4s, AQo+
+                open_raise: 22+, A2s+, K5s+, Q7s+, J7s+, T7s+, 97s+, 87s, A6o+, K9o+, QTo+
             LJ:
               actions:
                 three_bet: QQ+, AQs+, AKo
                 open_raise: 55+, ATs+, KJs+, QJs, JTs, AJo+, KQo
-            BTN:
-              actions:
-                open_raise: 22+, A2s+, K5s+, Q7s+, J7s+, T7s+, 97s+, 87s, A6o+, K9o+, QTo+
-                three_bet: QQ+, AJs+, KQs, A5s, A4s, AQo+
             SB:
               actions:
                 open_raise: 22+, A2s+, K7s+, Q8s+, J8s+, A5o+, KTo+
@@ -356,14 +442,18 @@ profiles:
               actions:
                 open_raise: 22+, A7s+, K8s+, Q8s+, J8s+, T8s+, 98s, A9o+, KTo+
                 three_bet: QQ+, AJs+, KQs, AQo+
+            HJ:
+              actions:
+                three_bet: QQ+, AJs+, AQo+
+                open_raise: 44+, A9s+, K9s+, Q9s+, J9s+, T9s, ATo+, KJo+
           default:
             actions: {}
         positional_betting:
           betting:
-            LJ:
-              aggression_factor: 65
-              bluff_frequency: 30
-              check_raise_frequency: 18
+            BTN:
+              aggression_factor: 80
+              bluff_frequency: 40
+              check_raise_frequency: 25
               preferred_bet_sizes:
               - 2/3
               - 1/1
@@ -374,13 +464,6 @@ profiles:
               preferred_bet_sizes:
               - 2/3
               - 1/1
-            HJ:
-              aggression_factor: 68
-              bluff_frequency: 33
-              check_raise_frequency: 20
-              preferred_bet_sizes:
-              - 2/3
-              - 1/1
             CO:
               aggression_factor: 72
               bluff_frequency: 36
@@ -388,10 +471,17 @@ profiles:
               preferred_bet_sizes:
               - 2/3
               - 1/1
-            BTN:
-              aggression_factor: 80
-              bluff_frequency: 40
-              check_raise_frequency: 25
+            LJ:
+              aggression_factor: 65
+              bluff_frequency: 30
+              check_raise_frequency: 18
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            HJ:
+              aggression_factor: 68
+              bluff_frequency: 33
+              check_raise_frequency: 20
               preferred_bet_sizes:
               - 2/3
               - 1/1
@@ -414,44 +504,107 @@ profiles:
           ranges:
             LJ:
               actions:
+                three_bet: QQ+, AKs, AKo
                 open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
-                three_bet: QQ+, AKs, AKo
-            HJ:
-              actions:
-                three_bet: QQ+, AQs+, AKo
-                open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
-            BB:
-              actions:
-                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
-                three_bet: QQ+, AKs, AKo
-            UTG:
-              actions:
-                three_bet: KK+
-                open_raise: JJ+, AKs, AKo
-            BTN:
-              actions:
-                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
-                three_bet: QQ+, AJs+, KQs, AQo+
             SB:
               actions:
                 three_bet: JJ+, AQs+, AQo+
                 open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
             UTGP1:
               actions:
-                open_raise: TT+, AQs+, KQs, AKo
                 three_bet: QQ+, AKs
-            CO:
+                open_raise: TT+, AQs+, KQs, AKo
+            UTG:
               actions:
-                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
-                three_bet: QQ+, AQs+, AKo
+                open_raise: JJ+, AKs, AKo
+                three_bet: KK+
             EP:
               actions:
-                open_raise: 99+, AJs+, KQs, AQo+
                 three_bet: QQ+, AKs, AKo
+                open_raise: 99+, AJs+, KQs, AQo+
+            BTN:
+              actions:
+                three_bet: QQ+, AJs+, KQs, AQo+
+                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
+            CO:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
+            BB:
+              actions:
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
+                three_bet: QQ+, AKs, AKo
+            HJ:
+              actions:
+                open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
+                three_bet: QQ+, AQs+, AKo
           default:
             actions: {}
         positional_betting:
-          betting: {}
+          betting:
+            BTN:
+              aggression_factor: 84
+              bluff_frequency: 42
+              check_raise_frequency: 24
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            BB:
+              aggression_factor: 73
+              bluff_frequency: 34
+              check_raise_frequency: 21
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            UTG:
+              aggression_factor: 66
+              bluff_frequency: 28
+              check_raise_frequency: 16
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            SB:
+              aggression_factor: 74
+              bluff_frequency: 34
+              check_raise_frequency: 19
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            HJ:
+              aggression_factor: 73
+              bluff_frequency: 33
+              check_raise_frequency: 19
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            LJ:
+              aggression_factor: 71
+              bluff_frequency: 32
+              check_raise_frequency: 18
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            EP:
+              aggression_factor: 70
+              bluff_frequency: 31
+              check_raise_frequency: 18
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            UTGP1:
+              aggression_factor: 68
+              bluff_frequency: 29
+              check_raise_frequency: 17
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            CO:
+              aggression_factor: 76
+              bluff_frequency: 36
+              check_raise_frequency: 20
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
           default:
             aggression_factor: 75
             bluff_frequency: 35
@@ -474,6 +627,201 @@ profiles:
     preferred_bet_sizes:
     - 2/3
     - 1/1
+  playbook:
+    entries:
+      9:
+        position_ranges:
+          ranges:
+            UTG:
+              actions:
+                open_raise: JJ+, AKs, AKo
+                three_bet: KK+
+            CO:
+              actions:
+                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
+                three_bet: QQ+, AQs+, AKo
+            SB:
+              actions:
+                three_bet: JJ+, AQs+, AQo+
+                open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
+            EP:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 99+, AJs+, KQs, AQo+
+            BTN:
+              actions:
+                three_bet: QQ+, AJs+, KQs, AQo+
+                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
+            BB:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
+            HJ:
+              actions:
+                open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
+                three_bet: QQ+, AQs+, AKo
+            UTGP1:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: TT+, AQs+, KQs, AKo
+            LJ:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            SB:
+              aggression_factor: 66
+              bluff_frequency: 17
+              check_raise_frequency: 13
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            BB:
+              aggression_factor: 66
+              bluff_frequency: 18
+              check_raise_frequency: 16
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            HJ:
+              aggression_factor: 65
+              bluff_frequency: 17
+              check_raise_frequency: 13
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            UTG:
+              aggression_factor: 55
+              bluff_frequency: 12
+              check_raise_frequency: 10
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            BTN:
+              aggression_factor: 78
+              bluff_frequency: 24
+              check_raise_frequency: 18
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            EP:
+              aggression_factor: 60
+              bluff_frequency: 15
+              check_raise_frequency: 12
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            UTGP1:
+              aggression_factor: 57
+              bluff_frequency: 13
+              check_raise_frequency: 11
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            LJ:
+              aggression_factor: 62
+              bluff_frequency: 16
+              check_raise_frequency: 12
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            CO:
+              aggression_factor: 70
+              bluff_frequency: 19
+              check_raise_frequency: 15
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+          default:
+            aggression_factor: 70
+            bluff_frequency: 20
+            check_raise_frequency: 15
+            preferred_bet_sizes:
+            - 2/3
+            - 1/1
+      6:
+        position_ranges:
+          ranges:
+            BTN:
+              actions:
+                open_raise: 22+, A2s+, K9s+, Q9s+, J8s+, T8s+, 98s, A8o+, KTo+
+                three_bet: QQ+, AJs+, KQs, AQo+
+            LJ:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: TT+, AQs+, KQs, AQo+
+            HJ:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+            SB:
+              actions:
+                open_raise: 33+, A4s+, K9s+, Q9s+, J9s+, T9s, A8o+, KJo+
+                three_bet: JJ+, AJs+, KQs, AQo+
+            BB:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+, J9o+
+            CO:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 66+, A9s+, KTs+, QTs+, JTs, T9s, ATo+, KJo+
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            CO:
+              aggression_factor: 68
+              bluff_frequency: 19
+              check_raise_frequency: 14
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            LJ:
+              aggression_factor: 60
+              bluff_frequency: 15
+              check_raise_frequency: 12
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            SB:
+              aggression_factor: 68
+              bluff_frequency: 18
+              check_raise_frequency: 14
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            BB:
+              aggression_factor: 66
+              bluff_frequency: 18
+              check_raise_frequency: 16
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            BTN:
+              aggression_factor: 78
+              bluff_frequency: 24
+              check_raise_frequency: 18
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+            HJ:
+              aggression_factor: 64
+              bluff_frequency: 17
+              check_raise_frequency: 13
+              preferred_bet_sizes:
+              - 2/3
+              - 1/1
+          default:
+            aggression_factor: 70
+            bluff_frequency: 20
+            check_raise_frequency: 15
+            preferred_bet_sizes:
+            - 2/3
+            - 1/1
 - name: loose_passive
   description: Wide hand selection with passive betting — the classic calling station archetype.
   style: loose_passive
@@ -488,6 +836,184 @@ profiles:
     check_raise_frequency: 2
     preferred_bet_sizes:
     - 1/2
+  playbook:
+    entries:
+      6:
+        position_ranges:
+          ranges:
+            BTN:
+              actions:
+                open_raise: 22+, A2s+, K5s+, Q7s+, J7s+, T7s+, 97s+, 87s, A6o+, K9o+, QTo+
+                three_bet: QQ+, AJs+, KQs, A5s, A4s, AQo+
+            SB:
+              actions:
+                three_bet: JJ+, AJs+, KQs, A5s, AQo+
+                open_raise: 22+, A2s+, K7s+, Q8s+, J8s+, A5o+, KTo+
+            HJ:
+              actions:
+                open_raise: 44+, A9s+, K9s+, Q9s+, J9s+, T9s, ATo+, KJo+
+                three_bet: QQ+, AJs+, AQo+
+            LJ:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 55+, ATs+, KJs+, QJs, JTs, AJo+, KQo
+            CO:
+              actions:
+                three_bet: QQ+, AJs+, KQs, AQo+
+                open_raise: 22+, A7s+, K8s+, Q8s+, J8s+, T8s+, 98s, A9o+, KTo+
+            BB:
+              actions:
+                open_raise: 22+, A2s+, K2s+, Q6s+, J7s+, T7s+, A2o+, K7o+, Q8o+
+                three_bet: QQ+, AQs+, A5s, A4s, AQo+
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            LJ:
+              aggression_factor: 12
+              bluff_frequency: 2
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            SB:
+              aggression_factor: 14
+              bluff_frequency: 3
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            BTN:
+              aggression_factor: 20
+              bluff_frequency: 5
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
+            HJ:
+              aggression_factor: 13
+              bluff_frequency: 2
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            CO:
+              aggression_factor: 14
+              bluff_frequency: 3
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            BB:
+              aggression_factor: 13
+              bluff_frequency: 3
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+          default:
+            aggression_factor: 15
+            bluff_frequency: 3
+            check_raise_frequency: 2
+            preferred_bet_sizes:
+            - 1/2
+      9:
+        position_ranges:
+          ranges:
+            LJ:
+              actions:
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+                three_bet: QQ+, AKs, AKo
+            BTN:
+              actions:
+                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
+                three_bet: QQ+, AJs+, KQs, AQo+
+            SB:
+              actions:
+                three_bet: JJ+, AQs+, AQo+
+                open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
+            BB:
+              actions:
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
+                three_bet: QQ+, AKs, AKo
+            CO:
+              actions:
+                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
+                three_bet: QQ+, AQs+, AKo
+            HJ:
+              actions:
+                open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
+                three_bet: QQ+, AQs+, AKo
+            UTG:
+              actions:
+                three_bet: KK+
+                open_raise: JJ+, AKs, AKo
+            EP:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 99+, AJs+, KQs, AQo+
+            UTGP1:
+              actions:
+                open_raise: TT+, AQs+, KQs, AKo
+                three_bet: QQ+, AKs
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            CO:
+              aggression_factor: 15
+              bluff_frequency: 3
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            EP:
+              aggression_factor: 11
+              bluff_frequency: 2
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            HJ:
+              aggression_factor: 13
+              bluff_frequency: 3
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            BTN:
+              aggression_factor: 20
+              bluff_frequency: 5
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 1/2
+            LJ:
+              aggression_factor: 12
+              bluff_frequency: 2
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            BB:
+              aggression_factor: 13
+              bluff_frequency: 3
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+            UTG:
+              aggression_factor: 10
+              bluff_frequency: 2
+              check_raise_frequency: 1
+              preferred_bet_sizes:
+              - 1/2
+            UTGP1:
+              aggression_factor: 10
+              bluff_frequency: 2
+              check_raise_frequency: 1
+              preferred_bet_sizes:
+              - 1/2
+            SB:
+              aggression_factor: 13
+              bluff_frequency: 3
+              check_raise_frequency: 2
+              preferred_bet_sizes:
+              - 1/2
+          default:
+            aggression_factor: 15
+            bluff_frequency: 3
+            check_raise_frequency: 2
+            preferred_bet_sizes:
+            - 1/2
 - name: maniac
   description: Extreme aggressor — bets and raises relentlessly with a very high bluff frequency.
   style: maniac
@@ -503,6 +1029,201 @@ profiles:
     preferred_bet_sizes:
     - 1/1
     - 2/1
+  playbook:
+    entries:
+      9:
+        position_ranges:
+          ranges:
+            UTG:
+              actions:
+                open_raise: JJ+, AKs, AKo
+                three_bet: KK+
+            LJ:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+            CO:
+              actions:
+                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
+                three_bet: QQ+, AQs+, AKo
+            BTN:
+              actions:
+                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
+                three_bet: QQ+, AJs+, KQs, AQo+
+            SB:
+              actions:
+                three_bet: JJ+, AQs+, AQo+
+                open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
+            HJ:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
+            EP:
+              actions:
+                open_raise: 99+, AJs+, KQs, AQo+
+                three_bet: QQ+, AKs, AKo
+            UTGP1:
+              actions:
+                open_raise: TT+, AQs+, KQs, AKo
+                three_bet: QQ+, AKs
+            BB:
+              actions:
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
+                three_bet: QQ+, AKs, AKo
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            EP:
+              aggression_factor: 84
+              bluff_frequency: 48
+              check_raise_frequency: 26
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            BB:
+              aggression_factor: 88
+              bluff_frequency: 54
+              check_raise_frequency: 32
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            HJ:
+              aggression_factor: 87
+              bluff_frequency: 51
+              check_raise_frequency: 27
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            LJ:
+              aggression_factor: 85
+              bluff_frequency: 49
+              check_raise_frequency: 26
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            BTN:
+              aggression_factor: 97
+              bluff_frequency: 62
+              check_raise_frequency: 34
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            UTGP1:
+              aggression_factor: 82
+              bluff_frequency: 46
+              check_raise_frequency: 25
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            CO:
+              aggression_factor: 90
+              bluff_frequency: 54
+              check_raise_frequency: 29
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            UTG:
+              aggression_factor: 80
+              bluff_frequency: 45
+              check_raise_frequency: 24
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            SB:
+              aggression_factor: 89
+              bluff_frequency: 53
+              check_raise_frequency: 28
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+          default:
+            aggression_factor: 90
+            bluff_frequency: 55
+            check_raise_frequency: 30
+            preferred_bet_sizes:
+            - 1/1
+            - 2/1
+      6:
+        position_ranges:
+          ranges:
+            SB:
+              actions:
+                three_bet: JJ+, AJs+, KQs, A5s, AQo+
+                open_raise: 22+, A2s+, K7s+, Q8s+, J8s+, A5o+, KTo+
+            HJ:
+              actions:
+                open_raise: 44+, A9s+, K9s+, Q9s+, J9s+, T9s, ATo+, KJo+
+                three_bet: QQ+, AJs+, AQo+
+            BTN:
+              actions:
+                three_bet: QQ+, AJs+, KQs, A5s, A4s, AQo+
+                open_raise: 22+, A2s+, K5s+, Q7s+, J7s+, T7s+, 97s+, 87s, A6o+, K9o+, QTo+
+            CO:
+              actions:
+                open_raise: 22+, A7s+, K8s+, Q8s+, J8s+, T8s+, 98s, A9o+, KTo+
+                three_bet: QQ+, AJs+, KQs, AQo+
+            BB:
+              actions:
+                open_raise: 22+, A2s+, K2s+, Q6s+, J7s+, T7s+, A2o+, K7o+, Q8o+
+                three_bet: QQ+, AQs+, A5s, A4s, AQo+
+            LJ:
+              actions:
+                open_raise: 55+, ATs+, KJs+, QJs, JTs, AJo+, KQo
+                three_bet: QQ+, AQs+, AKo
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            SB:
+              aggression_factor: 90
+              bluff_frequency: 55
+              check_raise_frequency: 30
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            BB:
+              aggression_factor: 88
+              bluff_frequency: 54
+              check_raise_frequency: 32
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            LJ:
+              aggression_factor: 84
+              bluff_frequency: 48
+              check_raise_frequency: 26
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            BTN:
+              aggression_factor: 97
+              bluff_frequency: 62
+              check_raise_frequency: 34
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            CO:
+              aggression_factor: 88
+              bluff_frequency: 52
+              check_raise_frequency: 28
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            HJ:
+              aggression_factor: 86
+              bluff_frequency: 50
+              check_raise_frequency: 27
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+          default:
+            aggression_factor: 90
+            bluff_frequency: 55
+            check_raise_frequency: 30
+            preferred_bet_sizes:
+            - 1/1
+            - 2/1
 - name: abc
   description: By-the-book play — bets strong hands and folds weak ones with no deception or bluffing.
   style: abc
@@ -517,6 +1238,184 @@ profiles:
     check_raise_frequency: 5
     preferred_bet_sizes:
     - 2/3
+  playbook:
+    entries:
+      6:
+        position_ranges:
+          ranges:
+            BB:
+              actions:
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+, J9o+
+                three_bet: QQ+, AQs+, AKo
+            HJ:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+            SB:
+              actions:
+                three_bet: JJ+, AJs+, KQs, AQo+
+                open_raise: 33+, A4s+, K9s+, Q9s+, J9s+, T9s, A8o+, KJo+
+            BTN:
+              actions:
+                open_raise: 22+, A2s+, K9s+, Q9s+, J8s+, T8s+, 98s, A8o+, KTo+
+                three_bet: QQ+, AJs+, KQs, AQo+
+            CO:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 66+, A9s+, KTs+, QTs+, JTs, T9s, ATo+, KJo+
+            LJ:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: TT+, AQs+, KQs, AQo+
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            BB:
+              aggression_factor: 60
+              bluff_frequency: 0
+              check_raise_frequency: 5
+              preferred_bet_sizes:
+              - 2/3
+            HJ:
+              aggression_factor: 58
+              bluff_frequency: 0
+              check_raise_frequency: 4
+              preferred_bet_sizes:
+              - 2/3
+            CO:
+              aggression_factor: 62
+              bluff_frequency: 0
+              check_raise_frequency: 5
+              preferred_bet_sizes:
+              - 2/3
+            LJ:
+              aggression_factor: 55
+              bluff_frequency: 0
+              check_raise_frequency: 4
+              preferred_bet_sizes:
+              - 2/3
+            BTN:
+              aggression_factor: 72
+              bluff_frequency: 0
+              check_raise_frequency: 6
+              preferred_bet_sizes:
+              - 2/3
+            SB:
+              aggression_factor: 60
+              bluff_frequency: 0
+              check_raise_frequency: 5
+              preferred_bet_sizes:
+              - 2/3
+          default:
+            aggression_factor: 65
+            bluff_frequency: 0
+            check_raise_frequency: 5
+            preferred_bet_sizes:
+            - 2/3
+      9:
+        position_ranges:
+          ranges:
+            SB:
+              actions:
+                three_bet: JJ+, AQs+, AQo+
+                open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
+            BB:
+              actions:
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
+                three_bet: QQ+, AKs, AKo
+            UTGP1:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: TT+, AQs+, KQs, AKo
+            HJ:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
+            BTN:
+              actions:
+                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
+                three_bet: QQ+, AJs+, KQs, AQo+
+            UTG:
+              actions:
+                three_bet: KK+
+                open_raise: JJ+, AKs, AKo
+            LJ:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+            EP:
+              actions:
+                open_raise: 99+, AJs+, KQs, AQo+
+                three_bet: QQ+, AKs, AKo
+            CO:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            EP:
+              aggression_factor: 52
+              bluff_frequency: 0
+              check_raise_frequency: 4
+              preferred_bet_sizes:
+              - 2/3
+            BTN:
+              aggression_factor: 72
+              bluff_frequency: 0
+              check_raise_frequency: 6
+              preferred_bet_sizes:
+              - 2/3
+            UTG:
+              aggression_factor: 48
+              bluff_frequency: 0
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 2/3
+            LJ:
+              aggression_factor: 55
+              bluff_frequency: 0
+              check_raise_frequency: 4
+              preferred_bet_sizes:
+              - 2/3
+            HJ:
+              aggression_factor: 58
+              bluff_frequency: 0
+              check_raise_frequency: 4
+              preferred_bet_sizes:
+              - 2/3
+            UTGP1:
+              aggression_factor: 50
+              bluff_frequency: 0
+              check_raise_frequency: 3
+              preferred_bet_sizes:
+              - 2/3
+            CO:
+              aggression_factor: 63
+              bluff_frequency: 0
+              check_raise_frequency: 5
+              preferred_bet_sizes:
+              - 2/3
+            SB:
+              aggression_factor: 58
+              bluff_frequency: 0
+              check_raise_frequency: 4
+              preferred_bet_sizes:
+              - 2/3
+            BB:
+              aggression_factor: 60
+              bluff_frequency: 0
+              check_raise_frequency: 5
+              preferred_bet_sizes:
+              - 2/3
+          default:
+            aggression_factor: 65
+            bluff_frequency: 0
+            check_raise_frequency: 5
+            preferred_bet_sizes:
+            - 2/3
 - name: short_stack_ninja
   description: Push-or-fold strategy optimized for short stack situations — all-in or nothing.
   style: short_stack_ninja
@@ -532,6 +1431,201 @@ profiles:
     preferred_bet_sizes:
     - 1/1
     - 2/1
+  playbook:
+    entries:
+      6:
+        position_ranges:
+          ranges:
+            HJ:
+              actions:
+                open_raise: QQ+, AKs, AKo
+                three_bet: KK+
+            LJ:
+              actions:
+                three_bet: KK+
+                open_raise: QQ+, AKs, AKo
+            CO:
+              actions:
+                open_raise: TT+, AQs+, AQo+
+                three_bet: QQ+, AKs
+            SB:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: TT+, AQs+, AQo+
+            BB:
+              actions:
+                open_raise: 22+, A2s+, K8s+, Q9s+, ATo+
+                three_bet: QQ+, AKs
+            BTN:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            LJ:
+              aggression_factor: 88
+              bluff_frequency: 38
+              check_raise_frequency: 34
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            CO:
+              aggression_factor: 93
+              bluff_frequency: 43
+              check_raise_frequency: 38
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            SB:
+              aggression_factor: 95
+              bluff_frequency: 45
+              check_raise_frequency: 40
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            HJ:
+              aggression_factor: 90
+              bluff_frequency: 40
+              check_raise_frequency: 36
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            BB:
+              aggression_factor: 94
+              bluff_frequency: 46
+              check_raise_frequency: 42
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            BTN:
+              aggression_factor: 100
+              bluff_frequency: 52
+              check_raise_frequency: 44
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+          default:
+            aggression_factor: 95
+            bluff_frequency: 45
+            check_raise_frequency: 40
+            preferred_bet_sizes:
+            - 1/1
+            - 2/1
+      9:
+        position_ranges:
+          ranges:
+            UTG:
+              actions:
+                open_raise: JJ+, AKs, AKo
+                three_bet: KK+
+            EP:
+              actions:
+                open_raise: 99+, AJs+, KQs, AQo+
+                three_bet: QQ+, AKs, AKo
+            LJ:
+              actions:
+                open_raise: 88+, ATs+, KJs+, QJs, AJo+, KQo
+                three_bet: QQ+, AKs, AKo
+            HJ:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 77+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+
+            UTGP1:
+              actions:
+                three_bet: QQ+, AKs
+                open_raise: TT+, AQs+, KQs, AKo
+            SB:
+              actions:
+                three_bet: JJ+, AQs+, AQo+
+                open_raise: 33+, A3s+, K8s+, Q9s+, J9s+, T9s, A7o+, KTo+, QJo
+            BTN:
+              actions:
+                open_raise: 22+, A2s+, K7s+, Q8s+, J7s+, T8s+, 97s+, 87s, A7o+, KTo+, QJo
+                three_bet: QQ+, AJs+, KQs, AQo+
+            BB:
+              actions:
+                three_bet: QQ+, AKs, AKo
+                open_raise: 22+, A2s+, K2s+, Q8s+, J8s+, T7s+, 97s+, A2o+, K8o+, Q9o+
+            CO:
+              actions:
+                three_bet: QQ+, AQs+, AKo
+                open_raise: 55+, A8s+, K9s+, Q9s+, JTs, T9s, 98s, ATo+, KJo+
+          default:
+            actions: {}
+        positional_betting:
+          betting:
+            SB:
+              aggression_factor: 94
+              bluff_frequency: 44
+              check_raise_frequency: 39
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            UTGP1:
+              aggression_factor: 84
+              bluff_frequency: 36
+              check_raise_frequency: 32
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            LJ:
+              aggression_factor: 88
+              bluff_frequency: 39
+              check_raise_frequency: 34
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            BTN:
+              aggression_factor: 100
+              bluff_frequency: 52
+              check_raise_frequency: 44
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            HJ:
+              aggression_factor: 90
+              bluff_frequency: 41
+              check_raise_frequency: 36
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            UTG:
+              aggression_factor: 82
+              bluff_frequency: 34
+              check_raise_frequency: 30
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            BB:
+              aggression_factor: 94
+              bluff_frequency: 46
+              check_raise_frequency: 42
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            EP:
+              aggression_factor: 86
+              bluff_frequency: 38
+              check_raise_frequency: 33
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+            CO:
+              aggression_factor: 93
+              bluff_frequency: 44
+              check_raise_frequency: 38
+              preferred_bet_sizes:
+              - 1/1
+              - 2/1
+          default:
+            aggression_factor: 95
+            bluff_frequency: 45
+            check_raise_frequency: 40
+            preferred_bet_sizes:
+            - 1/1
+            - 2/1
 - name: joker
   description: Randomly adopts a different playing style each hand — unpredictable by design.
   style: joker
