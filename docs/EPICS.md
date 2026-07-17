@@ -53,6 +53,7 @@ Phase 0: no panic, serial fallback confirmed, budget set at 500 MC samples.
 | [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) | Adaptive Bots — Player Stats & Exploitative Play | 46 | **Closed 2026-07-16** — Phases 1–4 complete; trained-`ExploitConfig` YAML deferred until an EPIC-28 artifact exists |
 | [EPIC-48](EPIC-48_Real_Equity_WASM.md) | Real Equity in the Browser | 46; upstream pkcore EPIC-36 | **Closed 2026-07-16** — Phase 0 delivered (500-sample MC budget, probe removed); Phases 1–2 deferred to a follow-up EPIC, now **unblocked**: upstream EPIC-36 shipped the `equity` knob 2026-07-17 |
 | [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47) | **Closed 2026-07-16** — Phases 1–3 complete (three parity-gated bundles, position awareness for all, difficulty selector, chips/100 bench `make bench-tiers`); `decision:`-knob adoption deferred to EPIC-48's follow-up, now **unblocked** (upstream EPIC-36 shipped 2026-07-17) |
+| [EPIC-50](EPIC-50_Decision_Knob_Adoption.md) | Decision-Knob Difficulty Adoption | 48, 49 (pkcore 0.3.0) | **Open** — the EPIC-48/49 follow-up: adopt `equity` / `ranges` / `pot_odds` knobs into the standard/strong bundles, land browser-equity validation, re-scope `strengthen()`. Phase 0 (dep bump) done; Phases 1–4 planned. `outs`/`preflop_charts`/tier-lever `exploit` out of scope |
 
 Suggested order — **completed as planned**: 46 → 47 → 48 Phase 0 →
 49 Phases 1–3. The one remaining thread — upstream pkcore EPIC-36 — **shipped
