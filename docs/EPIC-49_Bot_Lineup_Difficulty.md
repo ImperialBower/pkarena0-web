@@ -18,7 +18,7 @@ follow-up, with the bundles already structured to receive it.
 | Position awareness: `Playbook` attached to all archetypes | **Complete** (`attach_archetype_playbook`, `src/lib.rs`; seeded BTN≠UTG test per archetype) |
 | Difficulty selector UI → profile bundle (weak / standard / strong) | **Complete** (`#difficulty-select` in Settings; `set_difficulty` / `get_state().difficulty`) |
 | Difficulty honesty: chips/100 ordering weak < standard < strong | **Complete** (`difficulty_ordering_tests`; `make bench-tiers`) |
-| Strong bundle consumes EPIC-36 `decision:` knobs | **Deferred** (upstream EPIC-36 still Planned; interim strong = `strengthen()` — see corrigendum) |
+| Strong bundle consumes EPIC-36 `decision:` knobs | **Deferred** (interim strong = `strengthen()` — see corrigendum). Upstream EPIC-36 shipped 2026-07-17 (`equity`/`ranges`/`pot_odds`/`exploit` wired; `outs`/`preflop_charts` deferred upstream), so this adoption is now unblocked as the EPIC-48 follow-up. |
 | Arena mode chips/100 report (exportable) | **Complete** (`session_report` in `get_state()`; arena hand-log leaderboard at session end) |
 
 **Depends on:** [EPIC-46](EPIC-46_Decider_Integration.md).

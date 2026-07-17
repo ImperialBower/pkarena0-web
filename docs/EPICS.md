@@ -30,11 +30,11 @@ table, given pkcore 0.2.1's shipped capabilities:
 | `PlayerStats` / `StatsRegistry` (EPIC-26) | Complete | ✗ (`player-stats` feature off; hand histories carry no UUIDs) | [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) |
 | `ExploitativeDecider` + `ExploitConfig` (EPIC-27/28) | Complete | ✗ (nothing to wrap; no stats attached) | [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) |
 | Multi-way `EquityRequest` engine (exact + seeded MC) | Complete (`equity` feature) | ✗ (bots use hand-rank proxy / preflop coin-flip) | [EPIC-48](EPIC-48_Real_Equity_WASM.md) |
-| `Outs`/`CaseEvals` draw equity, graded `PotOdds` discipline | Complete (wiring = upstream EPIC-36) | ✗ | [EPIC-48](EPIC-48_Real_Equity_WASM.md) |
+| `Outs`/`CaseEvals` draw equity, graded `PotOdds` discipline | Upstream EPIC-36 (2026-07-17): graded `PotOdds` discipline **wired**; `Outs`/`CaseEvals` draw equity **deferred upstream** (needs villain cards the decider never sees) | ✗ | [EPIC-48](EPIC-48_Real_Equity_WASM.md) |
 | Embedded HUP preflop odds (`hup_cache`, wasm-safe) | Complete | ✗ | [EPIC-48](EPIC-48_Real_Equity_WASM.md) |
 | `Playbook` / `PositionRanges` position awareness | Complete | Partial (3 of 8 archetypes) | [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) |
 | `BotProfile` YAML round-trip (`bot-profiles`) | Complete | ✗ (feature on, never used — lineup hardcoded) | [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) |
-| Graded `decision:` capability knobs | **EPIC-36: Planned upstream** | — | [EPIC-48](EPIC-48_Real_Equity_WASM.md) / [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) adopt on release |
+| Graded `decision:` capability knobs | **EPIC-36: shipped upstream in pkcore 0.3.0** (2026-07-17) — `equity` / `ranges` / `pot_odds` / `exploit` wired into `RuleBasedDecider`; `outs` + `preflop_charts` deferred upstream | — | [EPIC-48](EPIC-48_Real_Equity_WASM.md) / [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) adopt in the (now-unblocked) follow-up |
 | CFR `Solver` at runtime | Complete upstream | ✗ — **deliberately**; too slow for live play (upstream ruling) | none (non-goal) |
 | `SimTable`, `store` (SQLite/BCM), stats persistence | Complete | ✗ — **deliberately**; batch/native-only or `std::fs` (won't link on wasm) | none (non-goal) |
 
@@ -51,13 +51,19 @@ Phase 0: no panic, serial fallback confirmed, budget set at 500 MC samples.
 |---|---|---|---|
 | [EPIC-46](EPIC-46_Decider_Integration.md) | Full BotDecider Integration | — | **Closed 2026-07-16** — both phases complete; repair ladder pulled forward into scope |
 | [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) | Adaptive Bots — Player Stats & Exploitative Play | 46 | **Closed 2026-07-16** — Phases 1–4 complete; trained-`ExploitConfig` YAML deferred until an EPIC-28 artifact exists |
-| [EPIC-48](EPIC-48_Real_Equity_WASM.md) | Real Equity in the Browser | 46; upstream pkcore EPIC-36 | **Closed 2026-07-16** — Phase 0 delivered (500-sample MC budget, probe removed); Phases 1–2 deferred, reopen as a follow-up EPIC when upstream EPIC-36 ships |
-| [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47) | **Closed 2026-07-16** — Phases 1–3 complete (three parity-gated bundles, position awareness for all, difficulty selector, chips/100 bench `make bench-tiers`); EPIC-36 knob adoption deferred with EPIC-48's follow-up |
+| [EPIC-48](EPIC-48_Real_Equity_WASM.md) | Real Equity in the Browser | 46; upstream pkcore EPIC-36 | **Closed 2026-07-16** — Phase 0 delivered (500-sample MC budget, probe removed); Phases 1–2 deferred to a follow-up EPIC, now **unblocked**: upstream EPIC-36 shipped the `equity` knob 2026-07-17 |
+| [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47) | **Closed 2026-07-16** — Phases 1–3 complete (three parity-gated bundles, position awareness for all, difficulty selector, chips/100 bench `make bench-tiers`); `decision:`-knob adoption deferred to EPIC-48's follow-up, now **unblocked** (upstream EPIC-36 shipped 2026-07-17) |
 
 Suggested order — **completed as planned**: 46 → 47 → 48 Phase 0 →
-49 Phases 1–3. The one remaining thread is upstream pkcore EPIC-36: when it
-ships, a follow-up EPIC picks up EPIC-48 Phases 1–2 (equity adoption) and
-lands the `decision:` knobs in EPIC-49's bundles.
+49 Phases 1–3. The one remaining thread — upstream pkcore EPIC-36 — **shipped
+in pkcore 0.3.0** (2026-07-17: `equity` / `ranges` / `pot_odds` / `exploit`
+wired; `outs` + `preflop_charts` deferred upstream), and this repo's dependency
+is now pinned to `0.3.0` (`Cargo.toml:14`; native + `wasm32` checks pass). The
+follow-up EPIC is now unblocked: it picks up EPIC-48 Phases 1–2 (equity
+adoption) and lands the `decision:` knobs in EPIC-49's bundles. Note
+`outs`/`preflop_charts` will remain unavailable until an upstream range-model
+lets the decider price draws without villain cards — track that before scoping
+any bundle that depends on them.
 
 ## Relationship to existing docs
 

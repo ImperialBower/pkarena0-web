@@ -757,9 +757,9 @@ dependencies = [
 
 [[package]]
 name = "pkcore"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95e87238e5b4b7f5f710be6b6dc90a7557ad3117659752d3cf087378fbf02b0e"
+checksum = "4a095f13f2fc545be89f6cc20a2ed124a7eb28198d23e466e9c1273e12b8e55c"
 dependencies = [
  "bint",
  "bitvec",

@@ -18,8 +18,8 @@ ships, rather than holding this EPIC open indefinitely.
 | Enable `equity` feature in `Cargo.toml` (wasm compile pre-verified) | **Complete** (`Cargo.toml:17`) |
 | Phase 0 spike: `compute(EquityRequest)` runtime behavior in-browser | **Complete** — no panic, rayon serial-fallback confirmed (probe since removed, see corrigendum) |
 | Latency budget: MC sample count vs per-decision wall time (incl. Turbo) | **Complete** — **`fast` = 500 MC samples** (2.8 ms HU / 5.7 ms 4-way) |
-| Upstream: pkcore EPIC-36 `DecisionConfig` (`decision:` YAML knobs) | **Deferred — still Planned upstream** at close |
-| Adopt `decision: { equity: fast, outs: on, pot_odds: … }` profiles | **Deferred** (reopens with EPIC-36) |
+| Upstream: pkcore EPIC-36 `DecisionConfig` (`decision:` YAML knobs) | **Deferred** at close. Upstream EPIC-36 **shipped 2026-07-17** (`equity`/`ranges`/`pot_odds`/`exploit` wired; `outs`/`preflop_charts` deferred upstream) — the follow-up is now unblocked. |
+| Adopt `decision: { equity: fast, pot_odds: … }` profiles | **Deferred** (reopens now that EPIC-36 shipped). Note `outs` is deferred upstream, so the adopted profile drops `outs: on` until an upstream range-model lands. |
 | Embedded HUP preflop odds (`hup_cache::lookup_odds`, wasm-safe) evaluation | **Deferred** (reopens with EPIC-36) |
 | Playwright: game-speed regression at Turbo with equity on | **Deferred** (nothing calls `compute()` in live play yet — the regression is vacuous until adoption) |
 
