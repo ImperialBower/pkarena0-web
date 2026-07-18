@@ -8,15 +8,21 @@ import { startGame, waitForHumanTurn } from './helpers';
 // during play" bug.
 test('bot action lines never reveal hole cards during play', async ({ page }) => {
   test.setTimeout(120_000);
-  await startGame(page, 0.42);          // deterministic seed → reaches showdowns
+  await startGame(page, 0.42);
   await page.click('#log-toggle');
-  // page.$eval runs the fn against the DOM element (Playwright API), not JS eval().
-  await page.$eval('#speed-slider', (el: HTMLInputElement) => {
-    el.value = '10';                    // Turbo, so a multi-hand call-down fits the budget
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  // Zero the human-facing pacing delays. Each bot action is otherwise gated by a
+  // real-time setTimeout (BOT_ACTION_MS is 75ms even at the Turbo slider preset);
+  // a hero call-down plays hundreds of bot actions across a variable number of
+  // hands (the deal is NOT seeded — pkcore shuffles from its own entropy RNG),
+  // so at 75ms/action the run can reach ~90s and flake past the timeout under
+  // parallel load. setInstant() lets it run at CPU speed. (See project memory:
+  // playwright game-speed.)
+  await page.evaluate(() =>
+    (window as unknown as { __PK0__: { setInstant: () => void } }).__PK0__.setInstant(),
+  );
 
-  // Call-down: hero never folds, so hands reach showdown while bots fold/raise.
+  // Call-down: hero never folds, so hands reliably reach showdown while bots
+  // fold/raise around it.
   for (let i = 0; i < 60; i++) {
     try { await waitForHumanTurn(page); } catch { break; }
     const check = page.locator('#action-buttons button:has-text("Check")');
@@ -35,6 +41,7 @@ test('bot action lines never reveal hole cards during play', async ({ page }) =>
   const ACTION = /: (folds|checks|calls|raises|bets|is all-in|all-in)/;
   const isBotAction = (l: string) =>
     ACTION.test(l) && !l.startsWith('You ') && !l.startsWith('★') && !l.startsWith('  ');
+  const REVEAL = /★ .+\[.+\].+wins \$/;
 
   const botActionLines = lines.filter(isBotAction);
 
@@ -47,5 +54,5 @@ test('bot action lines never reveal hole cards during play', async ({ page }) =>
   }
 
   // Guard against over-hiding: the showdown reveal must still show cards.
-  expect(lines.some(l => /★ .+\[.+\].+wins \$/.test(l))).toBe(true);
+  expect(lines.some(l => REVEAL.test(l))).toBe(true);
 });

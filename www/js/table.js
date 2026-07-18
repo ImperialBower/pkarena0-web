@@ -74,6 +74,30 @@ function buildSeat(i) {
   return seat;
 }
 
+// EPIC-47 Phase 4: format a seat's opponent-model stats as a compact
+// "VPIP/PFR/AF" HUD string. VPIP/PFR are fractions → whole percents; AF is a
+// ratio to one decimal. A missing stat (not enough sample) renders as "·".
+function formatHud(s) {
+  const pct = v => (v == null ? '·' : Math.round(v * 100));
+  const af = s.af == null ? '·' : s.af.toFixed(1);
+  return `${pct(s.vpip)}/${pct(s.pfr)}/${af}`;
+}
+
+// Populate a HUD element (.seat-hud / .list-hud) from a player's stats, or hide
+// it when the seat has no tracked hands yet. `base` is the element's base class.
+function renderHud(hudEl, base, stats) {
+  if (stats) {
+    hudEl.textContent = formatHud(stats);
+    hudEl.className = base + ' hud-' + (stats.confidence || 'low');
+    hudEl.title = `VPIP/PFR/AF · ${stats.hands} hand${stats.hands === 1 ? '' : 's'}`;
+    hudEl.style.display = '';
+  } else {
+    hudEl.textContent = '';
+    hudEl.className = base;
+    hudEl.style.display = 'none';
+  }
+}
+
 // Abbreviate an action label for the mobile pill. Handles both button-style
 // labels ("Raise $400") and pkcore's verb labels ("raises to $400", "calls $100").
 function shortLabel(label) {
@@ -160,6 +184,7 @@ export function createTable(rootEl, { replay = false } = {}) {
       q(i, '.seat-name').textContent = '—';
       q(i, '.seat-cards').replaceChildren();
       q(i, '.seat-badge').style.display = 'none';
+      renderHud(q(i, '.seat-hud'), 'seat-hud', null);
       setActionLabel(i, null);
       q(i, '.seat-chipamt').style.visibility = 'hidden';
       return;
@@ -185,7 +210,7 @@ export function createTable(rootEl, { replay = false } = {}) {
       view.bigBlind > 0 && allIn == null
         ? Math.round((p.chips ?? 0) / view.bigBlind) + 'BB' : '';
 
-    q(i, '.seat-hud').style.display = view.showHud ? '' : 'none';
+    renderHud(q(i, '.seat-hud'), 'seat-hud', p.stats);
 
     const chipEl = q(i, '.seat-chipamt');
     if (p.bet > 0 && p.state !== 'AllIn') {
@@ -229,7 +254,7 @@ export function createTable(rootEl, { replay = false } = {}) {
       row.className = 'list-row list-empty';
       q2('.list-tag').textContent = '';
       q2('.list-name').textContent = '—';
-      q2('.list-hud').textContent = '';
+      renderHud(q2('.list-hud'), 'list-hud', null);
       q2('.list-stack').textContent = '';
       q2('.list-bb').textContent = '';
       q2('.list-pill').className = 'list-pill';
@@ -242,7 +267,7 @@ export function createTable(rootEl, { replay = false } = {}) {
     q2('.list-tag').textContent = positionTag(i, view.dealerSeat);
     const emoji = view.emoji && i !== view.heroSeat ? view.emoji(p.name) : '';
     q2('.list-name').textContent = (emoji ? emoji + ' ' : '') + p.name;
-    q2('.list-hud').style.display = view.showHud ? '' : 'none';
+    renderHud(q2('.list-hud'), 'list-hud', p.stats);
     const allIn = p.state === 'AllIn'
       ? (view.allInAmounts?.get(i) ?? (p.bet > 0 ? p.bet : null)) : null;
     q2('.list-stack').textContent = allIn != null ? fmt(allIn) : fmt(p.chips);

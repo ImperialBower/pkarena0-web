@@ -16,15 +16,17 @@ async function startArena(page: import('@playwright/test').Page): Promise<void> 
   await page.click('#arena-start-btn');
 }
 
-/** Set the speed slider to a preset (1 = Very Slow … 10 = Turbo). */
-async function setSpeed(page: import('@playwright/test').Page, value: number): Promise<void> {
-  await page.$eval(
-    '#speed-slider',
-    (el: HTMLInputElement, v: number) => {
-      el.value = String(v);
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    },
-    value,
+/**
+ * Drop the real-time pacing delays (BOT_ACTION_MS / HAND_COMPLETE_MS) to zero so
+ * a multi-hand arena run plays at CPU speed. Even the Turbo slider preset is
+ * 75ms/action — hundreds of bot actions over an unseeded, variable number of
+ * hands can approach the test timeout and flake under parallel load. Call after
+ * startArena (the __PK0__ hook exists once the wasm has booted). See project
+ * memory: playwright game-speed.
+ */
+async function setInstant(page: import('@playwright/test').Page): Promise<void> {
+  await page.evaluate(() =>
+    (window as unknown as { __PK0__: { setInstant: () => void } }).__PK0__.setInstant(),
   );
 }
 
@@ -51,7 +53,7 @@ test('arena writes bot actions and hand outcomes to the hand log', async ({ page
   test.setTimeout(90_000);
   await startArena(page);
   await page.click('#log-toggle');           // open the (collapsed) hand-log aside
-  await setSpeed(page, 10);                   // Turbo so a hand completes quickly
+  await setInstant(page);                     // play at CPU speed so a hand completes quickly
 
   // Per-action lines must appear (e.g. "Name: raises to $300", "Name: folds").
   await page.waitForFunction(
@@ -87,11 +89,46 @@ test('arena log reveals a folded hand\'s cards on the fold line', async ({ page 
   test.setTimeout(90_000);
   await startArena(page);
   await page.click('#log-toggle');
-  await setSpeed(page, 10);                   // Turbo — folds happen within a hand or two
+  await setInstant(page);                     // play at CPU speed — folds happen within a hand or two
 
   // A fold line must carry the folder's cards, e.g. "Loose Larry [7♠ 2♦]: folds".
   await page.waitForFunction(
     () => /\[[^\]]+\]: folds/.test(document.getElementById('hand-log')?.textContent ?? ''),
     { timeout: 60_000 },
   );
+});
+
+test('arena forced-fold fallback counter stays below bound', async ({ page }) => {
+  test.setTimeout(120_000);
+  await startArena(page);
+  await setInstant(page);
+
+  // Wait until the arena has progressed through enough hands to exercise many bot actions.
+  await page.waitForFunction(
+    () => {
+      const text = document.getElementById('arena-status')?.textContent ?? '';
+      const m = text.match(/Hand #(\d+)/);
+      return m ? Number(m[1]) >= 20 : false;
+    },
+    { timeout: 100_000 },
+  );
+
+  const state = await page.evaluate(() => {
+    const hooks = (window as typeof window & {
+      __PK0__?: { arena?: { getState?: () => unknown } };
+    }).__PK0__;
+    return hooks?.arena?.getState?.() ?? {};
+  });
+
+  const forced = Number(state.forced_fold_count ?? 0);
+  // Regression guard: force-fold fallback should be rare over a 20-hand run.
+  expect(forced).toBeLessThan(20);
+
+  if (forced > 0) {
+    await page.click('#log-toggle');
+    await page.waitForFunction(
+      () => /engine rejected/i.test(document.getElementById('hand-log')?.textContent ?? ''),
+      { timeout: 30_000 },
+    );
+  }
 });

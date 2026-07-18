@@ -7,15 +7,21 @@
 
 ## Status
 
+**CLOSED 2026-07-16** (branch `EPIC-46`). Everything this repo could do ahead
+of upstream is done: the feature is enabled, the runtime spike is measured,
+and the browser sample budget is chosen. The remaining rows are the upstream
+adoption itself — they transfer to a follow-up that opens when pkcore EPIC-36
+ships, rather than holding this EPIC open indefinitely.
+
 | Component | Status |
 |---|---|
-| Enable `equity` feature in `Cargo.toml` (wasm compile pre-verified) | Planned |
-| Phase 0 spike: `compute(EquityRequest)` runtime behavior in-browser | Planned |
-| Latency budget: MC sample count vs per-decision wall time (incl. Turbo) | Planned |
-| Upstream: pkcore EPIC-36 `DecisionConfig` (`decision:` YAML knobs) | **Blocked — Planned upstream** |
-| Adopt `decision: { equity: fast, outs: on, pot_odds: … }` profiles | Planned (post EPIC-36) |
-| Embedded HUP preflop odds (`hup_cache::lookup_odds`, wasm-safe) evaluation | Planned |
-| Playwright: game-speed regression at Turbo with equity on | Planned |
+| Enable `equity` feature in `Cargo.toml` (wasm compile pre-verified) | **Complete** (`Cargo.toml:17`) |
+| Phase 0 spike: `compute(EquityRequest)` runtime behavior in-browser | **Complete** — no panic, rayon serial-fallback confirmed (probe since removed, see corrigendum) |
+| Latency budget: MC sample count vs per-decision wall time (incl. Turbo) | **Complete** — **`fast` = 500 MC samples** (2.8 ms HU / 5.7 ms 4-way) |
+| Upstream: pkcore EPIC-36 `DecisionConfig` (`decision:` YAML knobs) | **Deferred** at close. Upstream EPIC-36 **shipped 2026-07-17** (`equity`/`ranges`/`pot_odds`/`exploit` wired; `outs`/`preflop_charts` deferred upstream) — the follow-up is now unblocked. |
+| Adopt `decision: { equity: fast, pot_odds: … }` profiles | **Deferred** (reopens now that EPIC-36 shipped). Note `outs` is deferred upstream, so the adopted profile drops `outs: on` until an upstream range-model lands. |
+| Embedded HUP preflop odds (`hup_cache::lookup_odds`, wasm-safe) evaluation | **Deferred** (reopens with EPIC-36) |
+| Playwright: game-speed regression at Turbo with equity on | **Deferred** (nothing calls `compute()` in live play yet — the regression is vacuous until adoption) |
 
 **Depends on:** [EPIC-46](EPIC-46_Decider_Integration.md);
 pkcore [EPIC-36](../../pkcore/docs/EPIC-36_Configurable_Bot_Capabilities.md)
@@ -110,17 +116,63 @@ meet the latency budget).
 
 ## Work Items
 
-### Phase 0 — Spike (do first; informs everything)
-- [ ] 0a. Enable `equity` in `Cargo.toml`; `make build`.
-- [ ] 0b. Temporary wasm-exposed probe: run `compute()` for a heads-up and a
-  4-way flop spot at samples ∈ {500, 2000, 10000}; log wall-time via
-  `performance.now()`. Confirm serial-fallback (no panic) and record numbers
-  in this doc.
-- [ ] 0c. Decide the browser sample budget (target: ≤10ms per decision at
-  Turbo; bot steps are JS-timer-driven so even ~50ms may be invisible at
-  normal speed — measure, don't guess).
+### Phase 0 — Spike (do first; informs everything) ✅
+- [x] 0a. Enable `equity` in `Cargo.toml`; `make build`. (Feature on; wasm
+  bundle builds green.)
+- [x] 0b. Temporary wasm-exposed probe (`equity_probe` in `src/lib.rs`) runs
+  `compute()` for a hero (`AsKs`) vs `seats-1` random villains on a fixed flop
+  (`Qd 7h 2c`), forced to Monte Carlo (`exact_threshold: 0`). Driven headless,
+  batched, timed with `performance.now()`. **No panic; rayon serial-fallback
+  confirmed.** Numbers below.
+- [x] 0c. Browser sample budget chosen: **`fast` = 500 MC samples** (see
+  "Budget decision" below).
 
-### Phase 1 — Upstream adoption (blocked on pkcore EPIC-36)
+#### 0b results — per-`compute()` latency
+
+Median of 3 batched runs (15 computes each), headless Chromium on the dev
+machine (desktop; treat as a **fast-hardware floor** — mid-range mobile is
+plausibly 2–5× slower):
+
+| MC samples | heads-up (2) | 4-way |
+|---|---:|---:|
+| 500 | **2.8 ms** | **5.7 ms** |
+| 2 000 | 11.2 ms | 22.7 ms |
+| 10 000 | 56.4 ms | 113.4 ms |
+
+Latency is ~linear in samples and ~linear in seat count. Equity estimates were
+sane and stable (HU `AsKs` vs random on `Qd7h2c` ≈ 0.56 / 0.55 / 0.54 at
+500 / 2 000 / 10 000 — the 500-sample read is within ~2% of the 10k read).
+
+**Structural finding (de-risks the "exact could be seconds serial" worry):**
+with unknown villains (`PlayerSpec::Random`) the engine is *never* all-exact, so
+it **always** takes the Monte-Carlo path regardless of `exact_threshold`. Exact
+enumeration only triggers when every seat has known cards — not the live
+decision shape. So the browser doesn't need to *defensively* force `fast`; the
+realistic query is MC by construction. (An all-known flop spot would enumerate
+`C(45,2)=990` runouts — cheap — so even deliberate exact calls on the flop are
+fine; only preflop all-known enumeration would be large, and that still falls
+back to MC above the default threshold.)
+
+#### Budget decision (0c)
+
+Adopt **`equity: fast` with 500 MC samples** as the browser default:
+
+- 5.7 ms worst-case here (4-way) leaves headroom under the 10 ms/decision Turbo
+  target even at a 2× mobile penalty; ~11 ms at a harsh 2× 4-way is still
+  invisible at normal speed (≥1 s/action) and marginal at Turbo (75 ms/action).
+- 500 samples already gives ±~2% equity — ample for call/raise gating.
+- Bot steps are JS-timer-throttled, so a single ~3–6 ms compute per decision is
+  imperceptible. **Caveat to carry into Phase 1:** if one decision issues
+  *several* equity calls (e.g. outs + pot-odds + hand strength), keep the
+  *combined* budget ≤ ~10 ms — i.e. don't call `compute()` more than ~2× per
+  decision at 500 samples, or drop to 250–300 samples if a decision fans out.
+- Revisit only if a real device blows the budget → options in Open Questions
+  (lower samples per street; equity only on flop+; workers).
+
+> The `equity_probe` export was temporary; it was removed at EPIC close
+> (see corrigendum) with the numbers above as its record.
+
+### Phase 1 — Upstream adoption (DEFERRED at close — blocked on pkcore EPIC-36)
 - [ ] 1a. Track EPIC-36; review its `DecisionConfig` schema against wasm
   constraints while it's still in design (cheapest time to influence).
 - [ ] 1b. On release: bump pkcore, add `decision:` sections to the bot
@@ -129,14 +181,15 @@ meet the latency budget).
 - [ ] 1c. If EPIC-36's `preflop_charts: hup` resolves via the native SQLite
   path only, propose/PR the embedded `hup_cache` fallback for wasm.
 
-### Phase 2 — Validation
+### Phase 2 — Validation (DEFERRED at close — follows Phase 1)
 - [ ] 2a. Seeded unit test: equity-on profile makes a demonstrably better
   decision than equity-off in a constructed spot (e.g. folds a dominated
   hand facing a shove that the proxy would call).
 - [ ] 2b. Playwright Turbo regression: 20-hand arena run completes within
   existing spec timeouts with equity on.
-- [ ] 2c. Arena chips/100 comparison (EPIC-49 harness): equity-on lineup
-  beats equity-off lineup over a seeded long run.
+- [ ] 2c. Arena chips/100 comparison (EPIC-49 harness, now landed as
+  `difficulty_ordering_tests` / `make bench-tiers`): equity-on lineup beats
+  equity-off lineup over a long run.
 
 ---
 
@@ -144,8 +197,8 @@ meet the latency budget).
 
 | File | Role |
 |---|---|
-| `Cargo.toml` | add `equity` feature |
-| `src/lib.rs` (spike probe, later removed) | Phase 0 latency measurements |
+| `Cargo.toml:17` | `equity` feature (kept enabled at close) |
+| `src/lib.rs` (spike probe — removed at close, in git history) | Phase 0 latency measurements |
 | pkcore `src/analysis/equity/{engine,spec,result}.rs` | the engine |
 | pkcore `src/bot/decider.rs:447-472` | the proxy being replaced (upstream) |
 | pkcore `docs/EPIC-36_Configurable_Bot_Capabilities.md` | upstream design |
@@ -157,15 +210,47 @@ meet the latency budget).
 ## Verification
 
 ```bash
-cargo check --target wasm32-unknown-unknown        # already green with equity
+cargo check --target wasm32-unknown-unknown        # green with equity enabled
 make build                                          # bundle builds
-npx playwright test                                 # Turbo latency regression
 ```
 
-Acceptance: (1) spike numbers recorded (no panic, budget chosen);
-(2) equity-driven decisions differ from proxy decisions in constructed spots
-and win the seeded arena comparison; (3) no Playwright timeout regressions
-at Turbo; (4) zero web-side forks of decider logic.
+Acceptance at close: (1) spike numbers recorded (no panic, budget chosen) —
+**met**; (2)–(3) equity-driven decision quality and Turbo latency regression —
+**deferred with Phases 1–2** (nothing calls `compute()` in live play until
+upstream EPIC-36); (4) zero web-side forks of decider logic — **met** (held
+by construction: no decider logic exists web-side).
+
+---
+
+## Implementation corrigendum (2026-07-16, branch `EPIC-46`)
+
+Closed with Phase 0 delivered and Phases 1–2 deferred to upstream adoption.
+
+1. **The `equity_probe` export was removed at close** rather than kept until
+   Phase 1 as the doc originally planned. Phase 1 has no start date (pkcore
+   EPIC-36 was still entirely `Planned` upstream on 2026-07-16), and a
+   temporary diagnostic export should not outlive its EPIC. The measured
+   numbers above are its durable record; the implementation is one
+   `git log -S equity_probe` away. A note at the removal site in `src/lib.rs`
+   points here.
+2. **The `equity` cargo feature stays enabled** (`Cargo.toml:17`) so every
+   wasm build keeps proving the engine compiles for the browser — the cheap
+   half of readiness for EPIC-36 adoption.
+3. **Phase 0's structural finding stands**: with unknown villains the engine
+   is always Monte Carlo by construction, so the browser needs no defensive
+   `exact_threshold` clamp. Carry `fast = 500 MC samples` (≤2 `compute()`
+   calls per decision) into the EPIC-36 adoption work.
+4. **Follow-up home:** the deferred Phases 1–2 reopen as a new EPIC when
+   pkcore EPIC-36 ships; EPIC-49's difficulty bundles
+   (`data/bots/{weak,standard,strong}.yaml`) are where its `decision:` knobs
+   land, and EPIC-49's matchup bench (`make bench-tiers`) is the harness for
+   its 2c arena comparison.
+
+| Phase | Status at close |
+|---|---|
+| Phase 0 — spike, budget, feature flag | **Complete** |
+| Phase 1 — upstream adoption | **Deferred** (blocked on pkcore EPIC-36) |
+| Phase 2 — validation | **Deferred** (follows Phase 1) |
 
 ---
 

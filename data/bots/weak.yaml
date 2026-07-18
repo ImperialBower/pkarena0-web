@@ -1,0 +1,122 @@
+name: weak
+profiles:
+- name: gto
+  description: Balanced frequencies informed by GTO solver output; unexploitable at equilibrium.
+  style: gto
+  range_strategy:
+    open_raise: QQ+, JJ:0.95, TT:0.8, AKs, AQs, AJs:0.7, AKo, AQo:0.85, KQs:0.9
+    three_bet: QQ+, AKs
+    call_three_bet: JJ+, AQs+
+    postflop_cbet_frequency: 50
+  betting_strategy:
+    aggression_factor: 5
+    bluff_frequency: 40
+    check_raise_frequency: 2
+    preferred_bet_sizes:
+    - 1/2
+    value_threshold: 0.97
+- name: tight_passive
+  description: Plays strong hands only; rarely bluffs or raises without a strong holding.
+  style: tight_passive
+  range_strategy:
+    open_raise: QQ+, AKs
+    three_bet: KK+
+    call_three_bet: QQ, AKs
+    postflop_cbet_frequency: 30
+  betting_strategy:
+    aggression_factor: 5
+    bluff_frequency: 40
+    check_raise_frequency: 2
+    preferred_bet_sizes:
+    - 1/2
+    value_threshold: 0.97
+- name: loose_aggressive
+  description: Wide ranges, frequent bets and bluffs — puts maximum pressure on opponents.
+  style: loose_aggressive
+  range_strategy:
+    open_raise: 22+, AT+, 54s+
+    three_bet: QQ+, AKs, AQs
+    call_three_bet: TT+, AQs+
+    postflop_cbet_frequency: 75
+  betting_strategy:
+    aggression_factor: 5
+    bluff_frequency: 40
+    check_raise_frequency: 2
+    preferred_bet_sizes:
+    - 1/2
+    value_threshold: 0.97
+- name: tight_aggressive
+  description: Selective hand selection with maximum postflop aggression — the baseline winning style.
+  style: tight_aggressive
+  range_strategy:
+    open_raise: JJ+, AQs+, KQs, AKo
+    three_bet: QQ+, AKs
+    call_three_bet: JJ+, AQs+
+    postflop_cbet_frequency: 65
+  betting_strategy:
+    aggression_factor: 5
+    bluff_frequency: 40
+    check_raise_frequency: 2
+    preferred_bet_sizes:
+    - 1/2
+    value_threshold: 0.97
+- name: loose_passive
+  description: Wide hand selection with passive betting — the classic calling station archetype.
+  style: loose_passive
+  range_strategy:
+    open_raise: 22+, AKs-A2s, KTs+, QTs+, J9s+, T8s+, 98s, ATo+, KTo+
+    three_bet: QQ+, AKs
+    call_three_bet: TT+, AJs+
+    postflop_cbet_frequency: 15
+  betting_strategy:
+    aggression_factor: 5
+    bluff_frequency: 40
+    check_raise_frequency: 2
+    preferred_bet_sizes:
+    - 1/2
+    value_threshold: 0.97
+- name: maniac
+  description: Extreme aggressor — bets and raises relentlessly with a very high bluff frequency.
+  style: maniac
+  range_strategy:
+    open_raise: 22+, AT+, 54s+
+    three_bet: TT+, AQs, AQo+, KQs
+    call_three_bet: 88+, ATs+
+    postflop_cbet_frequency: 90
+  betting_strategy:
+    aggression_factor: 5
+    bluff_frequency: 40
+    check_raise_frequency: 2
+    preferred_bet_sizes:
+    - 1/2
+    value_threshold: 0.97
+- name: abc
+  description: By-the-book play — bets strong hands and folds weak ones with no deception or bluffing.
+  style: abc
+  range_strategy:
+    open_raise: QQ+, AKs, AKo
+    three_bet: AA, KK
+    call_three_bet: QQ, AKs
+    postflop_cbet_frequency: 60
+  betting_strategy:
+    aggression_factor: 5
+    bluff_frequency: 40
+    check_raise_frequency: 2
+    preferred_bet_sizes:
+    - 1/2
+    value_threshold: 0.97
+- name: short_stack_ninja
+  description: Push-or-fold strategy optimized for short stack situations — all-in or nothing.
+  style: short_stack_ninja
+  range_strategy:
+    open_raise: 77+, ATs+, KQs, AJo+, KQo
+    three_bet: AA, KK, QQ
+    call_three_bet: ''
+    postflop_cbet_frequency: 100
+  betting_strategy:
+    aggression_factor: 5
+    bluff_frequency: 40
+    check_raise_frequency: 2
+    preferred_bet_sizes:
+    - 1/2
+    value_threshold: 0.97

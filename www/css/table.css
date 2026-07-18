@@ -70,6 +70,10 @@
   font-family: var(--font-mono); font-size: 8px; color: var(--hud-col);
   white-space: nowrap;
 }
+/* EPIC-47 Phase 4: dim the HUD while the sample is low-confidence (<50 hands),
+   so a small-sample read is visibly provisional. */
+.seat-hud.hud-low, .list-hud.hud-low { opacity: .5; }
+.seat-hud.hud-high, .list-hud.hud-high { font-weight: 600; }
 .seat-badge {
   position: absolute; top: -8px; right: -9px; min-width: 18px; height: 18px;
   padding: 0 3px; border-radius: 50%; background: var(--badge-bg);

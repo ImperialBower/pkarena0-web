@@ -192,6 +192,7 @@
         // Opponents' hole cards stay hidden during play — they are revealed only
         // at showdown (see the showdown reveal block in the HandComplete handler).
         appendHandLog(`${result.name}: ${result.action_label}`);
+        if (result.fallback_notice) appendHandLog(`⚠ ${result.fallback_notice}`);
         setActionLabel(result.seat, result.action_label);
         const state = JSON.parse(_playMod.get_state());
         renderTableVisuals(state);
@@ -292,7 +293,33 @@
           import('../pkg/pkarena0_web.js?tab=play').then(async m  => { await m.default(); return m; }),
           import('../pkg/pkarena0_web.js?tab=arena').then(async m => { await m.default(); return m; }),
         ]);
+        // Lightweight test/debug hooks used by Playwright to read raw engine state
+        // without depending on visibility of the settings/debug controls.
+        window.__PK0__ = {
+          play: {
+            getState: () => JSON.parse(_playMod.get_state()),
+            getStateRaw: () => _playMod.get_state(),
+          },
+          arena: {
+            getState: () => JSON.parse(_arenaMod.get_state()),
+            getStateRaw: () => _arenaMod.get_state(),
+          },
+          // Test-only: drop the human-facing pacing delays to zero so headless
+          // specs that drive many hands run at CPU speed instead of being gated
+          // by real-time setTimeout pauses (BOT_ACTION_MS is still 75ms at the
+          // Turbo slider preset). A call-down can play hundreds of bot actions;
+          // at 75ms each that approaches the spec timeout and flakes under
+          // parallel load. Same delays fastForwardToHand() already zeroes.
+          setInstant: () => { BOT_ACTION_MS = 0; HAND_COMPLETE_MS = 0; },
+        };
         document.getElementById('sc-version').textContent = 'v' + _playMod.version();
+        // Push the stored adaptive-bots preference into both WASM instances now
+        // that they exist, and before restoreFromUrl() can build a game — the
+        // settings block wires the toggle synchronously but runs while these
+        // modules are still loading, so this is the first point the preference
+        // can actually reach the engine.
+        applyAdaptive(adaptiveEnabled);
+        applyDifficulty(difficulty);
         const restored = await restoreFromUrl();
         if (!restored) {
           setStatus('Click "New Game" to start.');
@@ -1044,6 +1071,52 @@
       if (!audioEnabled) voice?.cancel();
     });
 
+    // EPIC-47 Phase 3: adaptive (exploitative) bots toggle. Default on to match
+    // the WASM default; the value is read when a lineup is built, so a change
+    // applies on the next New Game / Start Arena, not mid-session. Pushed to
+    // both WASM instances (play + arena) since each owns its own decider pool.
+    const adaptiveStored = localStorage.getItem('adaptiveEnabled');
+    let adaptiveEnabled = adaptiveStored === null ? true : adaptiveStored === 'true';
+    // Guard on the module being loaded (a toggle change can race an in-flight
+    // boot), but call set_adaptive unguarded so a renamed/removed export throws
+    // loudly instead of silently no-opping. The initial push to WASM happens in
+    // boot() once the modules resolve — see applyAdaptive() call there.
+    const applyAdaptive = (on) => {
+      if (_playMod) _playMod.set_adaptive(on);
+      if (_arenaMod) _arenaMod.set_adaptive(on);
+    };
+    const adaptiveToggleEl = document.getElementById('adaptive-toggle');
+    if (adaptiveToggleEl) {
+      adaptiveToggleEl.checked = adaptiveEnabled;
+      adaptiveToggleEl.addEventListener('change', () => {
+        adaptiveEnabled = adaptiveToggleEl.checked;
+        localStorage.setItem('adaptiveEnabled', adaptiveEnabled);
+        applyAdaptive(adaptiveEnabled);
+      });
+    }
+
+    // EPIC-49 Phase 3: bot difficulty selector (weak / standard / strong).
+    // Same lifecycle as the adaptive toggle: persisted to localStorage, pushed
+    // to both WASM instances, read when a lineup is built — so it applies on
+    // the next New Game / Start Arena. The initial push to WASM happens in
+    // boot() (see applyDifficulty call there).
+    const difficultyStored = localStorage.getItem('difficulty');
+    let difficulty = ['weak', 'standard', 'strong'].includes(difficultyStored)
+      ? difficultyStored : 'standard';
+    const applyDifficulty = (level) => {
+      if (_playMod) _playMod.set_difficulty(level);
+      if (_arenaMod) _arenaMod.set_difficulty(level);
+    };
+    const difficultySelectEl = document.getElementById('difficulty-select');
+    if (difficultySelectEl) {
+      difficultySelectEl.value = difficulty;
+      difficultySelectEl.addEventListener('change', () => {
+        difficulty = difficultySelectEl.value;
+        localStorage.setItem('difficulty', difficulty);
+        applyDifficulty(difficulty);
+      });
+    }
+
     document.getElementById('reset-pnl-btn').addEventListener('click', () => {
       if (!confirm('Reset lifetime P&L to $0? This cannot be undone.')) return;
       lifetimePnl = 0;
@@ -1181,6 +1254,7 @@
               ? ` ${cardsToLogStr(result.hole_cards)}`
               : '';
             appendHandLog(`${result.name}${foldCards}: ${result.action_label}`);
+            if (result.fallback_notice) appendHandLog(`⚠ ${result.fallback_notice}`);
           }
           renderTableVisuals(state);   // not renderState — avoids triggering play-mode hand flow
           updateArenaStatus(state);
@@ -1199,6 +1273,20 @@
           document.getElementById('arena-status').textContent =
             `Session over! Winner: ${winner.name} — ${state.hand_number} hands played.`;
           document.getElementById('arena-start-btn').textContent = 'New Arena';
+          // EPIC-49 Phase 3: session chips/100 report (also in the exported
+          // STATE JSON as state.session_report).
+          if (state.session_report?.length) {
+            appendHandLog('— Session report (chips/100) —');
+            [...state.session_report]
+              .sort((a, b) => b.chips_per_100 - a.chips_per_100)
+              .forEach(r => {
+                const sign = v => (v >= 0 ? '+' : '');
+                appendHandLog(
+                  `${r.name}: ${sign(r.net_chips)}$${Math.abs(r.net_chips).toLocaleString()} ` +
+                  `(${sign(r.chips_per_100)}${Math.round(r.chips_per_100).toLocaleString()}/100 ` +
+                  `over ${r.hands_played} hands)`);
+              });
+          }
           arenaRunning = false;
           return;
         }

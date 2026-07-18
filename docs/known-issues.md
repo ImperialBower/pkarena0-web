@@ -7,6 +7,72 @@ or move them under a "Resolved" section so the history stays readable.
 
 ---
 
+## Bots occasionally fold a hand they meant to raise (forced-fold fallback)
+
+**First reported:** 2026-07-12
+
+### Symptom
+
+During normal play a bot sometimes folds a hand it clearly wanted to bet
+aggressively. In the hand log this shows up as a `⚠ engine rejected
+raises to $N for <bot>; folded` line, and the console carries a matching
+`Bot action rejected at seat …; forcing fold (InsufficientIncrement)`
+warning. The `forced_fold_count` field in `get_state()` climbs over the
+course of a session. This is routine, not rare — see the rate below.
+
+### Reproduction
+
+1. Start Arena mode (9 bots) at Turbo speed.
+2. Let it run ~20 hands.
+3. Read `window.__PK0__.arena.getState().forced_fold_count`, or watch the
+   hand log for `⚠ engine rejected …; folded` lines.
+4. Observe: the counter is almost never 0.
+
+Measured over 30 seeded arena-like runs of 20 hands each: **average ~2.1
+forced folds per run, range 0–6; only ~1 run in 5 hit exactly 0.**
+
+### Root cause
+
+pkcore's `RuleBasedDecider` (v0.2.1) sizes a raise as a fraction of the
+pot from `BotProfile.betting_strategy.preferred_bet_sizes`. In spots
+where that fraction lands below the No-Limit **minimum raise increment**
+(a raise must be at least the size of the prior bet/raise), it returns a
+`Raise(n)` whose *intent* is legal but whose *amount* is not.
+`PokerSession::apply_action` rejects it with `InsufficientIncrement`, and
+`step_bot` (`src/lib.rs`) force-converts the rejected action to `Fold`.
+
+This is **not** a pkarena0-web bug: the web layer builds the snapshot
+correctly and forwards a genuine decider decision. The gap is that the
+decider does not clamp its raise sizing to the legal minimum. Folding is
+also the *worst* possible substitution — the bot discards a hand it
+judged strong enough to raise.
+
+Note: EPIC-46 originally framed this fallback as a pure bug-catcher
+("a pkcore decider bug or a web-side state mismatch") and set an
+acceptance criterion of `forced_fold_count == 0`. That criterion is not
+achievable with the current decider and has since been amended; a
+`=== 0` test assertion would be flaky.
+
+### Fix direction
+
+In `step_bot`, when `apply_action` returns `InsufficientIncrement` for a
+`Raise`/`Bet`, clamp the amount to the legal minimum raise (or downgrade
+to `Call`/`Check`) before falling back to `Fold`. That preserves the
+bot's aggressive intent instead of throwing the hand away. The upstream
+fix is for pkcore's `RuleBasedDecider` to clamp raise sizing itself.
+Either reduces the forced-fold rate toward its true floor (genuine
+engine/decider bugs), at which point a tighter counter bound becomes
+meaningful.
+
+### Severity
+
+Low–moderate. No crash or state corruption — the fallback keeps play
+legal. But at ~2 folds per 20 hands across 9 seats it measurably distorts
+Arena outcomes, and the misleading original framing risks sending a
+future developer bug-hunting or wiring a flaky `=== 0` gate.
+
+---
+
 ## Game state resets when the page is backgrounded (mobile)
 
 **First reported:** 2026-04-25
