@@ -311,7 +311,11 @@
           // at 75ms each that approaches the spec timeout and flakes under
           // parallel load. Same delays fastForwardToHand() already zeroes.
           setInstant: () => { BOT_ACTION_MS = 0; HAND_COMPLETE_MS = 0; },
+          // Prefold test/debug hooks (see docs/superpowers/specs prefold design).
+          prefoldDecision: (legal) => prefoldDecision(legal),
         };
+        window.__PK0__.play.getPrefold = () => preFoldArmed;
+        window.__PK0__.play.setPrefold = (v) => { preFoldArmed = !!v; };
         document.getElementById('sc-version').textContent = 'v' + _playMod.version();
         // Push the stored adaptive-bots preference into both WASM instances now
         // that they exist, and before restoreFromUrl() can build a game — the
@@ -737,6 +741,22 @@
 
     // ── Action buttons ────────────────────────────────────────────────────────
     let pendingBetAction = 'Bet';
+
+    // ── Prefold (pre-action Check/Fold) ───────────────────────────────────────
+    // When armed during the bots-acting window, the hero auto check/folds the
+    // moment it becomes their turn. Ephemeral: never persisted, cleared on fire,
+    // on a new game, and on hand completion. See docs/superpowers/specs.
+    let preFoldArmed = false;
+
+    // Given the engine's legal-action list, decide the pre-action:
+    //   facing a bet (Fold offered) → 'Fold'; can check for free → 'Check';
+    //   neither actionable → null. Fold wins if both appear.
+    function prefoldDecision(legalActions) {
+      const legal = legalActions ?? [];
+      if (legal.includes('Fold')) return 'Fold';
+      if (legal.includes('Check')) return 'Check';
+      return null;
+    }
 
     function renderActionButtons(state) {
       const actions = state.legal_actions ?? [];
