@@ -118,8 +118,19 @@ classes): an "armed/lit" style for the toggle.
   (unexpected, since Check/Fold are always in the offered `legal_actions` set),
   fall back to the existing error path in `onHumanAction` (re-render buttons,
   leave the human to act). The toggle is already disarmed at this point.
-- Switching tabs to Arena while armed: `preFoldArmed` is reset on tab switch /
-  new game so it cannot leak into a later play hand.
+- Switching tabs to Arena while armed: no explicit reset is needed. `switchTab`
+  sets `playLoopRunning = false` (halting the Play bots loop), Arena hides
+  `#action-buttons` via CSS and never calls `renderActionButtons` (its only fire
+  path), so an armed flag cannot fire in Arena. Returning to Play resumes the
+  same hand, where the still-armed toggle behaving as armed is the intended
+  behavior. The arm is cleared on the next new game (`beginNewGame`) and on hand
+  completion (`HandComplete`), so it cannot leak into a *later* play hand.
+
+  *(Implementation note: an earlier draft of this doc said the arm is reset "on
+  tab switch"; the final code resets on new-game and hand-completion instead,
+  which the whole-branch review confirmed is both safe and preferable — no
+  Arena fire path exists, so a tab-switch reset would only discard a Play
+  intent the user may still want on return.)*
 
 ## Testing
 
