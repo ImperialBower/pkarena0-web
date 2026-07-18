@@ -248,6 +248,13 @@
   border-radius: 6px;
   overflow: hidden;
 }
+/* The replay felt is far shorter than the live #table-zone (which is flex:1 in
+   a full-height column), so the seat plane — whose card/plate sizes are fixed
+   pixels — doesn't fit: the top row's hole cards spill off the top edge and the
+   bottom row's action pills spill off the bottom. Inset the seat plane inward
+   (bottom a touch more, since those stacks carry bet chips) so every seat clears
+   within the wrapper at any modal height. overflow:hidden stays as a backstop. */
+#replay-table-wrapper .table-inner { top: 11%; bottom: 14%; }
 #replay-action-label {
   text-align: center;
   color: var(--accent);
