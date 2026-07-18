@@ -196,6 +196,7 @@
         setActionLabel(result.seat, result.action_label);
         const state = JSON.parse(_playMod.get_state());
         renderTableVisuals(state);
+        renderPreAction(state);   // show the pre-action Check/Fold toggle while bots act
         await new Promise(r => setTimeout(r, BOT_ACTION_MS));
       }
     }
@@ -756,6 +757,34 @@
       if (legal.includes('Fold')) return 'Fold';
       if (legal.includes('Check')) return 'Check';
       return null;
+    }
+
+    // Draw (or clear) the pre-action Check/Fold toggle into #action-buttons.
+    // Only shown while the hero can still act this hand (state === 'Active').
+    // Clicking flips preFoldArmed and re-renders the lit state.
+    //
+    // Only removes/replaces its own `.prefold` button rather than wiping the
+    // whole container: on the very first hand of a session (fresh New Game or
+    // a URL-restored session) #btn-new-game is still mounted in #action-buttons
+    // while the bots-acting loop runs (nothing has cleared it yet — see the
+    // `renderButtons([], null)` call in onHumanAction for subsequent hands).
+    // Blanket-clearing here would permanently delete that button before
+    // showNewGameButton() ever gets a chance to recreate it.
+    function renderPreAction(state) {
+      const container = document.getElementById('action-buttons');
+      container.querySelector('button.prefold')?.remove();
+      if (state?.hero?.state !== 'Active') return;
+
+      const btn = document.createElement('button');
+      btn.dataset.act = 'prefold';
+      btn.className = 'prefold' + (preFoldArmed ? ' armed' : '');
+      btn.textContent = (preFoldArmed ? '✓ ' : '') + 'Check/Fold';
+      btn.title = 'Auto check/fold on your turn';
+      btn.addEventListener('click', () => {
+        preFoldArmed = !preFoldArmed;
+        renderPreAction(state);
+      });
+      container.appendChild(btn);
     }
 
     function renderActionButtons(state) {
