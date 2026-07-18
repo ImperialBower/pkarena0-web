@@ -182,6 +182,8 @@ export function createTable(rootEl, { replay = false } = {}) {
     if (!p || p.state === 'Out' || !p.name) {
       seatEl.className = 'seat seat-empty';
       q(i, '.seat-name').textContent = '—';
+      q(i, '.seat-stack').textContent = '';
+      q(i, '.seat-bb').textContent = '';
       q(i, '.seat-cards').replaceChildren();
       q(i, '.seat-badge').style.display = 'none';
       renderHud(q(i, '.seat-hud'), 'seat-hud', null);
