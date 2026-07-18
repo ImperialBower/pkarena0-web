@@ -23,7 +23,9 @@ export async function waitForHumanTurn(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
       const btns = document.querySelectorAll<HTMLButtonElement>('#action-buttons button');
-      return [...btns].some(b => !b.disabled && b.id !== 'btn-new-game');
+      // Exclude the prefold Check/Fold toggle: it renders (enabled) during the
+      // bots-acting window too, so it isn't proof the human can act yet.
+      return [...btns].some(b => !b.disabled && b.id !== 'btn-new-game' && b.dataset.act !== 'prefold');
     },
     { timeout: 15_000 },
   );

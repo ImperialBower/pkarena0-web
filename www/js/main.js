@@ -66,6 +66,7 @@
     }
 
     function beginNewGame() {
+      preFoldArmed = false;   // never carry a pre-action arm into a new game
       commitCurrentGameToLifetime();
       pendingGameCommitted = false;
       currentGameChips = STARTING_CHIPS;
@@ -196,6 +197,7 @@
         setActionLabel(result.seat, result.action_label);
         const state = JSON.parse(_playMod.get_state());
         renderTableVisuals(state);
+        renderPreAction(state);   // show the pre-action Check/Fold toggle while bots act
         await new Promise(r => setTimeout(r, BOT_ACTION_MS));
       }
     }
@@ -311,7 +313,11 @@
           // at 75ms each that approaches the spec timeout and flakes under
           // parallel load. Same delays fastForwardToHand() already zeroes.
           setInstant: () => { BOT_ACTION_MS = 0; HAND_COMPLETE_MS = 0; },
+          // Prefold test/debug hooks (see docs/superpowers/specs prefold design).
+          prefoldDecision: (legal) => prefoldDecision(legal),
         };
+        window.__PK0__.play.getPrefold = () => preFoldArmed;
+        window.__PK0__.play.setPrefold = (v) => { preFoldArmed = !!v; };
         document.getElementById('sc-version').textContent = 'v' + _playMod.version();
         // Push the stored adaptive-bots preference into both WASM instances now
         // that they exist, and before restoreFromUrl() can build a game — the
@@ -642,6 +648,7 @@
       }
 
       if (state.phase === 'HandComplete') {
+        preFoldArmed = false;   // a pre-action arm does not carry across hands
         const street = state.street ?? '';
         appendHandLog('Hand #' + state.hand_number + ' complete — ' + street);
         enableYamlDownload();
@@ -738,7 +745,65 @@
     // ── Action buttons ────────────────────────────────────────────────────────
     let pendingBetAction = 'Bet';
 
+    // ── Prefold (pre-action Check/Fold) ───────────────────────────────────────
+    // When armed during the bots-acting window, the hero auto check/folds the
+    // moment it becomes their turn. Ephemeral: never persisted, cleared on fire,
+    // on a new game, and on hand completion. See docs/superpowers/specs.
+    let preFoldArmed = false;
+
+    // Given the engine's legal-action list, decide the pre-action:
+    //   facing a bet (Fold offered) → 'Fold'; can check for free → 'Check';
+    //   neither actionable → null. Fold wins if both appear.
+    function prefoldDecision(legalActions) {
+      const legal = legalActions ?? [];
+      if (legal.includes('Fold')) return 'Fold';
+      if (legal.includes('Check')) return 'Check';
+      return null;
+    }
+
+    // Draw (or clear) the pre-action Check/Fold toggle into #action-buttons.
+    // Only shown while the hero can still act this hand (state === 'Active').
+    // Clicking flips preFoldArmed and re-renders the lit state.
+    //
+    // Only removes/replaces its own `.prefold` button rather than wiping the
+    // whole container: on the very first hand of a session (fresh New Game or
+    // a URL-restored session) #btn-new-game is still mounted in #action-buttons
+    // while the bots-acting loop runs (nothing has cleared it yet — see the
+    // `renderButtons([], null)` call in onHumanAction for subsequent hands).
+    // Blanket-clearing here would permanently delete that button before
+    // showNewGameButton() ever gets a chance to recreate it.
+    function renderPreAction(state) {
+      const container = document.getElementById('action-buttons');
+      container.querySelector('button.prefold')?.remove();
+      if (state?.hero?.state !== 'Active') return;
+
+      const btn = document.createElement('button');
+      btn.dataset.act = 'prefold';
+      btn.className = 'prefold' + (preFoldArmed ? ' armed' : '');
+      btn.textContent = (preFoldArmed ? '✓ ' : '') + 'Check/Fold';
+      btn.title = 'Auto check/fold on your turn';
+      btn.addEventListener('click', () => {
+        preFoldArmed = !preFoldArmed;
+        renderPreAction(state);
+      });
+      container.appendChild(btn);
+    }
+
+    // If the pre-action toggle is armed, auto-act on the hero's turn:
+    // fold when facing a bet, else check. Returns true if it fired (the arm is
+    // consumed one-shot before firing so it cannot recurse across streets).
+    function autoActFold(state) {
+      const action = prefoldDecision(state.legal_actions);
+      if (!action) return false;   // hero can't check/fold (e.g. all-in) — let them decide
+      preFoldArmed = false;
+      onHumanAction(action, 0, state);
+      return true;
+    }
+
     function renderActionButtons(state) {
+      // Pre-action: if the hero armed Check/Fold while bots acted, fire it now
+      // instead of rendering buttons. onHumanAction() re-enters the bot loop.
+      if (preFoldArmed && autoActFold(state)) return;
       const actions = state.legal_actions ?? [];
       const btns = [];
 

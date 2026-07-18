@@ -116,6 +116,14 @@ body {
 }
 #action-buttons button:disabled { opacity: .45; cursor: default; }
 #action-buttons button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#action-buttons button.prefold {
+  border: var(--btn-min-border); background: var(--btn-min-bg); color: var(--btn-min-col);
+  opacity: .8;
+}
+#action-buttons button.prefold.armed {
+  border: var(--btn-fold-border); background: var(--btn-fold-bg); color: var(--btn-fold-col);
+  opacity: 1; box-shadow: 0 0 0 2px var(--accent);
+}
 
 #arena-panel { display: none; align-items: center; gap: 10px; }
 body[data-tab="arena"] #arena-panel { display: flex; }
