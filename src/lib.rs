@@ -112,6 +112,62 @@ thread_local! {
     /// (seat, name, chips). Unlike `HAND_START_CHIPS` this never advances, so
     /// the session chips/100 report can net busted seats (EPIC-49 Phase 3).
     static SESSION_START_CHIPS: RefCell<Vec<(u8, String, usize)>> = const { RefCell::new(Vec::new()) };
+    /// Within-hand undo stack: one entry pushed before each human action.
+    /// Cleared at every `next_hand()` boundary (no rewinding across a completed
+    /// hand once chips have been distributed). See `Snapshot` / `undo_action`.
+    static HISTORY: RefCell<Vec<Snapshot>> = const { RefCell::new(Vec::new()) };
+}
+
+// ── Within-hand undo snapshot ─────────────────────────────────────────────────
+//
+// Snapshot the mutable per-hand state before each human action; restore it in
+// `undo_action()`. Ported from the April `rewind` branch (pkcore 0.0.48). Two
+// things changed under it since then, both handled here:
+//   • `Snapshot.table` is now `Table` (was `TableNoCell`).
+//   • EPIC-49 added `FORCED_FOLD_COUNT`, which ticks mid-hand as bots act — it
+//     is snapshotted so an undo also un-counts any bot forced-folds that
+//     happened after the action being undone.
+// Deliberately NOT snapshotted: `BOTS` and `REGISTRY`. `BotDecider::decide_seeded`
+// takes `&self` (verified stateless in pkcore 0.3.0), so bots replay
+// deterministically from the restored `RNG`; `REGISTRY` only ingests a hand at
+// completion, never inside the snapshotted window (history clears at next_hand).
+struct Snapshot {
+    table: Table,
+    hand_number: u32,
+    shuffled_deck_str: Option<String>,
+    rng: SmallRng,
+    phase: SessionPhase,
+    hand_start_chips: Vec<(u8, usize)>,
+    forced_fold_count: u32,
+}
+
+fn push_snapshot() {
+    let snap = SESSION.with(|s| {
+        s.borrow().as_ref().map(|sess| {
+            (
+                sess.table.clone(),
+                sess.hand_number,
+                sess.shuffled_deck_str.clone(),
+            )
+        })
+    });
+    if let Some((table, hand_number, shuffled_deck_str)) = snap {
+        let rng = RNG.with(|r| r.borrow().clone());
+        let phase = PHASE.with(|p| *p.borrow());
+        let hand_start_chips = HAND_START_CHIPS.with(|h| h.borrow().clone());
+        let forced_fold_count = FORCED_FOLD_COUNT.with(|c| *c.borrow());
+        HISTORY.with(|h| {
+            h.borrow_mut().push(Snapshot {
+                table,
+                hand_number,
+                shuffled_deck_str,
+                rng,
+                phase,
+                hand_start_chips,
+                forced_fold_count,
+            })
+        });
+    }
 }
 
 /// EPIC-49 Phase 3 difficulty tiers. `Weak` plays the dampened bundle with
@@ -255,6 +311,9 @@ pub fn init_game(rand_seed: f64) -> String {
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
     REGISTRY.with(|r| *r.borrow_mut() = StatsRegistry::new());
     FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() = 0);
+    // A new game starts with no undo history; stale snapshots would point at
+    // the previous session's table.
+    HISTORY.with(|h| h.borrow_mut().clear());
 
     let table = Table::nlh_from_seats(Seats::new(seats_vec), ForcedBets::new(50, 100));
 
@@ -308,6 +367,9 @@ pub fn init_bot_game(rand_seed: f64) -> String {
     COLLECTION.with(|c| *c.borrow_mut() = HandCollection::new());
     REGISTRY.with(|r| *r.borrow_mut() = StatsRegistry::new());
     FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() = 0);
+    // A new game starts with no undo history; stale snapshots would point at
+    // the previous session's table.
+    HISTORY.with(|h| h.borrow_mut().clear());
 
     let table = Table::nlh_from_seats(Seats::new(seats_vec), ForcedBets::new(50, 100));
 
@@ -372,6 +434,9 @@ pub fn human_action(action_json: &str) -> String {
         other => return error_state(&format!("Unknown action: {other}")),
     };
 
+    // Snapshot before mutating so `undo_action()` can step back to this exact
+    // decision point. Popped again below if the action turns out illegal.
+    push_snapshot();
     let apply_result = SESSION.with(|s| {
         if let Some(session) = s.borrow_mut().as_mut() {
             session.apply_action(0, action).err().map(|e| e.to_string())
@@ -381,6 +446,11 @@ pub fn human_action(action_json: &str) -> String {
     });
 
     if let Some(err) = apply_result {
+        // Action was rejected — discard the snapshot we just pushed so undo
+        // doesn't step back to an identical (unchanged) state.
+        HISTORY.with(|h| {
+            h.borrow_mut().pop();
+        });
         // Store the error so build_game_state() can surface it, but keep the
         // phase as WaitingForHuman so the action buttons remain usable.
         LAST_ERROR.with(|e| *e.borrow_mut() = Some(err));
@@ -388,6 +458,38 @@ pub fn human_action(action_json: &str) -> String {
     }
 
     PHASE.with(|p| *p.borrow_mut() = SessionPhase::BotsActing);
+    build_game_state()
+}
+
+/// Undo the last applied action within the current hand.
+///
+/// Restores the game to the state it was in immediately before the most recent
+/// `human_action` call that mutated session state. Returns the restored
+/// `GameState` JSON. If there is nothing to undo, returns the current state
+/// unchanged (no error). History is cleared at each `next_hand()` boundary, so
+/// rewinding across a completed hand is not supported here.
+///
+/// Bots that acted after the undone action are replayed deterministically from
+/// the restored `RNG` on the next `step_bot` loop, because `BotDecider` is
+/// stateless (`decide_seeded(&self, …)`).
+#[wasm_bindgen]
+pub fn undo_action() -> String {
+    let snap = HISTORY.with(|h| h.borrow_mut().pop());
+    let Some(snap) = snap else {
+        return build_game_state();
+    };
+    SESSION.with(|s| {
+        if let Some(session) = s.borrow_mut().as_mut() {
+            session.table = snap.table;
+            session.hand_number = snap.hand_number;
+            session.shuffled_deck_str = snap.shuffled_deck_str;
+        }
+    });
+    RNG.with(|r| *r.borrow_mut() = snap.rng);
+    PHASE.with(|p| *p.borrow_mut() = snap.phase);
+    HAND_START_CHIPS.with(|h| *h.borrow_mut() = snap.hand_start_chips);
+    FORCED_FOLD_COUNT.with(|c| *c.borrow_mut() = snap.forced_fold_count);
+    LAST_ERROR.with(|e| *e.borrow_mut() = None);
     build_game_state()
 }
 
@@ -401,6 +503,8 @@ pub fn next_hand() -> String {
     if current_phase != SessionPhase::HandComplete {
         return build_game_state();
     }
+    // Undo does not cross hand boundaries: chips are about to be distributed.
+    HISTORY.with(|h| h.borrow_mut().clear());
 
     // ── Snapshot everything we need BEFORE end_hand() mucks cards ────────────
     struct PreEnd {
@@ -1179,6 +1283,9 @@ struct GameState {
     small_blind: usize,
     big_blind: usize,
     session_over: bool,
+    /// True when there is a within-hand human action that `undo_action()` can
+    /// step back to (the undo stack is non-empty). Cleared each `next_hand()`.
+    can_undo: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1417,6 +1524,7 @@ fn build_game_state() -> String {
                 small_blind: 0,
                 big_blind: 0,
                 session_over: false,
+                can_undo: false,
                 error: None,
                 last_result: None,
                 showdown: None,
@@ -1504,6 +1612,8 @@ fn build_game_state() -> String {
         let last_result = LAST_HAND_RESULT.with(|r| r.borrow_mut().take());
         let showdown = LAST_SHOWDOWN.with(|r| r.borrow_mut().take());
         let forced_fold_count = FORCED_FOLD_COUNT.with(|c| *c.borrow());
+        // Non-empty history = a human action this hand is available to undo.
+        let can_undo = HISTORY.with(|h| !h.borrow().is_empty());
 
         // Completed hands for the chips/100 report: the current hand counts
         // once it has finished (HandComplete covers SessionOver's final hand;
@@ -1531,6 +1641,7 @@ fn build_game_state() -> String {
             small_blind: table.forced.small_blind,
             big_blind: table.forced.big_blind,
             session_over: phase_val == SessionPhase::SessionOver,
+            can_undo,
             error: last_error,
             last_result,
             showdown,
@@ -3972,5 +4083,85 @@ mod equity_adoption_tests {
             "the proxy should misfold the strong draw far more than the equity knob: \
              proxy {proxy_folds}/64 vs equity {equity_folds}/64"
         );
+    }
+}
+
+#[cfg(test)]
+mod undo_tests {
+    use super::*;
+    use serde_json::Value;
+
+    fn state() -> Value {
+        serde_json::from_str(&get_state()).expect("get_state returns valid JSON")
+    }
+
+    /// Run the same bot loop the JS front-end runs: step until it's the hero's
+    /// turn or the hand is over.
+    fn advance_past_bots() {
+        while PHASE.with(|p| *p.borrow()) == SessionPhase::BotsActing {
+            step_bot();
+        }
+    }
+
+    #[test]
+    fn undo_round_trips_a_human_action() {
+        init_game(0.42);
+        advance_past_bots();
+
+        let before = state();
+        // If everyone folded to a blind before the hero acted there's nothing to
+        // exercise; a re-deal is out of scope for this unit test.
+        if before["phase"] != "WaitingForHuman" {
+            return;
+        }
+        assert_eq!(
+            before["can_undo"],
+            Value::Bool(false),
+            "no human action yet this hand, so nothing is undoable"
+        );
+
+        // Take the simplest legal action (never a sized bet, so no amount math).
+        let legal: Vec<String> = before["legal_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect();
+        let action = ["Check", "Call", "Fold"]
+            .into_iter()
+            .find(|a| legal.iter().any(|l| l == a))
+            .expect("a preflop hero always has at least Fold");
+
+        let after_act: Value = serde_json::from_str(&human_action(&format!(
+            r#"{{"action":"{action}","amount":0}}"#
+        )))
+        .unwrap();
+        assert_eq!(
+            after_act["can_undo"],
+            Value::Bool(true),
+            "the action applied, so it must be undoable"
+        );
+
+        let after_undo: Value = serde_json::from_str(&undo_action()).unwrap();
+        assert_eq!(after_undo["phase"], "WaitingForHuman");
+        assert_eq!(after_undo["can_undo"], Value::Bool(false));
+        for field in ["hand_number", "pot", "to_call", "board", "hero"] {
+            assert_eq!(
+                after_undo[field], before[field],
+                "field `{field}` should match the pre-action state after undo"
+            );
+        }
+    }
+
+    #[test]
+    fn undo_with_empty_history_is_a_noop() {
+        init_game(0.99);
+        let before = state();
+        // Undo with nothing on the stack must not panic or error — it returns
+        // the current state unchanged.
+        let after: Value = serde_json::from_str(&undo_action()).unwrap();
+        assert_eq!(after["can_undo"], Value::Bool(false));
+        assert_eq!(after["hand_number"], before["hand_number"]);
+        assert!(after.get("error").is_none(), "no-op undo must not set an error");
     }
 }

@@ -771,6 +771,13 @@
         }
       }
 
+      // Undo — step back to before your last action (within the current hand
+      // only; the stack is cleared at each next_hand boundary). Surfaced by the
+      // engine as `can_undo`.
+      if (state.can_undo) {
+        btns.push({ label: '↶ Undo', cls: '', action: 'undo' });
+      }
+
       renderButtons(btns, state);
     }
 
@@ -806,6 +813,18 @@
             setStatus('Dealing…');
             enableCurrentGameButton();
             stepBotsUntilHuman();
+          });
+        } else if (b.action === 'undo') {
+          btn.addEventListener('click', () => {
+            hideBetControls();
+            clearAllActions();
+            const s = JSON.parse(_playMod.undo_action());
+            renderTableVisuals(s);
+            // Undo restores a human decision point, so we always land back on
+            // WaitingForHuman; re-render the action buttons for the retry.
+            const street = s.street ?? 'Preflop';
+            setStatus('Undone — Hand #' + s.hand_number + ' — ' + street + ' — Your turn.');
+            renderActionButtons(s);
           });
         } else if (b.action === 'bet-open') {
           btn.addEventListener('click', () => {
