@@ -33,7 +33,7 @@ async function reachPrefoldWindow(page, maxHeroActions = 12): Promise<boolean> {
     const heroTurn = await page
       .waitForFunction(() => {
         const btns = document.querySelectorAll('#action-buttons button');
-        return [...btns].some((b: any) => !b.disabled && b.id !== 'btn-new-game');
+        return [...btns].some((b: any) => !b.disabled && b.id !== 'btn-new-game' && (b as any).dataset.act !== 'prefold');
       }, { timeout: 8000 })
       .then(() => true)
       .catch(() => false);
@@ -62,6 +62,27 @@ test.describe('prefold toggle', () => {
 
     await toggle.click();
     await expect(toggle).not.toHaveClass(/armed/);
+    expect(await page.evaluate(() => (window as any).__PK0__.play.getPrefold())).toBe(false);
+  });
+});
+
+test.describe('prefold auto-fire', () => {
+  test('armed toggle auto check/folds on the hero turn and disarms', async ({ page }) => {
+    await startGame(page);
+    const reached = await reachPrefoldWindow(page);
+    expect(reached).toBe(true);
+
+    await page.locator('[data-act="prefold"]').click();          // arm
+    expect(await page.evaluate(() => (window as any).__PK0__.play.getPrefold())).toBe(true);
+
+    // On the hero's next turn the pre-action fires automatically: the normal
+    // action buttons (fold/check/call/raise) must NOT be left waiting for a click.
+    // Either the hand advances (fold) or the hero checks and bots resume — in
+    // both cases the arm is consumed.
+    await page.waitForFunction(
+      () => (window as any).__PK0__.play.getPrefold() === false,
+      { timeout: 15_000 },
+    );
     expect(await page.evaluate(() => (window as any).__PK0__.play.getPrefold())).toBe(false);
   });
 });

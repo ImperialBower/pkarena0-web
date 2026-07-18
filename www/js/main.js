@@ -66,6 +66,7 @@
     }
 
     function beginNewGame() {
+      preFoldArmed = false;   // never carry a pre-action arm into a new game
       commitCurrentGameToLifetime();
       pendingGameCommitted = false;
       currentGameChips = STARTING_CHIPS;
@@ -647,6 +648,7 @@
       }
 
       if (state.phase === 'HandComplete') {
+        preFoldArmed = false;   // a pre-action arm does not carry across hands
         const street = state.street ?? '';
         appendHandLog('Hand #' + state.hand_number + ' complete — ' + street);
         enableYamlDownload();
@@ -787,7 +789,21 @@
       container.appendChild(btn);
     }
 
+    // If the pre-action toggle is armed, auto-act on the hero's turn:
+    // fold when facing a bet, else check. Returns true if it fired (the arm is
+    // consumed one-shot before firing so it cannot recurse across streets).
+    function autoActFold(state) {
+      const action = prefoldDecision(state.legal_actions);
+      if (!action) return false;   // hero can't check/fold (e.g. all-in) — let them decide
+      preFoldArmed = false;
+      onHumanAction(action, 0, state);
+      return true;
+    }
+
     function renderActionButtons(state) {
+      // Pre-action: if the hero armed Check/Fold while bots acted, fire it now
+      // instead of rendering buttons. onHumanAction() re-enters the bot loop.
+      if (preFoldArmed && autoActFold(state)) return;
       const actions = state.legal_actions ?? [];
       const btns = [];
 
