@@ -53,7 +53,8 @@ Phase 0: no panic, serial fallback confirmed, budget set at 500 MC samples.
 | [EPIC-47](EPIC-47_Adaptive_Bots_Player_Stats.md) | Adaptive Bots — Player Stats & Exploitative Play | 46 | **Closed 2026-07-16** — Phases 1–4 complete; trained-`ExploitConfig` YAML deferred until an EPIC-28 artifact exists |
 | [EPIC-48](EPIC-48_Real_Equity_WASM.md) | Real Equity in the Browser | 46; upstream pkcore EPIC-36 | **Closed 2026-07-16** — Phase 0 delivered (500-sample MC budget, probe removed); Phases 1–2 deferred to a follow-up EPIC, now **unblocked**: upstream EPIC-36 shipped the `equity` knob 2026-07-17 |
 | [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47) | **Closed 2026-07-16** — Phases 1–3 complete (three parity-gated bundles, position awareness for all, difficulty selector, chips/100 bench `make bench-tiers`); `decision:`-knob adoption deferred to EPIC-48's follow-up, now **unblocked** (upstream EPIC-36 shipped 2026-07-17) |
-| [EPIC-50](EPIC-50_Decision_Knob_Adoption.md) | Decision-Knob Difficulty Adoption | 48, 49 (pkcore 0.3.0) | **Open** — the EPIC-48/49 follow-up: adopt `equity` / `ranges` / `pot_odds` knobs into the standard/strong bundles, land browser-equity validation, re-scope `strengthen()`. Phase 0 (dep bump) done; Phases 1–4 planned. `outs`/`preflop_charts`/tier-lever `exploit` out of scope |
+| [EPIC-50](EPIC-50_Decision_Knob_Adoption.md) | Decision-Knob Difficulty Adoption | 48, 49 (pkcore 0.3.0) | **Complete 2026-07-17** — `ranges` on standard, `equity + ranges` on strong; bench (real pools) standard +23.8k / strong +67.5k chips/100; browser-latency spec passes. `outs`/`preflop_charts`/tier-lever `exploit` out of scope |
+| [EPIC-51](EPIC-51_Strengthen_Rescope.md) | `strengthen()` Isolation & Re-scope | 50 | **Planned** — the EPIC-50 follow-up: measure `strengthen()`'s marginal contribution now equity is the dominant strong lever, then keep / thin / retire it on the evidence |
 
 Suggested order — **completed as planned**: 46 → 47 → 48 Phase 0 →
 49 Phases 1–3. The one remaining thread — upstream pkcore EPIC-36 — **shipped
@@ -63,8 +64,9 @@ is now pinned to `0.3.0` (`Cargo.toml:14`; native + `wasm32` checks pass). The
 follow-up EPIC is now unblocked: it picks up EPIC-48 Phases 1–2 (equity
 adoption) and lands the `decision:` knobs in EPIC-49's bundles. Note
 `outs`/`preflop_charts` will remain unavailable until an upstream range-model
-lets the decider price draws without villain cards — track that before scoping
-any bundle that depends on them.
+lets the decider price draws without villain cards — tracked as pkcore
+[EPIC-39](../../pkcore/docs/EPIC-39_Decider_Range_Model.md); scope no bundle that
+depends on them until it ships.
 
 ## Relationship to existing docs
 
