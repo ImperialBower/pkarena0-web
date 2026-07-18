@@ -10,6 +10,7 @@ use pkcore::analysis::name::HandRankName;
 use pkcore::analysis::player_stats::{Confidence, PlayerStats, StatsRegistry};
 use pkcore::arrays::seven::Seven;
 use pkcore::bot::decider::{BotDecider, JokerDecider, RuleBasedDecider};
+use pkcore::bot::decision_config::{DecisionConfig, EquityMode, RangeMode};
 use pkcore::bot::exploit::ExploitConfig;
 use pkcore::bot::exploitative_decider::ExploitativeDecider;
 use pkcore::bot::profile::BotProfile;
@@ -1945,6 +1946,7 @@ fn builtin_strong_pool() -> Vec<BotProfile> {
         .into_iter()
         .filter(|p| p.name != "joker")
         .map(strengthen)
+        .map(|p| with_decision(p, strong_decision()))
         .collect()
 }
 
@@ -2044,9 +2046,51 @@ fn builtin_standard_pool() -> Vec<BotProfile> {
     let mut profiles: Vec<BotProfile> = BotProfile::default_profiles()
         .into_iter()
         .map(attach_archetype_playbook)
+        .map(|p| with_decision(p, standard_decision()))
         .collect();
+    // The joker keeps the default (off) decision block: JokerDecider ignores
+    // its own profile and morphs into a pkcore default profile each hand, so a
+    // decision block here would never be consulted.
     profiles.push(BotProfile::joker());
     profiles
+}
+
+// ── EPIC-50: graded decision-capability knobs per tier ────────────────────────
+
+/// Attaches a pkcore `DecisionConfig` to a profile so the graded capability
+/// knobs (real equity, position-aware ranges, pot-odds discipline) travel with
+/// the bundle YAML. `#[serde(default)]` upstream means a default block is
+/// omitted from the YAML, so bundles that don't opt in are byte-identical.
+fn with_decision(mut profile: BotProfile, decision: DecisionConfig) -> BotProfile {
+    profile.decision = decision;
+    profile
+}
+
+/// Standard-tier knobs: activate the position-aware ranges that
+/// `attach_archetype_playbook` already carries dormant. Equity is left at the
+/// proxy and pot-odds at the strict default — the real MC engine is the *strong*
+/// tier's lever, kept off the default in-browser path so standard play stays
+/// cheap (one `compute()` per postflop decision is reserved for players who opt
+/// into the strong difficulty).
+fn standard_decision() -> DecisionConfig {
+    DecisionConfig {
+        ranges: RangeMode::PositionAware,
+        ..DecisionConfig::default()
+    }
+}
+
+/// Strong-tier knobs: real multi-way equity plus position-aware ranges, layered
+/// on the `strengthen()` base (tighter range, bluff clamp, `value_threshold`).
+/// 500 Monte Carlo samples = the EPIC-48 Phase-0 browser budget (2.8 ms HU /
+/// 5.7 ms 4-way). Pot-odds discipline stays at the strict default (1.0);
+/// `exploit` stays `off` (a bot-vs-bot drag — EPIC-49 corrigendum §1 keeps
+/// adaptation a user toggle, not a tier lever).
+fn strong_decision() -> DecisionConfig {
+    DecisionConfig {
+        equity: EquityMode::Fast { samples: 500 },
+        ranges: RangeMode::PositionAware,
+        ..DecisionConfig::default()
+    }
 }
 
 /// Attaches an authored [`Playbook`] to the five archetypes pkcore ships
@@ -3138,6 +3182,23 @@ mod bot_bundle_fixture {
             parsed.iter().any(|p| p.name == "joker"),
             "joker profile missing from embedded lineup"
         );
+
+        // EPIC-50: every non-joker standard profile carries the standard-tier
+        // decision knobs (real fast equity, position-aware ranges, moderate
+        // pot-odds discipline). The joker keeps the default (off) block because
+        // JokerDecider morphs into pkcore default profiles each hand.
+        for p in &parsed {
+            if p.name == "joker" {
+                assert!(p.decision.is_default(), "joker should keep the default decision block");
+            } else {
+                assert_eq!(
+                    p.decision,
+                    standard_decision(),
+                    "{} should carry the standard-tier decision knobs",
+                    p.name
+                );
+            }
+        }
     }
 
     /// The fallback path must itself be sound: if the embedded YAML were
@@ -3268,6 +3329,13 @@ mod bot_bundle_fixture {
             assert!(
                 btn > utg,
                 "{}: strong-tier BTN aggression ({btn:?}) should still exceed UTG ({utg:?})",
+                p.name
+            );
+            // EPIC-50: strong profiles carry the strict decision knobs.
+            assert_eq!(
+                p.decision,
+                strong_decision(),
+                "{} should carry the strong-tier decision knobs",
                 p.name
             );
         }

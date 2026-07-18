@@ -18,15 +18,16 @@ landed this session; everything else is **Planned**.
 | Component | Status |
 |---|---|
 | pkcore dependency bumped `0.2.1 → 0.3.0`; native + `wasm32` checks pass | **Complete** (`Cargo.toml:14`) |
-| `decision:` block on `BotBundle` profiles (schema flows through pkcore `DecisionConfig`) | Planned |
-| **standard** tier: `equity: fast` + `ranges: position_aware` + graded `pot_odds` | Planned |
-| **strong** tier: same knobs at strict settings, layered on the `strengthen()` base | Planned |
-| **weak** tier: knobs left at default `off` (the proxy floor) — unchanged | Planned |
-| Regenerate embedded `data/bots/{standard,strong}.yaml` from the code pools | Planned |
-| Parity gate updated: `bot_bundle_fixture` asserts the `decision:` blocks round-trip | Planned |
-| Browser equity latency: Playwright Turbo regression with equity on | Planned |
-| `make bench-tiers`: ordering weak < standard < strong holds with real knobs | Planned |
-| Retire / re-scope `strengthen()` once the bench confirms the knobs carry the tier | Planned |
+| `with_decision` helper + `standard_decision()` / `strong_decision()` constructors | **Complete** (`src/lib.rs`) |
+| **standard** tier: `ranges: position_aware` (equity/pot_odds at default — see Design revision) | **Complete** |
+| **strong** tier: `equity: fast{500}` + `ranges: position_aware`, layered on `strengthen()` | **Complete** |
+| **weak** tier: knobs left at default `off` (the proxy floor) — unchanged | **Complete** |
+| Regenerate embedded `data/bots/{standard,strong}.yaml` from the code pools | **Complete** |
+| Parity gate updated: `bot_bundle_fixture` asserts the `decision:` blocks round-trip | **Complete** (`src/lib.rs` parity tests; suite 20 pass / 0.15 s) |
+| Browser equity latency: Playwright Turbo regression with equity on | Planned (Phase 3) |
+| Seeded unit test: equity-on out-decides the proxy | Planned (Phase 3) |
+| `make bench-tiers`: ordering weak < standard < strong holds with real knobs | Planned (Phase 4) |
+| Retire / re-scope `strengthen()` once the bench confirms the knobs carry the tier | Planned (Phase 4) |
 | `exploit` knob — **out of scope** as a tier lever (adaptation drags bot-vs-bot; see Scope) | **Deferred** |
 | `outs` / `preflop_charts` knobs — **deferred upstream** in pkcore 0.3.0 | **Deferred** |
 
@@ -143,36 +144,51 @@ regenerated from them, so the parity gate keeps both in lockstep.
 historical floor (proxy equity, flat ranges, strict-but-proxy pot odds). Left
 explicit-off by omission; `weaken()` (`src/lib.rs:1927-1936`) is unchanged.
 
-**standard** — real equity + activate the dormant position ranges + moderate
-discipline:
+**standard** — activate the dormant position-aware ranges only (cheap; no MC
+engine on the default in-browser path):
 
 ```yaml
 decision:
-  equity: { mode: fast, samples: 500 }   # EPIC-48 Phase-0 browser budget
-  ranges: position_aware                 # activates attach_archetype_playbook ranges
-  pot_odds: { discipline: 0.75 }
+  ranges: position_aware   # activates attach_archetype_playbook's dormant ranges
+  # equity stays off (proxy); pot_odds stays at the strict default (1.0)
 ```
 
-**strong** — the same knobs at strict settings, layered on the existing
+**strong** — real equity + position-aware ranges, layered on the existing
 `strengthen()` base (tight range + bluff clamp + `value_threshold: 0.5`):
 
 ```yaml
 decision:
-  equity: { mode: fast, samples: 500 }
+  equity: { mode: fast, samples: 500 }   # EPIC-48 Phase-0 browser budget
   ranges: position_aware
-  pot_odds: { discipline: 1.0 }          # strict break-even calling
+  # pot_odds stays at the strict default (1.0)
 ```
 
-Strong out-plays standard on two axes at once: a tighter opening range and
-value-threshold (from `strengthen()`) **and** stricter pot-odds discipline.
-Sample count is held at 500 for both tiers — more samples buys *accuracy*, not
-*strength*, and doubling it would breach the latency budget. This keeps the
-strength delta in the discipline/range knobs, where it is legible.
+> **Design revision (landed during implementation).** The original sketch put
+> `equity: fast` on *both* tiers and graded `pot_odds` discipline (0.75 / 1.0).
+> Implementation falsified that shape:
+> 1. **Equity belongs to the strong tier only.** Putting the MC engine on the
+>    *default* (standard) tier ran `compute()` on every postflop decision of the
+>    default in-browser path *and* made the native suite pathological — one
+>    EPIC-49 positional test (`btn_and_utg_decisions_diverge_for_each_archetype`,
+>    512 seeds × 2 positions × 2 spots × 7 archetypes) drove the full `cargo test
+>    --lib` from ~0.2 s to **701 s** and confounded its positional-divergence
+>    assertion (position-independent equity washed out the positional-betting
+>    nuance the test measures). Reserving equity for `strong` keeps standard cheap
+>    and keeps EPIC-49's tests fast and meaningful.
+> 2. **`pot_odds` discipline is not a useful gradient here.** The historical
+>    default is already `1.0` (strict break-even); *lowering* standard to `0.75`
+>    would make it call looser — i.e. *weaker*, not stronger. Both tiers keep the
+>    strict default.
+>
+> Net tiers: **weak** (proxy, flat, from `weaken()`) < **standard** (proxy,
+> `position_aware` ranges) < **strong** (real equity, `position_aware`, on the
+> tighter `strengthen()` base). Strong owns the equity engine; standard's lift is
+> the cheap, always-affordable position-range activation.
 
-> **Open tuning question (Phase 4).** Once `ranges: position_aware` + `equity`
-> are live, `strengthen()`'s *manual* range-tightening may be redundant with, or
-> even fight, the position-aware ranges. The bench decides: if the knobs alone
-> preserve `strong > standard` with margin, `strengthen()` is reduced to just the
+> **Open tuning question (Phase 4).** With `ranges: position_aware` + `equity`
+> live on strong, `strengthen()`'s *manual* range-tightening may be redundant
+> with, or fight, the position-aware ranges. The bench decides: if the knobs
+> preserve `strong > standard` with margin, `strengthen()` is reduced to the
 > bluff-clamp + `value_threshold` (or retired). We do **not** guess — we measure.
 
 ### Where the knobs attach
@@ -221,22 +237,23 @@ bot-vs-bot play reveals, and it cannot reward opponent-modeling of a human.
   (`cargo check --target wasm32-unknown-unknown`) both compile clean.
 
 ### Phase 1 — Schema flow-through
-- [ ] 1a. Confirm `DecisionConfig` re-exports resolve from the pinned pkcore
-  (`pkcore::bot::decision_config::*` / prelude); add a `use` in `src/lib.rs`.
-- [ ] 1b. Add a `with_decision(profile, cfg)` helper and thread it into the
-  standard/strong pool builders (`src/lib.rs:2043/1943`), default-off elsewhere.
+- [x] 1a. Import `DecisionConfig`/`EquityMode`/`RangeMode` from the pinned pkcore
+  in `src/lib.rs`.
+- [x] 1b. Add a `with_decision(profile, cfg)` helper + `standard_decision()` /
+  `strong_decision()` constructors; thread into the standard/strong pool builders
+  (`src/lib.rs`), default-off elsewhere.
 
 ### Phase 2 — Bundle adoption
-- [ ] 2a. **standard** pool: `equity: fast{500}` + `ranges: position_aware` +
-  `pot_odds{0.75}`.
-- [ ] 2b. **strong** pool: `equity: fast{500}` + `ranges: position_aware` +
-  `pot_odds{1.0}`, layered on the `strengthen()` base.
-- [ ] 2c. Regenerate `data/bots/{standard,strong}.yaml` via the `#[ignore]`d
-  fixture generators; confirm `decision:` blocks are present and `weak.yaml` is
-  unchanged.
-- [ ] 2d. Update `bot_bundle_fixture` parity tests (`src/lib.rs:3118/3229`) so the
-  round-trip assertions cover the `decision:` field (they already compare it via
-  `PartialEq`; add explicit per-tier `assert_eq!` on `decision`).
+- [x] 2a. **standard** pool: `ranges: position_aware` (equity/pot_odds at default
+  — see Design revision; equity is strong-only).
+- [x] 2b. **strong** pool: `equity: fast{500}` + `ranges: position_aware`, layered
+  on the `strengthen()` base.
+- [x] 2c. Regenerate `data/bots/{standard,strong}.yaml` via the `#[ignore]`d
+  fixture generators; `decision:` blocks present (8 each, joker excluded),
+  `weak.yaml` unchanged (0 blocks).
+- [x] 2d. Extend `bot_bundle_fixture` parity tests with explicit per-tier
+  `assert_eq!` on `decision` (standard carries `standard_decision()`, strong
+  `strong_decision()`, joker default).
 
 ### Phase 3 — Browser-equity validation (EPIC-48 Phases 1-2)
 - [ ] 3a. Seeded unit test: an `equity: exact/fast` profile makes a demonstrably
