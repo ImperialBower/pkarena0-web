@@ -43,10 +43,11 @@ install-playwright:
 validate-bots:
 	cargo test --lib bot_bundle
 
-# EPIC-49 Phase 3 acceptance bench: seeded-decider (entropy-dealt) matchups
-# asserting the chips/100 ordering weak < standard < strong with statistical
-# margin. Release mode; ~15s. Not in the default fast suite — the deal RNG is
-# entropy (pkcore has no seeded deck), so this is a bench, not a unit test.
+# EPIC-49/50 acceptance bench: entropy-dealt matchups asserting chips/100
+# ordering weak < standard < strong from the real bundle pools. Release mode;
+# the strong tier runs the equity engine (500-sample MC per postflop decision),
+# so the strong-vs-standard leg is ~5 min (standard-vs-weak ~65 s). Not in the
+# default fast suite — the deal RNG is entropy (pkcore has no seeded deck).
 bench-tiers:
 	cargo test --release --lib difficulty_ordering -- --ignored --nocapture --test-threads=2
 

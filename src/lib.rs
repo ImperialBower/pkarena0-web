@@ -1959,9 +1959,11 @@ fn builtin_strong_pool() -> Vec<BotProfile> {
 /// position grades — a measured decision: lifting aggression across the
 /// board bought all-in variance, not edge. The same discipline is applied at
 /// the flat baseline and at every playbook position, since the decider
-/// resolves positional strategy first. Interim until upstream pkcore EPIC-36
-/// ships real capability knobs (equity, outs, pot-odds discipline); the
-/// strong tier also forces adaptation on (see `effective_adaptive`).
+/// resolves positional strategy first. As of EPIC-50 this is the profile-tuning
+/// layer *beneath* the strong tier's real capability knobs (`decision.equity =
+/// fast{500}` + `ranges: position_aware`, pkcore 0.3.0 via `strong_decision()`),
+/// not a substitute for them — the bench shows equity roughly triples the strong
+/// edge (≈+24k → +67k chips/100).
 /// Validated by the matchup harness (`difficulty_ordering_tests`), not
 /// vibes.
 fn strengthen(mut profile: BotProfile) -> BotProfile {
@@ -3540,36 +3542,41 @@ mod difficulty_ordering_tests {
         (net_a, net_b)
     }
 
-    /// Four solid archetypes from the standard pool, used on both sides of
-    /// each matchup so only the tier lever under test differs.
-    fn core_profiles() -> Vec<BotProfile> {
-        let pool = builtin_standard_pool();
-        ["gto", "tight_aggressive", "loose_aggressive", "abc"]
-            .iter()
-            .map(|name| {
-                pool.iter()
-                    .find(|p| p.name == *name)
-                    .expect("core profile in pool")
-                    .clone()
-            })
-            .collect()
+    /// Four solid archetypes benched on both sides of each matchup, so only the
+    /// tier lever under test differs. EPIC-50: each side is drawn from its
+    /// *actual* bundle pool (so the `decision:` knobs are exercised — standard's
+    /// `ranges: position_aware`, strong's `equity: fast` on top of `strengthen`),
+    /// not reconstructed from `strengthen`/`weaken` alone.
+    const CORE_ARCHETYPES: [&str; 4] = ["gto", "tight_aggressive", "loose_aggressive", "abc"];
+
+    /// Pulls a named archetype from a tier's pool (its full tier form, knobs
+    /// included).
+    fn pool_profile(pool: &[BotProfile], name: &str) -> BotProfile {
+        pool.iter()
+            .find(|p| p.name == name)
+            .unwrap_or_else(|| panic!("{name} missing from tier pool"))
+            .clone()
     }
 
-    /// EPIC-49 Phase 3 acceptance: the standard tier beats the weak tier.
-    /// Seats alternate standard/weak(same archetype) to balance position.
+    /// EPIC-49 Phase 3 / EPIC-50 acceptance: the standard tier beats the weak
+    /// tier. Both sides are drawn from their real bundle pools (so standard
+    /// carries `ranges: position_aware`), alternating same-archetype seats to
+    /// balance position.
     ///
-    /// Statistical bench, run via `make bench-tiers` (release mode; ~2s):
-    /// measured edge ≈ +22k chips/100 with run-to-run σ ≈ 4k over four runs
-    /// at this volume (≈5σ) — comfortably beyond flake territory, but still
-    /// entropy-dealt (see `run_matchup` note), hence not part of the default
-    /// fast suite.
+    /// Statistical bench, run via `make bench-tiers` (release mode; ~65 s —
+    /// proxy-equity on both sides, so no MC cost): measured edge
+    /// **+23,836 chips/100** over 12,000 hands (EPIC-50, 2026-07-17), in line
+    /// with the pre-knob ≈+22k. Entropy-dealt (see `run_matchup` note), hence
+    /// not part of the default fast suite.
     #[test]
     #[ignore = "statistical bench (entropy-dealt); run via `make bench-tiers`"]
     fn standard_tier_beats_weak_tier() {
+        let standard = builtin_standard_pool();
+        let weak = builtin_weak_pool();
         let mut seats = Vec::new();
-        for p in core_profiles() {
-            seats.push(bare(p.clone(), true)); // standard
-            seats.push(bare(weaken(p), false)); // weak
+        for name in CORE_ARCHETYPES {
+            seats.push(bare(pool_profile(&standard, name), true)); // standard tier
+            seats.push(bare(pool_profile(&weak, name), false)); // weak tier
         }
         let hands = 12_000;
         let (standard_net, weak_net) = run_matchup(seats, hands);
@@ -3585,32 +3592,42 @@ mod difficulty_ordering_tests {
         );
     }
 
-    /// EPIC-49 Phase 3 acceptance: the strong tier's bundle (`strengthen`)
-    /// beats bare standard. Same archetypes on both sides; only the bundle
-    /// lever differs — adaptation is off on both, matching what the tiers
-    /// themselves control (the adaptive toggle is an orthogonal EPIC-47 axis
-    /// on both standard and strong).
+    /// EPIC-50 acceptance: the strong tier beats the standard tier with the
+    /// real `decision:` knobs live. Both sides are drawn from their bundle
+    /// pools: strong = `strengthen` base **plus** `decision.equity = fast{500}`
+    /// + `ranges: position_aware`; standard = `ranges: position_aware` only.
+    /// Adaptation is off on both (an orthogonal EPIC-47 toggle).
     ///
-    /// Measured provenance: adaptation is NOT part of the strong lever —
-    /// on this same bench, adaptive-wrapped standard profiles vs bare ones
-    /// measured a consistent mild drag (−2.7k and −3.8k chips/100 over two
-    /// 96k-hand runs). Its value proposition is modeling *human* tendencies,
-    /// which a bot-vs-bot bench cannot see. Discipline (tight range + bluff
-    /// clamp + value threshold) is the lever that measures.
+    /// Measured provenance:
+    /// - **EPIC-50 (2026-07-17): +67,450 chips/100** over 12,000 hands with the
+    ///   real equity engine on the strong seats — nearly 3× the pre-knob
+    ///   `strengthen`-only edge (≈+24k), so the multi-way equity engine is now
+    ///   the dominant strong lever; `strengthen`'s range/discipline tuning is
+    ///   the profile layer beneath it. Isolating `strengthen`'s marginal
+    ///   contribution now that equity is on is a follow-up measurement.
+    /// - Adaptation is NOT a strong lever: adaptive-wrapped vs bare standard
+    ///   measured a mild drag (−2.7k / −3.8k chips/100) — its value is modeling
+    ///   *human* tendencies, invisible to a bot-vs-bot bench (EPIC-49 §1).
     ///
-    /// Statistical bench, run via `make bench-tiers` (release mode; ~12s):
-    /// measured edge ≈ +24k chips/100 with run-to-run σ ≈ 2k over three runs
-    /// at this volume (≈12σ). Entropy-dealt (see `run_matchup` note), hence
-    /// not part of the default fast suite.
+    /// Run via `make bench-tiers` (release; **~5 min — the strong seats run a
+    /// 500-sample MC per postflop decision**, so hand count was cut 96k → 12k;
+    /// the equity edge is large enough that the ordering holds easily at this
+    /// volume). Entropy-dealt (see `run_matchup` note), not in the fast suite.
     #[test]
     #[ignore = "statistical bench (entropy-dealt); run via `make bench-tiers`"]
     fn strong_tier_beats_standard_tier() {
+        let strong = builtin_strong_pool();
+        let standard = builtin_standard_pool();
         let mut seats = Vec::new();
-        for p in core_profiles() {
-            seats.push(bare(strengthen(p.clone()), true)); // strong
-            seats.push(bare(p, false)); // standard
+        for name in CORE_ARCHETYPES {
+            seats.push(bare(pool_profile(&strong, name), true)); // strong tier
+            seats.push(bare(pool_profile(&standard, name), false)); // standard tier
         }
-        let hands = 96_000;
+        // Reduced from 96_000: the strong tier now runs the real equity engine
+        // (500-sample MC per postflop decision), so this bench is compute-bound.
+        // The equity edge is large, so the ordering holds with margin at this
+        // volume; see the measured numbers in the EPIC-50 corrigendum.
+        let hands = 12_000;
         let (strong_net, standard_net) = run_matchup(seats, hands);
         eprintln!(
             "strong {strong_net:+} vs standard {standard_net:+} over {hands} hands \
@@ -3867,5 +3884,93 @@ mod position_awareness_tests {
                  authored spot — position awareness is not reaching the decider"
             );
         }
+    }
+}
+
+// ── EPIC-50 Phase 3: browser-equity adoption ──────────────────────────────────
+
+#[cfg(test)]
+mod equity_adoption_tests {
+    use super::*;
+    use pkcore::bot::table_snapshot::SeatInfo;
+    use pkcore::games::betting_structure::{BetTier, BettingStructure};
+
+    /// A multi-way flop spot: hero (seat 0) plus `villains` still-active
+    /// opponents, so the real multi-way equity engine sees a full field and
+    /// prices the hand well below the proxy's opponent-blind absolute-rank
+    /// estimate. `to_call`/`pot` set the pot-odds the decision compares against.
+    fn multiway_snapshot(hole: &str, board: &str, to_call: usize, pot: usize, villains: u8) -> TableSnapshot<'static> {
+        let n = villains + 1;
+        let stacks: Vec<SeatInfo> = (0..n)
+            .map(|i| SeatInfo {
+                id: uuid::Uuid::from_u128(u128::from(i) + 1),
+                seat: i,
+                name: format!("seat{i}"),
+                chips: 9_800,
+                bet: if i == 1 { to_call } else { 0 },
+                is_active: true,
+            })
+            .collect();
+        TableSnapshot {
+            seat: 0,
+            phase: GamePhase::Flop,
+            board: board.parse().expect("valid board"),
+            hole_cards: hole.parse().expect("valid hole cards"),
+            pot,
+            to_call,
+            current_bet: to_call,
+            min_raise: 100,
+            my_chips: 9_800,
+            stacks,
+            big_blind: 100,
+            betting_structure: BettingStructure::NoLimit,
+            bet_tier: BetTier::Small,
+            checked_this_street: false,
+            dealer_button: Some(0),
+            seat_count: n,
+            logical_seat: Some(0),
+            opponent_stats: None,
+        }
+    }
+
+    /// EPIC-50 Phase 3a: the strong tier's `equity` knob makes a demonstrably
+    /// better decision than the proxy. Hero holds the nut flush draw with two
+    /// overcards (A♠K♠ on Q♠7♠2♥): a monster *drawing* hand with ~15 outs, but
+    /// no made hand yet — so the opponent-blind hand-rank proxy scores it as
+    /// ace-high junk and folds to a bet, while the real multi-way engine prices
+    /// its draw equity above the pot odds and continues. Deterministic —
+    /// authored snapshot, seeded decider RNG, no deal.
+    #[test]
+    fn equity_knob_continues_a_strong_draw_the_proxy_misfolds() {
+        // abc never bluffs (bluff_frequency 0), so a continue is equity-driven,
+        // not a bluff — and a fold is a genuine fold.
+        let proxy = BotProfile::abc();
+        let equity = with_decision(BotProfile::abc(), strong_decision());
+
+        // to_call 100 into pot 300 => pot odds 0.25. The proxy's ace-high sits
+        // far below that; the real 3-way equity of the nut flush draw + two
+        // overcards sits well above it.
+        let snap = multiway_snapshot("As Ks", "Qs 7s 2h", 100, 300, 2);
+        let rule = RuleBasedDecider;
+
+        let fold_rate = |profile: &BotProfile| -> usize {
+            (0u64..64)
+                .filter(|&seed| {
+                    matches!(
+                        rule.decide_seeded(profile, &snap, &mut SmallRng::seed_from_u64(seed)),
+                        PlayerAction::Fold
+                    )
+                })
+                .count()
+        };
+
+        let proxy_folds = fold_rate(&proxy);
+        let equity_folds = fold_rate(&equity);
+
+        assert!(
+            proxy_folds > equity_folds + 24,
+            "the proxy should misfold the strong draw far more than the equity knob: \
+             proxy {proxy_folds}/64 vs equity {equity_folds}/64"
+        );
     }
 }

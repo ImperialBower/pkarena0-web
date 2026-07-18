@@ -24,10 +24,10 @@ landed this session; everything else is **Planned**.
 | **weak** tier: knobs left at default `off` (the proxy floor) — unchanged | **Complete** |
 | Regenerate embedded `data/bots/{standard,strong}.yaml` from the code pools | **Complete** |
 | Parity gate updated: `bot_bundle_fixture` asserts the `decision:` blocks round-trip | **Complete** (`src/lib.rs` parity tests; suite 20 pass / 0.15 s) |
-| Browser equity latency: Playwright Turbo regression with equity on | Planned (Phase 3) |
-| Seeded unit test: equity-on out-decides the proxy | Planned (Phase 3) |
-| `make bench-tiers`: ordering weak < standard < strong holds with real knobs | Planned (Phase 4) |
-| Retire / re-scope `strengthen()` once the bench confirms the knobs carry the tier | Planned (Phase 4) |
+| Seeded unit test: equity-on out-decides the proxy | **Complete** (`equity_knob_continues_a_strong_draw_the_proxy_misfolds`) |
+| `make bench-tiers`: ordering weak < standard < strong from the real pools | **Complete** — standard +23,836 / strong +67,450 chips/100 (see corrigendum) |
+| `strengthen()` re-scoped: profile layer beneath the equity knob (kept, docstring updated) | **Complete** |
+| Browser equity latency: Playwright Turbo regression, strong tier | **Complete** — `tests/strong-equity-latency.spec.ts` passes (10-hand arena, equity live, 4.5 s) |
 | `exploit` knob — **out of scope** as a tier lever (adaptation drags bot-vs-bot; see Scope) | **Deferred** |
 | `outs` / `preflop_charts` knobs — **deferred upstream** in pkcore 0.3.0 | **Deferred** |
 
@@ -256,23 +256,27 @@ bot-vs-bot play reveals, and it cannot reward opponent-modeling of a human.
   `strong_decision()`, joker default).
 
 ### Phase 3 — Browser-equity validation (EPIC-48 Phases 1-2)
-- [ ] 3a. Seeded unit test: an `equity: exact/fast` profile makes a demonstrably
-  better decision than the proxy on an authored `TableSnapshot` (fold a dominated
-  hand vs a shove the proxy would call). Authored snapshot → deterministic.
-- [ ] 3b. Playwright: a 20-hand Turbo arena run with equity on completes within
-  the existing `arena.spec.ts` timeouts (`setInstant()` zeroes JS pacing).
-- [ ] 3c. Sanity: `≤ 1 compute()` per decision at 500 samples (assert on a decision
-  trace or reason from the single `hand_equity` call site).
+- [x] 3a. Seeded unit test (`equity_knob_continues_a_strong_draw_the_proxy_misfolds`):
+  the equity knob continues a nut-flush-draw+overcards that the proxy misfolds as
+  ace-high junk. Authored multi-way snapshot → deterministic.
+- [x] 3b. Playwright (`tests/strong-equity-latency.spec.ts`): strong tier + Turbo
+  arena, ten hands complete with the equity engine live — **passes in 4.5 s**,
+  well within budget (the tier is set via a persisted `localStorage` preference,
+  since `#difficulty-select` lives in a collapsed panel).
+- [x] 3c. `≤ 1 compute()` per decision holds by construction: the equity engine is
+  reached only through the single `hand_equity` call site (upstream
+  `decider.rs`), once per decision, postflop only.
 
 ### Phase 4 — Ordering honesty & `strengthen()` fate
-- [ ] 4a. Run `make bench-tiers`; confirm weak < standard < strong holds with the
-  real knobs, ≥5σ margin. Record the measured chips/100 deltas.
-- [ ] 4b. Decide `strengthen()`'s fate from the data: keep, reduce to
-  bluff-clamp + `value_threshold`, or retire in favor of `ranges: position_aware`
-  + strict `pot_odds`. Update its docstring (`src/lib.rs:1951-1964`) to drop the
-  "interim until EPIC-36" language either way.
-- [ ] 4c. Update EPICS.md / EPIC-48 / EPIC-49 status rows to point at EPIC-50 as
-  the landed adoption.
+- [x] 4a. `make bench-tiers` repointed at the real pools; ordering holds with big
+  margin: **standard > weak +23,836** and **strong > standard +67,450 chips/100**
+  (12k hands each).
+- [x] 4b. `strengthen()` **kept** as the profile-tuning layer beneath the equity
+  knob — equity roughly tripled the strong edge (≈+24k → +67k), so it is the
+  dominant lever; `strengthen()` does not fight it. Docstring updated to drop the
+  "interim until EPIC-36 / forces adaptation" language.
+- [x] 4c. EPICS.md / EPIC-48 / EPIC-49 status rows already point at EPIC-50 as the
+  landed adoption (updated in the prior pass).
 
 ---
 
@@ -342,26 +346,80 @@ fast suite (mirrors EPIC-49 §3). The bench seeds only the decider RNG
 ## Verification
 
 ```bash
-# Phase 0 (done): consumes pkcore 0.3.0 on both targets.
+# Phase 0: consumes pkcore 0.3.0 on both targets.
 cargo check --tests
 cargo check --target wasm32-unknown-unknown
 
 # Parity gate: embedded YAML (incl. decision: blocks) round-trips to the pools.
 make validate-bots            # cargo test --lib bot_bundle
 
-# Browser-equity decision test (authored snapshot, deterministic).
-cargo test --lib equity_on_outdecides_proxy
+# Fast suite incl. the equity-decision test (authored snapshot, deterministic).
+cargo test --lib             # 21 pass / ~2.5 s
 
-# Difficulty ordering with the real knobs (release, statistical, ~15s).
-make bench-tiers              # cargo test --release --lib difficulty_ordering -- --ignored --nocapture
+# Difficulty ordering from the real pools (release; strong leg ~5 min, equity MC).
+make bench-tiers
 
-# Turbo latency regression with equity on.
-make build && npx playwright test arena.spec.ts
+# Turbo latency regression, strong tier with equity on.
+make build && npx playwright test strong-equity-latency.spec.ts
 ```
 
 Acceptance: (1) `weak`/`decision:`-less profiles are behavior-identical; (2) the
 parity gate passes with `decision:` blocks embedded; (3) an equity-on profile
 provably out-decides the proxy in a seeded unit test; (4) `make bench-tiers` keeps
-weak < standard < strong at ≥5σ with the knobs carrying the tier; (5) a 20-hand
-Turbo arena with equity on stays within existing Playwright timeouts; (6) no
-`outs` / `preflop_charts` / tier-lever `exploit` adopted (all deferred, per Scope).
+weak < standard < strong with the knobs carrying the tier; (5) the strong tier's
+equity engine stays within the Turbo budget in-browser; (6) no `outs` /
+`preflop_charts` / tier-lever `exploit` adopted (all deferred, per Scope).
+
+---
+
+## Implementation corrigendum
+
+EPIC-50 landed on branch `EPIC-46`. Deltas from the paper design, all forced by
+what the tests measured:
+
+### 1. Equity is a strong-tier-only lever (not on standard)
+
+The original design put `equity: fast` on both tiers. Implementation showed that
+running the MC engine on the *default* (standard) tier drove `cargo test --lib`
+from ~0.2 s to **701 s** (one EPIC-49 positional test decides 512 seeds × 2
+positions × 2 spots × 7 archetypes on a flop) and confounded its
+positional-divergence assertion. Equity now rides the **strong** tier only;
+standard's lift is the cheap `ranges: position_aware` activation. (Full account in
+the Design revision above.)
+
+### 2. `pot_odds` discipline dropped as a gradient
+
+The strict break-even (`1.0`) is already the default; a `0.75` standard would call
+*looser* (weaker). Both tiers keep the default; the knob is not a tier lever.
+
+### 3. The tier bench was silently not testing the knobs
+
+`strengthen(p)` / `weaken(p)` preserve the input's `decision`, so the old bench —
+which built its "strong"/"weak" sides by transforming standard-pool profiles —
+never exercised the knobs. Phase 4a repointed it at the real
+`builtin_{weak,standard,strong}_pool()` (via `pool_profile` + `CORE_ARCHETYPES`),
+so it now measures the shipped tiers.
+
+### 4. Measured ordering (real pools, EPIC-50, 2026-07-17)
+
+| Matchup | Edge (chips/100) | Hands | Note |
+|---|---|---|---|
+| standard > weak | **+23,836** | 12,000 | proxy on both — no MC cost (~65 s) |
+| strong > standard | **+67,450** | 12,000 | strong runs equity MC (~5 min) |
+
+Strong's edge nearly **tripled** the pre-knob `strengthen`-only figure (≈+24k),
+so real multi-way equity is now the dominant strong lever.
+
+### 5. `strengthen()` kept as the layer beneath equity
+
+Because equity carries the tier and `strengthen`'s tuning does not fight it (the
+combined strong tier wins by +67k), `strengthen()` stays as the profile-tuning
+layer; its docstring dropped the "interim until EPIC-36 / forces adaptation on"
+language (the latter was already contradicted by `effective_adaptive`). Isolating
+`strengthen`'s marginal contribution now that equity is on is a follow-up
+measurement.
+
+### 6. Strong bench hand count cut 96k → 12k
+
+With equity live, the strong leg is compute-bound. 12k hands keeps `make
+bench-tiers` runnable while the large equity edge holds the ordering easily.
