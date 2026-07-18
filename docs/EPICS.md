@@ -55,6 +55,7 @@ Phase 0: no panic, serial fallback confirmed, budget set at 500 MC samples.
 | [EPIC-49](EPIC-49_Bot_Lineup_Difficulty.md) | Data-Driven Bot Lineup & Difficulty | 46 (consumes 47) | **Closed 2026-07-16** — Phases 1–3 complete (three parity-gated bundles, position awareness for all, difficulty selector, chips/100 bench `make bench-tiers`); `decision:`-knob adoption deferred to EPIC-48's follow-up, now **unblocked** (upstream EPIC-36 shipped 2026-07-17) |
 | [EPIC-50](EPIC-50_Decision_Knob_Adoption.md) | Decision-Knob Difficulty Adoption | 48, 49 (pkcore 0.3.0) | **Complete 2026-07-17** — `ranges` on standard, `equity + ranges` on strong; bench (real pools) standard +23.8k / strong +67.5k chips/100; browser-latency spec passes. `outs`/`preflop_charts`/tier-lever `exploit` out of scope |
 | [EPIC-51](EPIC-51_Strengthen_Rescope.md) | `strengthen()` Isolation & Re-scope | 50 | **Planned** — the EPIC-50 follow-up: measure `strengthen()`'s marginal contribution now equity is the dominant strong lever, then keep / thin / retire it on the evidence |
+| [EPIC-52](EPIC-52_Bot_Decision_Transparency.md) | Bot Decision Transparency ("Bot X-Ray") | 46, 47, 50; Phase 2 needs a new upstream pkcore `DecisionTrace` EPIC | **Draft** — preliminary outline only: a debug toggle exposing bot inputs, exploit adjustments, and (once upstream trace lands) per-decision reasoning |
 
 Suggested order — **completed as planned**: 46 → 47 → 48 Phase 0 →
 49 Phases 1–3. The one remaining thread — upstream pkcore EPIC-36 — **shipped
