@@ -15,6 +15,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Score bar now shows hand and blinds together as `Hand: N (sb/bb)`,
   reclaiming horizontal space for the new P&L slot.
 
+### Changed
+- Upgraded `pkcore` from 0.3.0 to 0.4.0. That release fixes DEFECT_007, in
+  which `RuleBasedDecider` emitted bets and raises the table then rejected,
+  and it returned `Raise` where it had wrongly returned `Bet`. Shipped
+  behaviour here improves accordingly; no app code changed. `TableSnapshot`
+  gained a public `raises_this_street` field, so the three test fixtures that
+  build it as a struct literal now set it to `0` — correct for these
+  No-Limit flop spots, where no raise has been made and the field's only
+  consumer, the Fixed-Limit raise cap, does not apply.
+
 ### Removed
 - Score-bar P&L indicator (Play mode). It duplicated information already
   visible in the chip count and had no role in a single-session,

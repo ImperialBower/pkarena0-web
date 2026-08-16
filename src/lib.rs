@@ -3123,6 +3123,10 @@ mod adaptive_wrapping_tests {
             to_call: 0,
             current_bet: 0,
             min_raise: 100,
+            // No raise has been made on this flop, so the per-street count is 0.
+            // pkcore reads it only for the Fixed-Limit raise cap, and these
+            // fixtures are No-Limit, where the cap does not apply.
+            raises_this_street: 0,
             my_chips: 9_800,
             stacks: vec![
                 SeatInfo {
@@ -3928,6 +3932,10 @@ mod position_awareness_tests {
             to_call,
             current_bet,
             min_raise: 100,
+            // No raise has been made on this flop, so the per-street count is 0.
+            // pkcore reads it only for the Fixed-Limit raise cap, and these
+            // fixtures are No-Limit, where the cap does not apply.
+            raises_this_street: 0,
             my_chips: 9_800,
             stacks,
             big_blind: 100,
@@ -4031,6 +4039,10 @@ mod equity_adoption_tests {
             to_call,
             current_bet: to_call,
             min_raise: 100,
+            // No raise has been made on this flop, so the per-street count is 0.
+            // pkcore reads it only for the Fixed-Limit raise cap, and these
+            // fixtures are No-Limit, where the cap does not apply.
+            raises_this_street: 0,
             my_chips: 9_800,
             stacks,
             big_blind: 100,
