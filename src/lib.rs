@@ -1095,7 +1095,7 @@ fn build_replay_snapshot(hh: &HandHistory, target_step: usize) -> Result<ReplayS
                 label,
             } => {
                 table
-                    .apply_action(*seat, action.clone())
+                    .apply_action(*seat, *action)
                     .map_err(|e| e.to_string())?;
                 last_label = label.clone();
                 current_seat = Some(*seat);
@@ -3120,6 +3120,9 @@ mod adaptive_wrapping_tests {
             board: "Ks 7h 2c".parse().expect("valid board"),
             hole_cards: "Ad Kd".parse().expect("valid hole cards"),
             pot: 300,
+            // Flop and later, the pot-limit ceiling is computed against the
+            // real pot, so this mirrors `pot`. No-Limit fixtures ignore it.
+            pot_limit_pot: 300,
             to_call: 0,
             current_bet: 0,
             min_raise: 100,
@@ -3127,6 +3130,9 @@ mod adaptive_wrapping_tests {
             // pkcore reads it only for the Fixed-Limit raise cap, and these
             // fixtures are No-Limit, where the cap does not apply.
             raises_this_street: 0,
+            // This seat has not acted yet on the flop, so TDA 47-A never bars
+            // it from raising.
+            reopen_gated: false,
             my_chips: 9_800,
             stacks: vec![
                 SeatInfo {
@@ -3929,6 +3935,9 @@ mod position_awareness_tests {
             board: "Ks 7h 2c".parse().expect("valid board"),
             hole_cards: hole.parse().expect("valid hole cards"),
             pot: 300,
+            // Flop and later, the pot-limit ceiling is computed against the
+            // real pot, so this mirrors `pot`. No-Limit fixtures ignore it.
+            pot_limit_pot: 300,
             to_call,
             current_bet,
             min_raise: 100,
@@ -3936,6 +3945,9 @@ mod position_awareness_tests {
             // pkcore reads it only for the Fixed-Limit raise cap, and these
             // fixtures are No-Limit, where the cap does not apply.
             raises_this_street: 0,
+            // This seat has not acted yet on the flop, so TDA 47-A never bars
+            // it from raising.
+            reopen_gated: false,
             my_chips: 9_800,
             stacks,
             big_blind: 100,
@@ -4036,6 +4048,9 @@ mod equity_adoption_tests {
             board: board.parse().expect("valid board"),
             hole_cards: hole.parse().expect("valid hole cards"),
             pot,
+            // Flop and later, the pot-limit ceiling is computed against the
+            // real pot, so this mirrors `pot`. No-Limit fixtures ignore it.
+            pot_limit_pot: pot,
             to_call,
             current_bet: to_call,
             min_raise: 100,
@@ -4043,6 +4058,9 @@ mod equity_adoption_tests {
             // pkcore reads it only for the Fixed-Limit raise cap, and these
             // fixtures are No-Limit, where the cap does not apply.
             raises_this_street: 0,
+            // This seat has not acted yet on the flop, so TDA 47-A never bars
+            // it from raising.
+            reopen_gated: false,
             my_chips: 9_800,
             stacks,
             big_blind: 100,

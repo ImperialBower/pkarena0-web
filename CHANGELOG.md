@@ -16,6 +16,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   reclaiming horizontal space for the new P&L slot.
 
 ### Changed
+- Upgraded `pkcore` from 0.4.0 to 0.5.0, a TDA 2024 rules-correctness
+  release. It fixes DEFECT_010 (a player who had already acted could
+  re-raise a short all-in, Rule 47-A), DEFECT_011 (the odd chip in a split
+  pot went to the highest-numbered winning seat instead of walking left from
+  the button, Rule 20), DEFECT_012 (a short or dead blind shrank the pre-flop
+  pot-limit maximum, Rule 54-B), DEFECT_013 (dead button, Rule 32) and
+  DEFECT_014 (replay sized a dead-button table wrongly). Shipped behaviour
+  here improves accordingly; no app code changed, because production
+  snapshots are built by `TableSnapshot::from_table`, which carries the fixes
+  for free. `TableSnapshot` gained public `pot_limit_pot` and `reopen_gated`
+  fields, so the three test fixtures that build it as a struct literal now
+  set them: `pot_limit_pot` mirrors `pot` (these are flop spots, and Rule
+  54-C sizes post-flop ceilings against the real pot) and `reopen_gated` is
+  `false` (the fixture seat has not acted on that street, so Rule 47-A cannot
+  bar it). `PlayerAction` is now `Copy`, so the replay loop dereferences it
+  instead of cloning.
 - Upgraded `pkcore` from 0.3.0 to 0.4.0. That release fixes DEFECT_007, in
   which `RuleBasedDecider` emitted bets and raises the table then rejected,
   and it returned `Raise` where it had wrongly returned `Bet`. Shipped
