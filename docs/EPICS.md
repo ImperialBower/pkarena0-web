@@ -58,6 +58,7 @@ Phase 0: no panic, serial fallback confirmed, budget set at 500 MC samples.
 | [EPIC-52](EPIC-52_Bot_Decision_Transparency.md) | Bot Decision Transparency ("Bot X-Ray") | 46, 47, 50; Phase 2 needs a new upstream pkcore `DecisionTrace` EPIC | **Draft** — preliminary outline only: a debug toggle exposing bot inputs, exploit adjustments, and (once upstream trace lands) per-decision reasoning |
 | [EPIC-53](EPIC-53_Learning_Mode.md) | Learning Mode — Drills & Achievements | 46, 48 (consumes 47, 49) | **Planned** — salvaged 2026-07-18 from the `EPIC-50` branch (was drafted as EPIC-50, renumbered): a learning table variant that quizzes pot odds/outs/equity/ranges graded by pkcore, with an achievement ladder culminating in a "spot the GTO bot" archetype read. Phases 0–1 unblocked |
 | [EPIC-54](EPIC-54_Player_Mode_Table_Setup.md) | Player-Mode Table Setup — Opponent Count & Bot Selection | — (builds on `main`; related 49) | **Planned** — salvaged 2026-07-18 from the `EPIC-50` branch (was drafted as EPIC-51, renumbered): a Play-tab setup panel choosing opponent count (1–8) and archetypes (duplicates allowed), with today's random 8-bot lineup as the seeded-identical default |
+| [EPIC-55](EPIC-55_Coach_Mode.md) | Coach Mode — Live Play Advisor | 48, 50; T3 needs upstream pkcore EPIC-39 | **Planned** — a right-hand drawer answering the *hero's* spot before they act, every answer stamped with the tier that produced it: T0 price (`PotOdds`/`Ev`, exact, 9-way), T1 equity (500-sample seeded MC, 9-way, over-states while villains are `Random`), T2 chart (`PositionRanges`, preflop). T2b exact HUP is gated on a **~15.8 MB wasm cliff**; T3 CFR is heads-up + turn/river only and blocked on pkcore EPIC-39. Retires the JS pot-odds/SPR math at `www/js/main.js:572-580` |
 
 Suggested order — **completed as planned**: 46 → 47 → 48 Phase 0 →
 49 Phases 1–3. The one remaining thread — upstream pkcore EPIC-36 — **shipped
@@ -81,3 +82,18 @@ depends on them until it ships.
 - pkcore [`ROADMAP.md`](../../pkcore/ROADMAP.md) — upstream EPIC index;
   EPIC-34 (variant selection in this app) is upstream-tracked and untouched
   by this set.
+
+## The transparency trio (52 / 53 / 55)
+
+Three EPICs approach the same theme — making the engine's reasoning visible —
+from different directions, and should be read together:
+
+- **[EPIC-52](EPIC-52_Bot_Decision_Transparency.md)** explains *the bot's*
+  decision ("why did seat 4 raise?"). Blocked on an upstream `DecisionTrace`.
+- **[EPIC-53](EPIC-53_Learning_Mode.md)** *hides* the answer and grades the
+  player's guess ("what price are you being offered?").
+- **[EPIC-55](EPIC-55_Coach_Mode.md)** *shows* the answer for the hero's own
+  spot, live, before they act.
+
+EPIC-55 builds the shared advice engine (`src/coach.rs`); EPIC-53 Phase 4
+consumes it rather than reimplementing the grading math. Coach ships first.
