@@ -68,7 +68,7 @@ struct BotBundle {
 
 thread_local! {
     static SESSION: RefCell<Option<PokerSession>> = const { RefCell::new(None) };
-    static BOTS: RefCell<Vec<BotSeat>> = RefCell::new(Vec::new());
+    static BOTS: RefCell<Vec<BotSeat>> = const { RefCell::new(Vec::new()) };
     static RNG: RefCell<SmallRng> = RefCell::new(SmallRng::seed_from_u64(0));
     static PHASE: RefCell<SessionPhase> = const { RefCell::new(SessionPhase::Uninitialized) };
     /// Chip counts at the start of the current hand (before blinds), indexed by seat.
@@ -3716,7 +3716,7 @@ mod difficulty_ordering_tests {
     /// EPIC-50 acceptance: the strong tier beats the standard tier with the
     /// real `decision:` knobs live. Both sides are drawn from their bundle
     /// pools: strong = `strengthen` base **plus** `decision.equity = fast{500}`
-    /// + `ranges: position_aware`; standard = `ranges: position_aware` only.
+    /// and `ranges: position_aware`; standard = `ranges: position_aware` only.
     /// Adaptation is off on both (an orthogonal EPIC-47 toggle).
     ///
     /// Measured provenance:
