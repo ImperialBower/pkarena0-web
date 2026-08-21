@@ -16,6 +16,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   reclaiming horizontal space for the new P&L slot.
 
 ### Changed
+- Upgraded `pkcore` from 0.5.0 to 0.6.0, a defect-fix release. No app code
+  changed: every breaking signature in 0.6.0 sits on `PokerSession::next_step`
+  (new `SessionStep::Failed` arm), the fallible stud/razz constructors,
+  `BettingStructure::min_raise_for_tier`, `TableAction::generate_player_loses`,
+  `Shifter::shifts`, and the `TryFrom<Vec<Card>>` impls for `SevenFiveBCM` and
+  `IndexCardMap` — none of which this crate calls. Shipped behaviour improves
+  for free through `TableSnapshot::from_table`. The fixes that reach the table
+  here are DEFECT_022 (`next_to_act` restarted its scan under the gun on every
+  call, so after a re-raise the action went to a seat that had already acted on
+  that bet level — pots balanced, but the order was wrong), DEFECT_023
+  (`min_raise_for_tier` returned `0` for No-Limit on the first raise of a
+  street, plus four public methods that always panicked now return or report),
+  and `TableCelled::act_raise` no longer underflowing on a short all-in raise.
+  Full suite green: 23 Rust tests, 5 bot-bundle fixtures, clippy clean, and all
+  49 Playwright specs.
 - Upgraded `pkcore` from 0.4.0 to 0.5.0, a TDA 2024 rules-correctness
   release. It fixes DEFECT_010 (a player who had already acted could
   re-raise a short all-in, Rule 47-A), DEFECT_011 (the odd chip in a split
