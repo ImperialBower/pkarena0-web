@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.25] — 2026-08-22
+
 ### Added
 - Lifetime P&L tracker in the Play-tab score bar. Persists across reloads
   via `localStorage`; commits each completed game's net delta on
