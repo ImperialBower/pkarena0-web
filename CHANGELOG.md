@@ -16,6 +16,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   reclaiming horizontal space for the new P&L slot.
 
 ### Changed
+- Upgraded `pkcore` from 0.6.0 to 0.7.0. One breaking signature reaches this
+  crate: `PokerSession::next_actor` now returns
+  `Result<Option<u8>, PKError>`. Before 0.7.0 a failed street advance (a dry
+  deck) collapsed to `None`, which `step_bot` read as "hand over" — the phase
+  went to `HandComplete`, `end_hand()` then returned `ActionIsntFinished`, and
+  the pot was stranded. `step_bot` now unwinds an `Err` with
+  `PokerSession::abort_hand` (every committed chip goes back to its owner),
+  records it in `LAST_ERROR`, and returns `{"done":true,"error":"…"}`. The
+  other 0.7.0 breakages (`KuhnCfr::train`, `Deck::get`,
+  `Terminal::receive_usize`, `HUPResult::from_sorted_heads_up`) and the removed
+  `pkcore::play::actions` / `pkcore::play::positions` modules are not used
+  here. Six test call sites gained `.expect("next_actor")`.
 - Upgraded `pkcore` from 0.5.0 to 0.6.0, a defect-fix release. No app code
   changed: every breaking signature in 0.6.0 sits on `PokerSession::next_step`
   (new `SessionStep::Failed` arm), the fallible stud/razz constructors,
