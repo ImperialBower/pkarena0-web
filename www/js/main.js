@@ -486,7 +486,8 @@
       setStatus('…');
       const req = JSON.stringify({ action, amount: amount ?? 0 });
       const state = JSON.parse(_playMod.human_action(req));
-      // Legacy hard-error path (should not occur after the derive_legal_actions fix).
+      // Legacy hard-error path: legal_actions now comes straight from
+      // Table::legal_actions(), so an advertised action can no longer be rejected.
       if (state.phase === 'Error') { renderState(state); return; }
       // Recoverable error: action was rejected but game is still WaitingForHuman.
       // Show the message and re-render buttons so the player can try again.
@@ -813,8 +814,12 @@
         } else if (action === 'Check') {
           btns.push({ label: 'Check', cls: 'safe', action });
         } else if (action === 'Call') {
-          const amt = state.to_call ?? 0;
-          btns.push({ label: 'Call $' + amt.toLocaleString(), cls: '', action });
+          // pkcore always offers Call and converts a short stack into a partial
+          // all-in call, so clamp the label to what the hero can actually put in.
+          const stack = state.max_bet ?? 0;
+          const amt = Math.min(state.to_call ?? 0, stack);
+          const short = amt < (state.to_call ?? 0);
+          btns.push({ label: 'Call $' + amt.toLocaleString() + (short ? ' (all-in)' : ''), cls: '', action });
         } else if (action === 'Bet' || action === 'Raise') {
           const minRaise = state.min_raise ?? 100;
           const maxBet   = state.max_bet   ?? 10000;

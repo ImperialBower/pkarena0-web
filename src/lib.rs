@@ -1557,15 +1557,16 @@ fn build_game_state() -> String {
         let bb_seat = table.determine_big_blind();
 
         let to_call = table.to_call(0);
-        // min_raise is the minimum *total* bet/raise-to amount.
-        // Raise(n) validates n - table.bet >= min_raise_increment, so the
-        // minimum valid total is table.bet + increment.  Bet on a fresh street
-        // has table.bet == 0, so the formula still gives the right answer (1 BB).
-        let min_raise = table.bet + table.min_raise();
         let hero_chips = table.seats.get_seat(0).map_or(0, |s| s.player.chips);
         let max_bet = hero_chips;
 
-        let legal_actions = derive_legal_actions(to_call, hero_chips, table.bet);
+        // Ask the engine what the hero may do rather than re-deriving it here.
+        // `min_raise` is the minimum *total* bet/raise-to amount, taken from the
+        // `Bet(n)` / `Raise(n)` pkcore itself advertised, so the UI's "Min"
+        // button can never name a figure `act_raise` would reject.
+        let hero_legal = table.legal_actions(0);
+        let min_raise = advertised_min_raise(&hero_legal).unwrap_or_else(|| table.min_raise_to());
+        let legal_actions = legal_action_names(&hero_legal);
 
         // Bot views — reveal hole cards at HandComplete/Showdown for in-hand bots.
         // In Arena (all-bot spectator) mode there is no one to hide from, so every
@@ -1785,31 +1786,45 @@ fn empty_player_view(seat: u8) -> PlayerView {
     }
 }
 
-fn derive_legal_actions(to_call: usize, hero_chips: usize, current_bet: usize) -> Vec<String> {
-    if hero_chips == 0 {
-        return vec![];
+/// The front-end's action-name string for one of pkcore's `PlayerAction`
+/// variants. The amount carried by `Bet(n)` / `Raise(n)` is dropped here — the
+/// UI reads the minimum from `min_raise` and the ceiling from `max_bet`.
+fn action_name(action: PlayerAction) -> &'static str {
+    match action {
+        PlayerAction::Fold => "Fold",
+        PlayerAction::Check => "Check",
+        PlayerAction::Call => "Call",
+        PlayerAction::Bet(_) => "Bet",
+        PlayerAction::Raise(_) => "Raise",
+        PlayerAction::AllIn => "AllIn",
     }
-    if to_call == 0 {
-        // No bet facing us.
-        let mut actions = vec!["Check".to_string()];
-        actions.push("Bet".to_string());
-        actions.push("AllIn".to_string());
-        actions
-    } else {
-        // There is a bet to call/raise.
-        let mut actions = vec!["Fold".to_string()];
-        // Only offer Call when the player can cover the full amount; when they
-        // can't, AllIn is the correct action (calling for less / going all-in).
-        if hero_chips >= to_call {
-            actions.push("Call".to_string());
-        }
-        // Can raise only if chips exceed the call and exceed the current bet.
-        if hero_chips > to_call && hero_chips > current_bet {
-            actions.push("Raise".to_string());
-        }
-        actions.push("AllIn".to_string());
-        actions
-    }
+}
+
+/// Translates pkcore's legal-action list into the strings the front-end
+/// expects, preserving pkcore's order.
+///
+/// `Table::legal_actions` is the single source of betting legality: it runs the
+/// same `validate_raise` that `act_raise` runs and honours TDA Rule 47-A
+/// re-open gating, so nothing advertised here can be rejected on the way in.
+/// Deriving the list locally instead — the shape this replaced — silently drops
+/// distinctions pkcore makes; the big-blind option is the one that bit us
+/// (`to_call == 0` with a live bet is a Raise, not a Bet, and sending `Bet`
+/// logs `TableAction::Bet` and mislabels the hand history — pkcore DEFECT_007).
+fn legal_action_names(actions: &[PlayerAction]) -> Vec<String> {
+    actions
+        .iter()
+        .map(|a| action_name(*a).to_string())
+        .collect()
+}
+
+/// The minimum legal raise-to amount pkcore advertises, read off whichever of
+/// `Bet(n)` / `Raise(n)` it offered. `None` when no voluntary open is legal —
+/// the caller falls back to `Table::min_raise_to()`.
+fn advertised_min_raise(actions: &[PlayerAction]) -> Option<usize> {
+    actions.iter().find_map(|a| match a {
+        PlayerAction::Bet(n) | PlayerAction::Raise(n) => Some(*n),
+        _ => None,
+    })
 }
 
 /// Builds a seat's decider. `joker` seats morph each hand via `JokerDecider`;
@@ -4193,5 +4208,138 @@ mod undo_tests {
         assert_eq!(after["can_undo"], Value::Bool(false));
         assert_eq!(after["hand_number"], before["hand_number"]);
         assert!(after.get("error").is_none(), "no-op undo must not set an error");
+    }
+}
+
+#[cfg(test)]
+mod legal_action_tests {
+    use super::{advertised_min_raise, legal_action_names};
+    use pkcore::casino::action::PlayerAction;
+    use pkcore::casino::game::ForcedBets;
+    use pkcore::casino::table::{Player, Seat, Seats, Table};
+
+    /// Three 5,000-chip seats at 50/100, blinds posted and cards dealt.
+    fn dealt_table() -> Table {
+        let seats = Seats::new(vec![
+            Seat::new(Player::new_with_chips("A".to_string(), 5_000)),
+            Seat::new(Player::new_with_chips("B".to_string(), 5_000)),
+            Seat::new(Player::new_with_chips("C".to_string(), 5_000)),
+        ]);
+        let mut t = Table::nlh_from_seats(seats, ForcedBets::new(50, 100));
+        t.act_forced_bets().expect("forced bets");
+        t.deal_cards_to_seats().expect("deal");
+        t
+    }
+
+    /// Everyone calls around to the big blind, leaving the option open.
+    fn limp_to_the_big_blind(t: &mut Table) {
+        let bb = t.determine_big_blind();
+        for _ in 0..t.seats.0.len() {
+            let seat = t.next_to_act();
+            if seat == bb {
+                return;
+            }
+            t.apply_action(seat, PlayerAction::Call).expect("limp");
+        }
+        panic!("never reached the big blind");
+    }
+
+    // -- translation -------------------------------------------------------
+
+    #[test]
+    fn names_drop_the_amount_and_keep_pkcore_order() {
+        let actions = [
+            PlayerAction::Fold,
+            PlayerAction::Call,
+            PlayerAction::Raise(200),
+            PlayerAction::AllIn,
+        ];
+        assert_eq!(
+            legal_action_names(&actions),
+            vec!["Fold", "Call", "Raise", "AllIn"]
+        );
+    }
+
+    #[test]
+    fn check_and_bet_translate_too() {
+        let actions = [PlayerAction::Check, PlayerAction::Bet(100), PlayerAction::AllIn];
+        assert_eq!(legal_action_names(&actions), vec!["Check", "Bet", "AllIn"]);
+    }
+
+    // -- advertised minimum ------------------------------------------------
+
+    #[test]
+    fn min_raise_is_read_off_whichever_variant_pkcore_offered() {
+        assert_eq!(
+            advertised_min_raise(&[PlayerAction::Check, PlayerAction::Bet(100)]),
+            Some(100)
+        );
+        assert_eq!(
+            advertised_min_raise(&[PlayerAction::Call, PlayerAction::Raise(200)]),
+            Some(200)
+        );
+    }
+
+    #[test]
+    fn min_raise_is_none_when_no_voluntary_open_is_legal() {
+        assert_eq!(
+            advertised_min_raise(&[PlayerAction::Fold, PlayerAction::Call, PlayerAction::AllIn]),
+            None
+        );
+    }
+
+    // -- the real engine ---------------------------------------------------
+
+    /// The defect: everyone limps to the big blind. `to_call` is 0 because the
+    /// blind already matched the live bet, but a bet stands, so re-opening it
+    /// is a Raise. Sending `Bet` here logs `TableAction::Bet` and mislabels the
+    /// hand history (pkcore DEFECT_007).
+    #[test]
+    fn big_blind_option_offers_raise_not_bet() {
+        let mut t = dealt_table();
+        let bb = t.determine_big_blind();
+        limp_to_the_big_blind(&mut t);
+
+        assert_eq!(t.to_call(bb), 0, "the blind already matches the live bet");
+        assert!(t.bet > 0, "a live bet still stands");
+
+        let names = legal_action_names(&t.legal_actions(bb));
+        assert!(
+            names.contains(&"Raise".to_string()),
+            "BB option must offer Raise, got {names:?}"
+        );
+        assert!(
+            !names.contains(&"Bet".to_string()),
+            "BB option must not offer Bet, got {names:?}"
+        );
+    }
+
+    /// The other half of the same branch: a fresh street with no live bet is a
+    /// genuine open, so it stays a Bet.
+    #[test]
+    fn fresh_street_still_offers_bet() {
+        let mut t = dealt_table();
+        let bb = t.determine_big_blind();
+        limp_to_the_big_blind(&mut t);
+        t.apply_action(bb, PlayerAction::Check)
+            .expect("BB closes the pre-flop round");
+        // `act()` is pkcore's universal regulator: with betting complete it
+        // collects the street and deals the flop.
+        t.act().expect("to the flop");
+
+        assert_eq!(t.bet, 0, "no live bet on a fresh street");
+        let names = legal_action_names(&t.legal_actions(t.determine_small_blind()));
+        assert!(names.contains(&"Bet".to_string()), "got {names:?}");
+        assert!(!names.contains(&"Raise".to_string()), "got {names:?}");
+    }
+
+    /// A folded, all-in, or busted seat has no decision, so pkcore returns an
+    /// empty list and the front-end draws no buttons.
+    #[test]
+    fn a_folded_seat_has_no_legal_actions() {
+        let mut t = dealt_table();
+        let utg = t.determine_utg();
+        t.apply_action(utg, PlayerAction::Fold).expect("fold");
+        assert!(legal_action_names(&t.legal_actions(utg)).is_empty());
     }
 }
