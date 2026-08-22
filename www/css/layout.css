@@ -6,7 +6,15 @@
 html, body { margin: 0; padding: 0; height: 100%; }
 html { overflow-x: hidden; }   /* never let a wide row scroll-shift the page */
 body {
-  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column; overflow: hidden;
+  /* `vh` on mobile is the *large* viewport — the size with the browser's own
+     chrome hidden — so the last rows of the dock end up underneath the URL bar
+     and toolbar. Nothing scrolls (`overflow: hidden`), so whatever lands there
+     is unreachable: the New Game button after a bust-out, the action buttons
+     during play. `dvh` tracks the chrome. `vh` stays first as the fallback for
+     browsers that do not know `dvh`. */
+  height: 100vh;
+  height: 100dvh;
   background: var(--bg); color: var(--text); font-family: var(--font-body);
 }
 #topbar {
@@ -173,7 +181,18 @@ body[data-tab="arena"] .play-only, body[data-tab="arena"] #action-buttons { disp
   .topbar-stats span.play-only:nth-of-type(2),
   .topbar-stats span.play-only:nth-of-type(3) { display: none; }
   .topbar-stats { gap: 9px; font-size: 9.5px; }
+  /* Hidden during play (design README §Mobile): the dock carries the actions.
+     Restored when the session ends, because then it is the only thing left to
+     do and the top bar is the one strip a mobile browser never covers. The bar
+     is already full at 390px, so the two view preferences step aside to make
+     room — they persist, and the next session restores them. HAND and P&L stay:
+     they are what a player wants to read at the end. */
   #new-table-btn { display: none; }
+  body.session-over #new-table-btn {
+    display: inline-block; white-space: nowrap; font-size: 10.5px; padding: 7px 11px;
+  }
+  body.session-over #view-toggle,
+  body.session-over #theme-select { display: none; }
   #view-toggle { display: inline-block; }   /* revealed on mobile (button added in Task 9) */
   /* Compact mobile top bar per design README §Mobile: logo · HAND · P&L ·
      theme · view-toggle · LOG (+settings). Tabs/deck/version are desktop-only. */
@@ -187,6 +206,9 @@ body[data-tab="arena"] .play-only, body[data-tab="arena"] #action-buttons { disp
 
   #dock {
     flex-wrap: wrap; gap: 10px 12px; padding: 10px 12px;
+    /* Clear the iPhone home indicator. Needs `viewport-fit=cover` on the
+       viewport meta, or `env()` resolves to 0. */
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
   }
   #hero-cards { min-height: 52px; }
   #hero-info { flex: 1 1 40%; }
@@ -224,6 +246,7 @@ body[data-tab="arena"] .play-only, body[data-tab="arena"] #action-buttons { disp
   #raise-strip {
     flex-wrap: wrap; bottom: 0; left: 0; right: 0; transform: none;
     border-radius: 16px 16px 0 0; justify-content: center;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
   }
   #raise-strip #bet-slider { width: 100%; order: 1; }
   .raise-quick { order: 2; }

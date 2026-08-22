@@ -107,6 +107,11 @@
       // potential pot winnings — the banked stack is whatever shows now ($0).
       const heroOutOfMoney = (state?.hero?.chips ?? null) === 0;
       btn.disabled = !(heroNotInHand || phaseAllows || heroOutOfMoney);
+      // Mobile hides this button while a session is live, so the dock's New
+      // Game button is the only one — and the dock is exactly what a phone's
+      // browser chrome covers. Flagging the state brings this one back as a
+      // reachable fallback (see the mobile media query in layout.css).
+      document.body.classList.toggle('session-over', phase === 'SessionOver');
     }
 
     // ── Action callout helpers ────────────────────────────────────────────────
