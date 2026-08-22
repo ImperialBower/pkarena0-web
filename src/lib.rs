@@ -1368,7 +1368,36 @@ pub fn step_bot() -> String {
         return serde_json::json!({"done": true}).to_string();
     }
 
-    let next = SESSION.with(|s| s.borrow_mut().as_mut().and_then(|sess| sess.next_actor()));
+    // pkcore 0.7.0 made `next_actor` fallible: `Ok(None)` means "no streets
+    // remain", while `Err` means the street could not be advanced (a dry deck).
+    // Before 0.7.0 both collapsed to `None`, so a failed advance looked like a
+    // finished hand and stranded the pot.  Unwind with `abort_hand` — it hands
+    // every committed chip back — and surface the error instead of hiding it.
+    let next = SESSION.with(|s| {
+        s.borrow_mut()
+            .as_mut()
+            .map_or(Ok(None), PokerSession::next_actor)
+    });
+
+    let next = match next {
+        Ok(next) => next,
+        Err(err) => {
+            let aborted = SESSION.with(|s| {
+                s.borrow_mut()
+                    .as_mut()
+                    .map_or(Ok(0), PokerSession::abort_hand)
+            });
+            let detail = match aborted {
+                Ok(returned) => format!("hand aborted, ${returned} returned"),
+                Err(abort_err) => format!("abort also failed: {abort_err}"),
+            };
+            LAST_ERROR.with(|e| {
+                *e.borrow_mut() = Some(format!("Engine error: {err} ({detail})"));
+            });
+            PHASE.with(|p| *p.borrow_mut() = SessionPhase::HandComplete);
+            return serde_json::json!({"done": true, "error": err.to_string()}).to_string();
+        }
+    };
 
     match next {
         None => {
@@ -2658,7 +2687,7 @@ mod decider_path_parity_tests {
         let mut hands_completed = 0usize;
 
         while hands_completed < 8 {
-            match session.next_actor() {
+            match session.next_actor().expect("next_actor") {
                 None => {
                     session.end_hand().expect("failed to end hand");
                     session.eliminate_busted();
@@ -2768,7 +2797,7 @@ mod repair_ladder_tests {
         let table = Table::nlh_from_seats(seats, ForcedBets::new(50, 100));
         let mut session = PokerSession::new(table);
         session.start_hand().expect("failed to start hand");
-        let seat = session.next_actor().expect("a seat should be to act preflop");
+        let seat = session.next_actor().expect("next_actor").expect("a seat should be to act preflop");
         (session, seat)
     }
 
@@ -2852,7 +2881,7 @@ mod stats_plumbing_tests {
         let mut hands_completed = 0usize;
 
         while hands_completed < 6 {
-            match session.next_actor() {
+            match session.next_actor().expect("next_actor") {
                 None => {
                     // Mirror production next_hand(): snapshot BEFORE end_hand,
                     // build an id-threaded HandHistory, ingest, then advance.
@@ -3031,7 +3060,7 @@ mod stats_injection_tests {
 
         // Advance to the bot's (seat 1) first decision.
         loop {
-            match session.next_actor() {
+            match session.next_actor().expect("next_actor") {
                 Some(1) => break,
                 Some(0) => {
                     let to_call = session.table.to_call(0);
@@ -3599,7 +3628,7 @@ mod difficulty_ordering_tests {
         for hand_num in 0..hands {
             session.start_hand().expect("start hand");
 
-            while let Some(seat) = session.next_actor() {
+            while let Some(seat) = session.next_actor().expect("next_actor") {
                 let action = {
                     let snapshot = TableSnapshot::from_table_with_stats(
                         &session.table,
@@ -3803,7 +3832,7 @@ mod session_report_tests {
         assert!(report.iter().all(|r| r.chips_per_100 == 0.0));
 
         // Play one hand to completion with minimal legal actions.
-        while let Some(seat) = session.next_actor() {
+        while let Some(seat) = session.next_actor().expect("next_actor") {
             let to_call = session.table.to_call(seat);
             let chips = session
                 .table
