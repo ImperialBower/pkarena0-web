@@ -193,6 +193,12 @@ body[data-tab="arena"] .play-only, body[data-tab="arena"] #action-buttons { disp
   }
   body.session-over #view-toggle,
   body.session-over #theme-select { display: none; }
+  /* CI renders the Google font fallback (DejaVu Sans, wider than the macOS
+     fallback), which pushed the bar ~5px past the right edge. Tighten the
+     chrome instead of trusting one platform's metrics. */
+  body.session-over #topbar { gap: 6px; padding: 0 8px; }
+  body.session-over .topbar-divider { display: none; }
+  body.session-over .topbar-stats { gap: 7px; }
   #view-toggle { display: inline-block; }   /* revealed on mobile (button added in Task 9) */
   /* Compact mobile top bar per design README §Mobile: logo · HAND · P&L ·
      theme · view-toggle · LOG (+settings). Tabs/deck/version are desktop-only. */
