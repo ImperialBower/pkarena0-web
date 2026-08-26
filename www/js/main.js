@@ -86,6 +86,24 @@
     // Mirrors the Rust `is_in_hand()` helper (src/lib.rs:860) inverted.
     const HERO_NOT_IN_HAND_STATES = new Set(['Fold', 'Ready', 'Out']);
 
+    // True when the hero's own seat is finished — which is NOT the same thing as
+    // the table being finished. `SessionOver` is set in exactly one place
+    // (src/lib.rs:748) and only when `funded < 2`. `init_game` seats hero plus
+    // eight bots, so the hero busting leaves eight funded seats: the phase stays
+    // BotsActing and `stepBotsUntilHuman()` deals on without them, forever. For
+    // every UI purpose ("you are done, here is the way out") that state is
+    // session-over and must be treated as such.
+    //
+    // `state === 'Out'` is the discriminator, not `chips === 0`: an all-in hero
+    // also reads zero chips but is still contesting a pot, and must not be shown
+    // an exit. The hand_number guard keeps a booting/cleared table — where
+    // `empty_player_view` reports Out/0 (src/lib.rs:1803) — from tripping it.
+    function heroIsEliminated(state) {
+      if (!state || state.phase === 'Uninitialized' || state.phase === 'Error') return false;
+      if ((state.hand_number ?? 0) < 1) return false;
+      return state.hero?.state === 'Out' && (state.hero?.chips ?? null) === 0;
+    }
+
     // Enables the New Table button when it's safe to walk away — i.e. the
     // player is not actively in a hand. Called everywhere renderPnlSlot is.
     function updateNewTableButton(state) {
@@ -111,7 +129,10 @@
       // Game button is the only one — and the dock is exactly what a phone's
       // browser chrome covers. Flagging the state brings this one back as a
       // reachable fallback (see the mobile media query in layout.css).
-      document.body.classList.toggle('session-over', phase === 'SessionOver');
+      document.body.classList.toggle(
+        'session-over',
+        phase === 'SessionOver' || heroIsEliminated(state),
+      );
     }
 
     // ── Action callout helpers ────────────────────────────────────────────────
@@ -321,6 +342,11 @@
           // Prefold test/debug hooks (see docs/superpowers/specs prefold design).
           prefoldDecision: (legal) => prefoldDecision(legal),
         };
+        // Test-only: drive renderState with a hand-authored GameState. The
+        // busted-hero terminal branch is otherwise reachable only via a seed
+        // that happens to bust the hero while ≥2 bots stay funded, which makes
+        // the spec a hostage to the shuffle.
+        window.__PK0__.play.render = (s) => renderState(s);
         window.__PK0__.play.getPrefold = () => preFoldArmed;
         window.__PK0__.play.setPrefold = (v) => { preFoldArmed = !!v; };
         document.getElementById('sc-version').textContent = 'v' + _playMod.version();
@@ -653,6 +679,22 @@
         return;
       }
 
+      // The hero busted but the table lives on (see heroIsEliminated). Without
+      // this the bot loop runs unattended: the dock renders no buttons, the hero
+      // never gets a turn, and on mobile the top-bar control is `display: none`
+      // (layout.css §mobile) — leaving no reachable way to start a new table.
+      // Stop the loop and offer the same two exits SessionOver offers.
+      if (heroIsEliminated(state)) {
+        playLoopRunning = false;
+        commitCurrentGameToLifetime(0);
+        renderPnlSlot();
+        updateNewTableButton(state);
+        setStatus('You are out of chips — start a new table.');
+        renderButtons([{ label: 'New Game', cls: 'primary', action: 'new-game' }]);
+        appendHandLog('You busted out on hand #' + state.hand_number + '.');
+        return;
+      }
+
       if (state.phase === 'HandComplete') {
         preFoldArmed = false;   // a pre-action arm does not carry across hands
         const street = state.street ?? '';
@@ -720,6 +762,7 @@
           hideHandResult();
           clearAllActions();
           if (nextState.phase === 'SessionOver') { renderState(nextState); return; }
+          if (heroIsEliminated(nextState)) { renderState(nextState); return; }
           if (nextState.phase === 'Error') {
             setStatus('Engine error: ' + (nextState.error ?? 'unknown'));
             renderButtons([{ label: 'New Game', cls: 'primary', action: 'new-game' }]);
