@@ -5,7 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.27] — 2026-08-30
+
+### Changed
+- Upgraded `pkcore` from 0.7.0 to 0.11.0 (four releases). **No app code
+  changed** — the crate compiles, clippy-clean, on both the host and
+  `wasm32-unknown-unknown`, and all 30 Rust tests plus all 65 Playwright specs
+  pass untouched. Every breaking change in the range lands on a surface this
+  crate does not call:
+  - 0.8.0 removed the whole `TableCelled` family and re-based `Dealer` on
+    `casino::table::Table`; `TestData` fixtures now return plain types. This
+    crate drives `PokerSession` directly and owns its own fixtures, so none of
+    it reaches here.
+  - 0.10.0 added Pluribus-format hand *export*; not used here.
+  - 0.11.0 dropped `store` and `terminal` from the default feature set — a
+    no-op for us, since `Cargo.toml` has always pinned
+    `default-features = false` with an explicit four-feature list
+    (`bot-profiles`, `hand-histories`, `equity`, `player-stats`), all of which
+    still exist. The combinatorics signatures (`Pile::combinations_*`,
+    `Cards::combinations`, `Deck::combinations`, `Outs::iter`) now return
+    `impl Iterator`, and `FIVE_CARD_COMBOS` / `Deck::to_par_iter` were removed;
+    this crate calls none of them. `TableManager` and `TableEvent` are
+    `#[deprecated]`; not used here, so no new warnings.
+  - Two silent 0.11.0 behaviour changes were checked rather than assumed.
+    `Card` deserialization now errors on an index it cannot parse instead of
+    yielding a blank card — this crate never deserializes cards from an
+    untrusted payload. `EquityOptions::max_samples` dropped its default from
+    100,000 to 25,000, which would silently coarsen equity for anyone riding
+    the default; the strong tier sets `EquityMode::Fast { samples: 500 }`
+    explicitly and `pkcore::bot::decider::real_equity` passes that straight
+    into `max_samples`, so bot decisions are unaffected.
+- The dependency tree lost **16 crates** and no crate was added
+  (`Cargo.lock` shrank by 166 lines). `rayon` and `rayon-core` leave because
+  0.11.0 moved every rayon entry point behind a new default-on `parallel`
+  feature that a `default-features = false` consumer never enables — 0.11.0's
+  release notes name this browser build as the reason the gate exists, since
+  the old `analysis::equity::compute` linked a thread pool into wasm32 that a
+  browser can never run. `pkstate` leaving pkcore took `chrono` with it, and
+  `chrono` took its platform tail (`iana-time-zone`,
+  `android_system_properties`, `core-foundation-sys`, five `windows-*` crates)
+  plus the `cc` / `shlex` / `find-msvc-tools` build chain.
+- Dropped a stale `[[patch.unused]] pkcore 0.11.0` stanza that a removed local
+  patch had left behind in `Cargo.lock`.
 
 ## [0.1.25] — 2026-08-22
 
