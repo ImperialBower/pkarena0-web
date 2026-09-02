@@ -11,7 +11,7 @@ license = "GPL-3.0-or-later"
 crate-type = ["cdylib"]
 
 [dependencies]
-pkcore = { version = "0.11.0", default-features = false, features = [
+pkcore = { version = "0.12.0", default-features = false, features = [
     "bot-profiles",
     "hand-histories",
     "equity",
