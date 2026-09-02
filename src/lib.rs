@@ -10,7 +10,7 @@ use pkcore::analysis::name::HandRankName;
 use pkcore::analysis::player_stats::{Confidence, PlayerStats, StatsRegistry};
 use pkcore::arrays::seven::Seven;
 use pkcore::bot::decider::{BotDecider, JokerDecider, RuleBasedDecider};
-use pkcore::bot::decision_config::{DecisionConfig, EquityMode, RangeMode};
+use pkcore::bot::decision_config::{DecisionConfig, EquityMode, PreflopCharts, RangeMode, Toggle};
 use pkcore::bot::exploit::ExploitConfig;
 use pkcore::bot::exploitative_decider::ExploitativeDecider;
 use pkcore::bot::profile::BotProfile;
@@ -2229,9 +2229,16 @@ fn with_decision(mut profile: BotProfile, decision: DecisionConfig) -> BotProfil
 /// tier's lever, kept off the default in-browser path so standard play stays
 /// cheap (one `compute()` per postflop decision is reserved for players who opt
 /// into the strong difficulty).
+///
+/// `outs` is on here and nowhere else. It acts on the hand-rank proxy, which is
+/// blind to draws — it scores an open-ended straight draw below total air — and
+/// pkcore skips it entirely once the equity engine is running, since the engine
+/// enumerates runouts and already prices draws. So this tier, the one at
+/// `equity: off`, is the only tier the knob can help. It costs no `compute()`.
 fn standard_decision() -> DecisionConfig {
     DecisionConfig {
         ranges: RangeMode::PositionAware,
+        outs: Toggle::On,
         ..DecisionConfig::default()
     }
 }
@@ -2242,10 +2249,18 @@ fn standard_decision() -> DecisionConfig {
 /// 5.7 ms 4-way). Pot-odds discipline stays at the strict default (1.0);
 /// `exploit` stays `off` (a bot-vs-bot drag — EPIC-49 corrigendum §1 keeps
 /// adaptation a user toggle, not a tier lever).
+///
+/// `preflop_charts` is `Solver`, not `Hup`: the chart is exact but strictly
+/// heads-up, and this is a six-handed table. `Solver` also reads no chart, which
+/// is what keeps `generated/hups.bin` — 15.8 MB — out of the WASM bundle; see
+/// pkcore EPIC-39 corrigendum 16. It reuses the same `compute()` the `equity`
+/// knob already runs, so preflop costs one sampled call rather than a coin flip.
+/// `outs` stays off: alongside `equity: fast` it is a documented no-op.
 fn strong_decision() -> DecisionConfig {
     DecisionConfig {
         equity: EquityMode::Fast { samples: 500 },
         ranges: RangeMode::PositionAware,
+        preflop_charts: PreflopCharts::Solver,
         ..DecisionConfig::default()
     }
 }
@@ -4024,9 +4039,17 @@ mod position_awareness_tests {
 
             // Position::from_seat(9-max, button at logical 0): offset 0 = BTN,
             // offset 3 = UTG.
+            // Each archetype needs to diverge in at least one spot. The third
+            // was added when `outs: on` went in: pricing a draw lifts hand
+            // strength past `loose_passive`'s thresholds in both of the first
+            // two spots, so it acted the same at either position there. That is
+            // the knob working, not position awareness failing — the flop proxy
+            // is position-blind either way, and divergence comes from the
+            // playbook's positional betting grades tipping the random rolls.
             let spots = [
                 ("weak hand, unopened pot", "4d 3s", 0usize, 0usize),
                 ("strong hand facing a bet", "Ad Kd", 100, 100),
+                ("two overcards, unopened pot", "Ah Qd", 0, 0),
             ];
 
             let mut diverged = false;
@@ -4060,6 +4083,7 @@ mod position_awareness_tests {
             );
         }
     }
+
 }
 
 // ── EPIC-50 Phase 3: browser-equity adoption ──────────────────────────────────
