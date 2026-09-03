@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.28] — 2026-09-02
+
+### Changed
+- Upgraded `pkcore` from 0.12.0 to 0.12.1, a single-defect release. **No app
+  code changed**, and no new knob or cargo feature ships in it — but the defect
+  it fixes lands squarely on the strong tier, so the bump alone is the whole
+  benefit.
+
+  `preflop_charts: solver` built its equity request with
+  `EquityOptions::default()`, whose `max_samples` is **25,000**, instead of
+  reading the profile's `equity` knob. `strong_decision()` asks for
+  `EquityMode::Fast { samples: 500 }` (`src/lib.rs:2259-2266`) and
+  `data/bots/strong.yaml` carries the same pair, so every strong-tier bot was
+  spending **50x its stated budget** — on preflop, the most frequent decision in
+  a hand, and the one street with no board to narrow the runouts. The knob now
+  governs both streets alike: `fast { samples }` spends that many, `exact`
+  spends 100,000, and `off` — legal here, since `solver` runs without the engine
+  knob — spends pkcore's own default of 2,000. See pkcore EPIC-39 corrigendum 18.
+
+  The docstring at `src/lib.rs:2256-2257` claimed `Solver` "reuses the same
+  `compute()` the `equity` knob already runs, so preflop costs one sampled call
+  rather than a coin flip". That was true of the *call* but not of its *budget*;
+  as of 0.12.1 it is true of both, so the comment stands unamended.
+
+  **Standard and weak are unaffected.** Standard sets `preflop_charts: off`
+  (`standard_decision()`, `src/lib.rs:2238-2244`) and weak carries no `decision:`
+  block at all, so neither ever entered the solver path.
+
+- No feature flags were added or changed. The four-feature pin
+  (`bot-profiles`, `hand-histories`, `equity`, `player-stats`) still covers
+  everything this crate calls. The 0.12.0 arrivals stay deliberately out:
+  `hup-charts` links `generated/hups.bin` — 15.8 MB, which took the WASM
+  download from 478 KB to 3.84 MB brotli when it was reachable by accident — and
+  `preflop_charts: hup` is heads-up only at a six-handed table; `parallel` links
+  a rayon thread pool a browser cannot run; `exploit` stays a user toggle rather
+  than a tier lever (EPIC-49 corrigendum §1); and `store`, `terminal`,
+  `bot-training`, `generators`, `pokerbench`, `player-stats-persistence` and
+  `debug-json` are host-side tooling with no browser surface.
+
+  One trap the fix creates, recorded so it is not walked into: `preflop_charts:
+  solver` on the **standard** tier would now cost **2,000** samples per preflop
+  decision, because standard's `equity` is `off` and `off` falls back to
+  pkcore's default. That is 4x the strong tier's 500 — standard would decide
+  slower than strong. Adopting it there means pinning an explicit
+  `equity: fast { samples }` first.
+
+  Verified: 30 Rust tests pass, 5 bot-bundle parity fixtures pass
+  (`make validate-bots`), `make build` is clean, and
+  `tests/strong-equity-latency.spec.ts` passes. WASM download is **472 KB**
+  brotli (2.1 MB raw) — no growth.
+
 ## [0.1.27] — 2026-08-30
 
 ### Changed
