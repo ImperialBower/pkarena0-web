@@ -671,7 +671,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "pkarena0-web"
-version = "0.1.27"
+version = "0.1.28"
 dependencies = [
  "console_error_panic_hook",
  "getrandom 0.2.17",
@@ -687,9 +687,9 @@ dependencies = [
 
 [[package]]
 name = "pkcore"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3598ea438090a4d5916da44b908e34a0a79b898f0d0a06072b5dbdb913c7eef6"
+checksum = "40144167ae57dcf8bb58604fde7ba9d9f100bb8995ba4fdb64a44e62e6eef36a"
 dependencies = [
  "bint",
  "bitvec",
