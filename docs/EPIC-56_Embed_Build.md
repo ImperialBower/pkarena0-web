@@ -15,11 +15,11 @@
 
 ## Status
 
-**Planned — drafted 18 October 2026 at `0884ca8` (v0.2.0). No work started.**
+**Phase 0 done 18 October 2026; Phase 1 next.** Drafted the same day at `0884ca8` (v0.2.0).
 
 | Component | Status |
 |---|---|
-| Phase 0 — decisions: Shadow DOM, the action-row extraction, the block registration | Planned |
+| Phase 0 — decisions: Shadow DOM, the action-row extraction, the block registration | **Complete** — 18 October 2026, commit pending: `tests/shadow.spec.ts` green; pkcore `ROADMAP.md` line added; `bots` reserved in § Design |
 | Phase 1 — `www/js/actions.js`: `buttonsFor(state)` lifted out of `main.js`, parity-tested | Planned |
 | Phase 2 — `www/js/embed/pk-table.js`, `www/css/pk-table.css`, `www/embed.html` | Planned |
 | Phase 3 — `tests/embed.spec.ts`: the eight contract rules | Planned |
@@ -265,13 +265,20 @@ the `TECHNICAL_DEBT.md:55` worry). `deploy.yml` is untouched.
 
 ## Phase 0 — Decisions
 
-- [ ] **0a.** Shadow DOM (rule 7) over scoped classes: confirm `createTable`
-  works inside a shadow root (it uses `document.createElement`, fine; check
-  nothing in `table.js` queries `document`). Record.
-- [ ] **0b.** `bots` reserved, named in the README table, warned on use.
-- [ ] **0c.** Add a pkarena0-web line to pkcore `ROADMAP.md` § EPIC Numbering
-  Policy: 46–49 (registered) plus 50–56 in use here, overlapping `pkgate`'s
-  block; claim the next free ten-block for what follows 56.
+- [x] **0a.** Shadow DOM (rule 7) over scoped classes. `table.js` and
+  `cards.js` make no `document.getElementById` / `querySelector` / `window`
+  lookups (grep, 18 October 2026). `tests/shadow.spec.ts` mounts
+  `createTable` under an open shadow root with `table.css` linked inside it:
+  nine seats, five slots, three board cards and the pot render; nothing lands
+  in the host's light DOM; the felt is `position: absolute`, so the
+  stylesheet reached it. Green against `main` at `ccb874e`.
+- [x] **0b.** `bots` reserved in § Design's attribute table (ignored with
+  one `console.warn` until EPIC-54). The README copy is 5a.
+- [x] **0c.** pkcore `ROADMAP.md` § EPIC Numbering Policy gains a
+  pkarena0-web line (18 October 2026, in the pkcore clone, commit pending):
+  50–56 recorded as overlapping `pkgate`'s block, both runs keep their
+  numbers, and **EPIC-100–109** is claimed as pkarena0-web's next block, so
+  the EPIC after this one is `EPIC-100`.
 
 ## Phase 1 — `actions.js`
 
