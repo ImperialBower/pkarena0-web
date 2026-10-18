@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-10-18
+
+First minor release since 0.1.0. It re-licenses the project and rolls up the
+feature set built across 0.1.x. The full tour is in
+[`docs/releases/v0.2.0.md`](docs/releases/v0.2.0.md).
+
+### Changed
+- **License changed from `GPL-3.0-or-later` to `MIT OR Apache-2.0`**, matching
+  `pkcore`. `LICENSE` is replaced by `LICENSE-MIT` and `LICENSE-APACHE`;
+  `Cargo.toml`, the README license section and the vendored-checker notice in
+  `scripts/okf_validate.py` follow. `docs/releases/v0.1.0.md` still says GPL on
+  purpose: it records what 0.1.0 shipped under.
+- README now carries the same badge set as the sibling repos: Deploy,
+  Playwright, and one badge per license.
+- No game logic, WASM exports or bot data changed in this release.
+
 ## [0.1.28] — 2026-09-02
 
 ### Changed

@@ -403,4 +403,4 @@ output in CI without dealing with actual sound playback.
 
 ## License
 
-Same as the parent project: GPL-3.0-or-later.
+Same as the parent project: MIT OR Apache-2.0.

@@ -8,8 +8,8 @@
 # does not depend on a locally-installed OKF skill.
 # Source:  scaccogatto/okf skill (validate/scripts/okf_validate.py), v0.4.0,
 #          which vendors the Open Knowledge Format v0.1 reference checker.
-# License: Apache-2.0 (c) Google LLC — Apache-2.0 is one-way compatible with
-#          this repo's GPL-3.0-or-later. Keep this notice on any copy.
+# License: Apache-2.0 (c) Google LLC — this repo is dual-licensed MIT OR Apache-2.0,
+#          so the upstream Apache-2.0 terms apply unchanged. Keep this notice on any copy.
 # To refresh: re-copy from the upstream skill; do not hand-edit the logic.
 #
 """Deterministic conformance checker for Open Knowledge Format (OKF) v0.1.
