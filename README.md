@@ -2,6 +2,7 @@
 
 [![Deploy to GitHub Pages](https://github.com/ImperialBower/pkarena0-web/actions/workflows/deploy.yml/badge.svg)](https://github.com/ImperialBower/pkarena0-web/actions/workflows/deploy.yml)
 [![Playwright Tests](https://github.com/ImperialBower/pkarena0-web/actions/workflows/playwright.yml/badge.svg)](https://github.com/ImperialBower/pkarena0-web/actions/workflows/playwright.yml)
+[![Release embed](https://github.com/ImperialBower/pkarena0-web/actions/workflows/release.yml/badge.svg)](https://github.com/ImperialBower/pkarena0-web/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE-APACHE)
 
@@ -102,6 +103,45 @@ npx playwright test --ui
   session.
 
 ---
+
+## Embedding the table in your own page
+
+Every tagged release carries `pk-table-<tag>.tar.gz`: one flat directory
+with a custom element, its stylesheet, the engine, and the licenses. Unpack
+it beside your page and write two lines:
+
+```html
+<script type="module" src="pk-table/pk-table.js"></script>
+<pk-table seed="42"><img src="table.png" alt="A poker table"></pk-table>
+```
+
+The `<img>` is what readers see with script off, from a file, or on paper;
+the element adds a **Deal** button under it and fetches nothing until Deal is
+pressed. Then it loads the engine, swaps the picture for the live table, and
+plays one hand at a time against eight bots. If the engine will not load, the
+picture stays and the status line says so.
+
+| Attribute | Meaning | Default |
+|---|---|---|
+| `seed` | Seeds which bots sit down (the cards are dealt fresh every hand). | fresh per Deal |
+| `delay` | Milliseconds between bot actions. | `1000` |
+| `base` | Where `pkarena0_web.js` and `pkarena0_web_bg.wasm` live. | beside `pk-table.js` |
+| `css` | Where `pk-table.css` lives. | beside `pk-table.js` |
+| `bots` | **Reserved** for [EPIC-54](docs/EPIC-54_Player_Mode_Table_Setup.md); ignored with a console warning. | `8` |
+
+Events (they bubble): `pk-table:ready` (`detail.version`),
+`pk-table:hand-over` (`detail.state`, the engine's state after the hand
+settles), `pk-table:error` (`detail.message`). Each `<pk-table>` on a page is
+its own game. Every request goes to the directory the module came from — no
+fonts, no CDN. The surround follows your page's `--bg`, `--fg` and `--links`
+custom properties when present; the felt stays green.
+
+`www/embed.html` is a working example (`make serve`, then
+<http://localhost:8080/embed.html>), and `make embed` builds the directory
+locally into `dist/pk-table/`. `MANIFEST.sha256` lists every file's digest;
+`sha256sum -c MANIFEST.sha256` verifies an unpacked copy. The rules the
+element keeps are tested in `tests/embed.spec.ts` and written up in
+[EPIC-56](docs/EPIC-56_Embed_Build.md).
 
 ## Audio (experimental)
 

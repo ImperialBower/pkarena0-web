@@ -1,0 +1,83 @@
+# The embed release (EPIC-56 Phase 4): on every version tag, build the wasm
+# once in release mode, bundle the seven files with scripts/embed-bundle.mjs,
+# and attach pk-table-<tag>.tar.gz to the tag's GitHub release.
+#
+# The bundler is the gate: it refuses a tag that is not Cargo.toml's version
+# (the badge on the page would lie) and a wasm over 2.3 MB (hup-charts on by
+# accident). deploy.yml is untouched; the Pages site keeps its own build.
+name: Release embed
+
+on:
+  push:
+    tags: ['v*']
+  # A re-run by hand builds from the default branch (so a fix to this
+  # workflow or the bundler can be applied) and attaches to the named tag's
+  # release; the bundler's tag-equals-crate-version check is what keeps that
+  # honest — it refuses if main's Cargo.toml has moved past the tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'An existing tag whose release gets the embed, e.g. v0.2.1'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  embed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable + wasm32 target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build WASM (release, glue only)
+        run: wasm-pack build --release --target web --no-typescript --no-pack --out-dir www/pkg
+
+      - name: Bundle the embed (asserts tag = crate version, wasm < 2.3 MB)
+        run: node scripts/embed-bundle.mjs dist/pk-table --tag "$TAG"
+
+      - name: Tarball
+        run: |
+          set -euo pipefail
+          tar czf "pk-table-$TAG.tar.gz" -C dist/pk-table .
+          ls -l "pk-table-$TAG.tar.gz" dist/pk-table
+          cat dist/pk-table/MANIFEST.sha256
+
+      - name: Attach to the release (created if the tag has none yet)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            if [ -f "docs/releases/$TAG.md" ]; then
+              gh release create "$TAG" --title "$TAG" --notes-file "docs/releases/$TAG.md"
+            else
+              gh release create "$TAG" --title "$TAG" --generate-notes
+            fi
+          fi
+          gh release upload "$TAG" "pk-table-$TAG.tar.gz" --clobber

@@ -1,4 +1,4 @@
-.PHONY: help build serve kill build-release clean install-playwright test test-ui validate-bots validate-okf bench-tiers ayce default
+.PHONY: help build serve kill build-release embed clean install-playwright test test-ui validate-bots validate-okf bench-tiers ayce default
 
 # Default target
 default: ayce
@@ -8,6 +8,7 @@ help:
 	@echo ""
 	@echo "  build               wasm-pack dev build → www/pkg/"
 	@echo "  build-release       wasm-pack release build (optimised)"
+	@echo "  embed               build-release, then the <pk-table> release directory → dist/pk-table/"
 	@echo "  serve               dev build + python3 http.server on :8080"
 	@echo "  kill                kill the http.server on :8080"
 	@echo "  clean               cargo clean + remove www/pkg/"
@@ -31,9 +32,16 @@ kill:
 build-release:
 	wasm-pack build --release --target web --out-dir www/pkg
 
+# The embed release directory, as release.yml builds it (EPIC-56). The
+# bundler refuses a stale pk-table.css or an oversized wasm; pass TAG=vX.Y.Z
+# to also assert the tag names Cargo.toml's version.
+embed: build-release
+	rm -rf dist/pk-table
+	node scripts/embed-bundle.mjs dist/pk-table $(if $(TAG),--tag $(TAG),)
+
 clean:
 	cargo clean
-	rm -rf www/pkg
+	rm -rf www/pkg dist
 
 install-playwright:
 	npm install
