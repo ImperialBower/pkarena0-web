@@ -318,6 +318,12 @@
 
     async function boot() {
       try {
+        // Two imports of one file, told apart by their query strings: the
+        // module cache keys on the full URL, so each gets its own wasm instance
+        // and its own thread_local! state. A bundler that normalised the query
+        // would merge them and cross-contaminate Play and Arena — which is why
+        // scripts/embed-bundle.mjs is string work and not a bundler, and why the
+        // embed (www/js/embed/pk-table.js) uses the same trick per element.
         [_playMod, _arenaMod] = await Promise.all([
           import('../pkg/pkarena0_web.js?tab=play').then(async m  => { await m.default(); return m; }),
           import('../pkg/pkarena0_web.js?tab=arena').then(async m => { await m.default(); return m; }),

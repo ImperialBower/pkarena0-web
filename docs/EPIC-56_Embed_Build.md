@@ -15,7 +15,7 @@
 
 ## Status
 
-**Phases 0–3 done 18 October 2026; Phase 4 (the release) next.** Drafted the same day at `0884ca8` (v0.2.0).
+**Phases 0–4 built 18 October 2026; the v0.2.1 tag and Phase 5's docs remain.** Drafted the same day at `0884ca8` (v0.2.0).
 
 | Component | Status |
 |---|---|
@@ -23,8 +23,8 @@
 | Phase 1 — `www/js/actions.js`: `buttonsFor(state)` lifted out of `main.js`, parity-tested | **Complete** — 18 October 2026, commit pending: `tests/actions.spec.ts` four green; full suite 70/70 |
 | Phase 2 — `www/js/embed/pk-table.js`, `www/css/pk-table.css`, `www/embed.html` | **Complete** — 18 October 2026, commit pending |
 | Phase 3 — `tests/embed.spec.ts`: the eight contract rules | **Complete** — 18 October 2026, commit pending: 10 green (eight rules, a seed rule, script off); full suite 79/79 |
-| Phase 4 — `release.yml`: `pk-table-<tag>.tar.gz` + `MANIFEST.sha256` on every tag; size gate | Planned |
-| Phase 5 — README "Embedding", CHANGELOG, `EPICS.md`, the isolation-trick comment, the tag | Planned |
+| Phase 4 — `release.yml`: `pk-table-<tag>.tar.gz` + `MANIFEST.sha256` on every tag; size gate | **Built** — 18 October 2026, commit pending: bundler + 5 tests green, recipe dry-run locally; first CI run is v0.2.1 (4c) |
+| Phase 5 — README "Embedding", CHANGELOG, `EPICS.md`, the isolation-trick comment, the tag | **Docs done** 18 October 2026, commit pending; the tag is 4c |
 
 **Depends on:** nothing unmerged. Builds on `main` at v0.2.0 (`MIT OR
 Apache-2.0`, which is what let the consumer vendor it — bower EPIC-19
@@ -312,10 +312,11 @@ the `TECHNICAL_DEBT.md:55` worry). `deploy.yml` is untouched.
   rule 7 asserts it. Found by the second: the same seed dealt different
   cards — `seed` seeds the lineup, not the deck; the attribute table, the
   demo page, bower EPIC-19 and rule 2 now say so.
-- [ ] **2b.** Comment the import site (`main.js:321`) with the invariant
-  (the embed's `#load` already carries it); close `TECHNICAL_DEBT.md:55`'s
-  first suggestion. *(Deferred to Phase 4 with the bundle step, which is
-  where a bundler would break it.)*
+- [x] **2b.** The import site (`main.js`, `boot()`) now carries the
+  invariant in a comment, as does the embed's `#load` and the bundler's
+  header; `TECHNICAL_DEBT.md:55`'s first suggestion is met (its second, a
+  startup assertion, is not — the bundler not being a bundler is the
+  stronger guard).
 - [x] **2c.** Sizes in § Measured: 16,606 / 13,418 raw; 4,896 / 3,137
   brotli.
 
@@ -338,19 +339,38 @@ the `TECHNICAL_DEBT.md:55` worry). `deploy.yml` is untouched.
 
 ## Phase 4 — The release
 
-- [ ] **4a.** `scripts/embed-bundle.mjs`; `release.yml` as § Design; the
-  two asserts.
-- [ ] **4b.** Dry run on a `v0.2.1-rc` tag of a branch (delete after);
-  download, `sha256sum -c MANIFEST.sha256`, serve the directory, open a
-  page that mounts it: a hand plays.
-- [ ] **4c.** Tag `v0.2.1`; the release carries `pk-table-v0.2.1.tar.gz`.
+- [x] **4a.** `scripts/embed-bundle.mjs`: four modules inlined by string
+  work (each a block returning its exports; `import {…} from './x.js'` →
+  `const {…} = __m_x`), so the `?instance=` query survives; refuses before
+  writing when the tag ≠ `Cargo.toml` version, the wasm ≥ 2.3 MB,
+  `www/pkg` is missing, or the committed `pk-table.css` no longer ends with
+  `table.css`. `tests/bundle.spec.ts` (five, serial): exact file set and a
+  verifying manifest; no relative import survives; size and license gates;
+  a wrong tag is refused and leaves no directory; a two-line page plays a
+  hand from the flat layout, fetching only the three files beside it.
+  `release.yml`: release build → bundle → tarball → `gh release upload
+  --clobber` (creating the release from `docs/releases/<tag>.md` if it has
+  none); `workflow_dispatch` re-runs from `main` for a named tag.
+- [x] **4b.** Dry run, local, 18 October 2026, the workflow's commands
+  verbatim: `wasm-pack build --release --target web --no-typescript
+  --no-pack`, the bundler with `--tag v0.2.0`, `tar czf`, extract,
+  `shasum -a 256 -c MANIFEST.sha256` → six `OK`; the tarball is 710,750
+  bytes. The hand-plays check is `bundle.spec.ts`'s last test. (An `-rc`
+  tag cannot be used: the bundler would refuse `0.2.1-rc` ≠ `0.2.1`, by
+  design.)
+- [ ] **4c.** Bump `Cargo.toml` to 0.2.1 (Phase 5a carries the CHANGELOG
+  entry), tag `v0.2.1`, push the tag; `release.yml`'s first run attaches
+  `pk-table-v0.2.1.tar.gz`. Checks when the asset is on the release.
 
 ## Phase 5 — Docs
 
-- [ ] **5a.** README § Embedding: the two lines, the attribute table, the
-  tarball, the license. CHANGELOG 0.2.1.
-- [ ] **5b.** `EPICS.md` row flipped; this Status table flipped with
-  commits; § Measured filled.
+- [x] **5a.** README § Embedding (the two lines, the attribute table with
+  `bots` reserved, events, the manifest, `make embed`), a Release badge,
+  CHANGELOG 0.2.1, `docs/releases/v0.2.1.md` (what `release.yml` creates
+  the release from), `Cargo.toml` and `Cargo.lock` at 0.2.1, `make embed`.
+- [x] **5b.** `EPICS.md` row flipped; this Status table flipped (commit
+  hashes to follow the commit); § Measured filled from the local release
+  build.
 
 ---
 
@@ -360,13 +380,14 @@ Filled by Phases 2 and 4.
 
 | | raw | brotli | budget |
 |---|---|---|---|
-| `pkarena0_web_bg.wasm` (release, v0.2.1) | | | ≤ 2.3 MB / ≤ 600 KB |
-| `pkarena0_web.js` | | | |
-| `pk-table.js` (checkout, unbundled) | 16,606 | 4,896 | ≤ 12 KB — missed; pair ≤ 60 KB holds |
-| `pk-table.css` | 13,418 | 3,137 | ≤ 30 KB |
-| `pkarena0_web_bg.wasm` (dev build, 18 Oct) | 2,156,142 | | release numbers in Phase 4 |
-| requests before Deal | 0 | | 0 (rule 1) |
-| Deal → first bot action, `delay=1000` | | | |
+| `pkarena0_web_bg.wasm` (release build at v0.2.0 source, 18 Oct 2026; wasm-pack 0.15.0 builds release by default, so the earlier "dev" number was the same build) | 2,156,142 | 484,152 | ≤ 2.3 MB / ≤ 600 KB ✓ |
+| `pkarena0_web.js` | 18,442 | 4,009 | |
+| `pk-table.js` (bundled: embed + table + cards + actions) | 33,422 | 9,087 | with the CSS ≤ 60 KB ✓ (46.8 KB raw) |
+| `pk-table.js` (checkout, unbundled) | 16,606 | 4,896 | ≤ 12 KB — missed |
+| `pk-table.css` | 13,418 | 3,137 | ≤ 30 KB ✓ |
+| `pk-table-v0.2.0.tar.gz` (local dry run) | 710,750 | | |
+| requests before Deal | 0 | | 0 (rule 1) ✓ |
+| Deal → first bot action, `delay=1000` | | | not measured; `delay=0` plays a hand in under 2 s in the spec |
 
 ## Verification
 

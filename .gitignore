@@ -28,3 +28,7 @@ tests/fixtures/
 
 # WASM
 *.wat
+# The embed build (EPIC-56): scripts/embed-bundle.mjs writes here; tests use it.
+www/dist/
+www/dist-*/
+dist/

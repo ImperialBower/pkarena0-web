@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-10-18
+
+The embed build ([EPIC-56](docs/EPIC-56_Embed_Build.md)): the table as a
+custom element for other people's pages, released as a tarball per tag.
+
+### Added
+- **`<pk-table>`** (`www/js/embed/pk-table.js`, `www/css/pk-table.css`): two
+  lines mount a playable hero-vs-eight-bots table into any page. Nothing is
+  fetched until **Deal**; the host's `<img>` stays for script-off, `file://`
+  and failed loads; each element imports its own engine instance; every
+  request goes to the module's own directory; the badge shows `version()`.
+  Attributes `seed`, `delay`, `base`, `css`; `bots` reserved for EPIC-54.
+  Events `pk-table:ready`, `pk-table:hand-over`, `pk-table:error`.
+- **`www/embed.html`**, a plain prose page with two tables — the example a
+  consumer copies from.
+- **`scripts/embed-bundle.mjs`** and **`make embed`**: the release directory
+  (`pk-table.js` with its four modules inlined, the stylesheet, the engine,
+  both licenses, `MANIFEST.sha256`). Refuses a tag that is not the crate
+  version and a wasm over 2.3 MB.
+- **`release.yml`**: on every `v*` tag, builds the wasm in release mode,
+  bundles, and attaches `pk-table-<tag>.tar.gz` to the tag's release
+  (creating it from `docs/releases/<tag>.md`).
+- Tests: `tests/embed.spec.ts` (the eight contract rules, a seed rule, script
+  off), `tests/bundle.spec.ts` (the artefact), `tests/actions.spec.ts`,
+  `tests/shadow.spec.ts`. 85 specs in all.
+
+### Changed
+- `www/js/actions.js`: the action row's logic, `buttonsFor(state)`, lifted
+  out of `main.js` so the app and the embed render the same choices from
+  one function. Parity-tested; no label, amount or order changed.
+- The `?tab=play` / `?tab=arena` double import in `main.js` is now
+  commented with the invariant it relies on (`TECHNICAL_DEBT.md`'s
+  module-isolation item); the embed uses the same trick per element.
+
+### Notes
+- `seed` seeds the bot lineup, not the deck: pkcore deals from entropy, so no
+  seed pins a hand. The README says so where it used to be implied.
+- Driven by bower EPIC-19, which vendors this build into the HTML edition of
+  *Rust for Failures*.
+
 ## [0.2.0] — 2026-10-18
 
 First minor release since 0.1.0. It re-licenses the project and rolls up the
