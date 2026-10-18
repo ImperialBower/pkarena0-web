@@ -15,16 +15,16 @@
 
 ## Status
 
-**Phases 0–4 built 18 October 2026; the v0.2.1 tag and Phase 5's docs remain.** Drafted the same day at `0884ca8` (v0.2.0).
+**Shipped as v0.2.1 on 18 October 2026** (`f90337c`, PR #39; `release.yml` run 39172102196 green; `pk-table-v0.2.1.tar.gz` on the release, 714,101 bytes, manifest verified on a download). Drafted the same day at `0884ca8` (v0.2.0).
 
 | Component | Status |
 |---|---|
-| Phase 0 — decisions: Shadow DOM, the action-row extraction, the block registration | **Complete** — 18 October 2026, commit pending: `tests/shadow.spec.ts` green; pkcore `ROADMAP.md` line added; `bots` reserved in § Design |
-| Phase 1 — `www/js/actions.js`: `buttonsFor(state)` lifted out of `main.js`, parity-tested | **Complete** — 18 October 2026, commit pending: `tests/actions.spec.ts` four green; full suite 70/70 |
-| Phase 2 — `www/js/embed/pk-table.js`, `www/css/pk-table.css`, `www/embed.html` | **Complete** — 18 October 2026, commit pending |
-| Phase 3 — `tests/embed.spec.ts`: the eight contract rules | **Complete** — 18 October 2026, commit pending: 10 green (eight rules, a seed rule, script off); full suite 79/79 |
-| Phase 4 — `release.yml`: `pk-table-<tag>.tar.gz` + `MANIFEST.sha256` on every tag; size gate | **Built** — 18 October 2026, commit pending: bundler + 5 tests green, recipe dry-run locally; first CI run is v0.2.1 (4c) |
-| Phase 5 — README "Embedding", CHANGELOG, `EPICS.md`, the isolation-trick comment, the tag | **Docs done** 18 October 2026, commit pending; the tag is 4c |
+| Phase 0 — decisions: Shadow DOM, the action-row extraction, the block registration | **Complete** — `f90337c` (PR #39): `tests/shadow.spec.ts` green; pkcore `ROADMAP.md` line added; `bots` reserved in § Design |
+| Phase 1 — `www/js/actions.js`: `buttonsFor(state)` lifted out of `main.js`, parity-tested | **Complete** — `f90337c`: `tests/actions.spec.ts` four green |
+| Phase 2 — `www/js/embed/pk-table.js`, `www/css/pk-table.css`, `www/embed.html` | **Complete** — `f90337c` |
+| Phase 3 — `tests/embed.spec.ts`: the eight contract rules | **Complete** — `f90337c`: 10 green (eight rules, a seed rule, script off) |
+| Phase 4 — `release.yml`: `pk-table-<tag>.tar.gz` + `MANIFEST.sha256` on every tag; size gate | **Complete** — `f90337c`; first run 39172102196 green on the v0.2.1 tag; asset attached |
+| Phase 5 — README "Embedding", CHANGELOG, `EPICS.md`, the isolation-trick comment, the tag | **Complete** — `f90337c`; tag v0.2.1 |
 
 **Depends on:** nothing unmerged. Builds on `main` at v0.2.0 (`MIT OR
 Apache-2.0`, which is what let the consumer vendor it — bower EPIC-19
@@ -358,9 +358,11 @@ the `TECHNICAL_DEBT.md:55` worry). `deploy.yml` is untouched.
   bytes. The hand-plays check is `bundle.spec.ts`'s last test. (An `-rc`
   tag cannot be used: the bundler would refuse `0.2.1-rc` ≠ `0.2.1`, by
   design.)
-- [ ] **4c.** Bump `Cargo.toml` to 0.2.1 (Phase 5a carries the CHANGELOG
-  entry), tag `v0.2.1`, push the tag; `release.yml`'s first run attaches
-  `pk-table-v0.2.1.tar.gz`. Checks when the asset is on the release.
+- [x] **4c.** Tagged `v0.2.1` at `f90337c` (PR #39), 18 October 2026.
+  `release.yml` run 39172102196 succeeded; `pk-table-v0.2.1.tar.gz`
+  (714,101 bytes) is on the release; downloaded and `shasum -a 256 -c
+  MANIFEST.sha256` → six `OK`. CI's wasm is 2,164,759 bytes (its rustc,
+  not the laptop's), under the gate.
 
 ## Phase 5 — Docs
 
@@ -386,6 +388,7 @@ Filled by Phases 2 and 4.
 | `pk-table.js` (checkout, unbundled) | 16,606 | 4,896 | ≤ 12 KB — missed |
 | `pk-table.css` | 13,418 | 3,137 | ≤ 30 KB ✓ |
 | `pk-table-v0.2.0.tar.gz` (local dry run) | 710,750 | | |
+| `pk-table-v0.2.1.tar.gz` (the release, CI build; wasm 2,164,759) | 714,101 | | the artefact consumers pin |
 | requests before Deal | 0 | | 0 (rule 1) ✓ |
 | Deal → first bot action, `delay=1000` | | | not measured; `delay=0` plays a hand in under 2 s in the spec |
 
