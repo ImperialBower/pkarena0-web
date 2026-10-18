@@ -1,0 +1,373 @@
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <!-- Table felt gradient -->
+    <radialGradient id="feltGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a6b3c"/>
+      <stop offset="70%" stop-color="#145a30"/>
+      <stop offset="100%" stop-color="#0e4825"/>
+    </radialGradient>
+    <!-- Table rim gradient -->
+    <linearGradient id="rimGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5c3a1e"/>
+      <stop offset="40%" stop-color="#8b5e3c"/>
+      <stop offset="60%" stop-color="#6b4226"/>
+      <stop offset="100%" stop-color="#3e2512"/>
+    </linearGradient>
+    <!-- Card back pattern -->
+    <pattern id="cardBack" width="6" height="6" patternUnits="userSpaceOnUse">
+      <rect width="6" height="6" fill="#1a3a6b"/>
+      <path d="M0 3 L3 0 L6 3 L3 6 Z" fill="#1e4080" opacity="0.6"/>
+    </pattern>
+    <!-- Chip shadow -->
+    <filter id="chipShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+    <!-- Card shadow -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <!-- Glow for pot area -->
+    <filter id="potGlow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Subtle felt texture -->
+    <filter id="feltNoise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" result="noise"/>
+      <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+      <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blended"/>
+      <feComponentTransfer in="blended">
+        <feFuncA type="linear" slope="1"/>
+      </feComponentTransfer>
+    </filter>
+
+    <!-- ===== CARD SUIT SYMBOLS ===== -->
+    <!-- Spade -->
+    <symbol id="spade" viewBox="0 0 20 20">
+      <path d="M10 2 C10 2 2 10 2 13 C2 16 5 17 7 16 C8 15.5 9 15 10 18 C11 15 12 15.5 13 16 C15 17 18 16 18 13 C18 10 10 2 10 2Z" fill="currentColor"/>
+      <rect x="9" y="15" width="2" height="4" rx="0.5" fill="currentColor"/>
+    </symbol>
+    <!-- Heart -->
+    <symbol id="heart" viewBox="0 0 20 20">
+      <path d="M10 18 C10 18 2 12 2 7 C2 4 4.5 2 7 2 C8.5 2 9.5 3 10 4 C10.5 3 11.5 2 13 2 C15.5 2 18 4 18 7 C18 12 10 18 10 18Z" fill="currentColor"/>
+    </symbol>
+    <!-- Diamond -->
+    <symbol id="diamond" viewBox="0 0 20 20">
+      <path d="M10 1 L18 10 L10 19 L2 10 Z" fill="currentColor"/>
+    </symbol>
+    <!-- Club -->
+    <symbol id="club" viewBox="0 0 20 20">
+      <circle cx="10" cy="7" r="4" fill="currentColor"/>
+      <circle cx="5.5" cy="12" r="4" fill="currentColor"/>
+      <circle cx="14.5" cy="12" r="4" fill="currentColor"/>
+      <rect x="9" y="14" width="2" height="5" rx="0.5" fill="currentColor"/>
+    </symbol>
+
+    <!-- ===== REUSABLE CARD TEMPLATES ===== -->
+    <!-- Face-down card -->
+    <symbol id="cardDown" viewBox="0 0 44 62">
+      <rect x="0" y="0" width="44" height="62" rx="4" ry="4" fill="#fff" stroke="#999" stroke-width="0.5"/>
+      <rect x="2" y="2" width="40" height="58" rx="3" ry="3" fill="url(#cardBack)"/>
+      <rect x="2" y="2" width="40" height="58" rx="3" ry="3" fill="none" stroke="#c8a84e" stroke-width="1" opacity="0.5"/>
+    </symbol>
+
+    <!-- ===== CHIP TEMPLATES ===== -->
+    <!-- White chip ($1) -->
+    <symbol id="chipWhite" viewBox="0 0 28 28">
+      <circle cx="14" cy="14" r="13" fill="#e8e8e8" stroke="#aaa" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="10" fill="none" stroke="#ccc" stroke-width="1" stroke-dasharray="3 3"/>
+      <circle cx="14" cy="14" r="6" fill="none" stroke="#bbb" stroke-width="0.5"/>
+    </symbol>
+    <!-- Red chip ($5) -->
+    <symbol id="chipRed" viewBox="0 0 28 28">
+      <circle cx="14" cy="14" r="13" fill="#cc2222" stroke="#881111" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="10" fill="none" stroke="#ff6666" stroke-width="1" stroke-dasharray="3 3"/>
+      <circle cx="14" cy="14" r="6" fill="none" stroke="#ee4444" stroke-width="0.5"/>
+    </symbol>
+    <!-- Green chip ($25) -->
+    <symbol id="chipGreen" viewBox="0 0 28 28">
+      <circle cx="14" cy="14" r="13" fill="#1a8a3a" stroke="#0e5522" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="10" fill="none" stroke="#44cc66" stroke-width="1" stroke-dasharray="3 3"/>
+      <circle cx="14" cy="14" r="6" fill="none" stroke="#33aa55" stroke-width="0.5"/>
+    </symbol>
+    <!-- Black chip ($100) -->
+    <symbol id="chipBlack" viewBox="0 0 28 28">
+      <circle cx="14" cy="14" r="13" fill="#222" stroke="#000" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="10" fill="none" stroke="#555" stroke-width="1" stroke-dasharray="3 3"/>
+      <circle cx="14" cy="14" r="6" fill="none" stroke="#444" stroke-width="0.5"/>
+    </symbol>
+    <!-- Blue chip ($50) -->
+    <symbol id="chipBlue" viewBox="0 0 28 28">
+      <circle cx="14" cy="14" r="13" fill="#2255bb" stroke="#113388" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="10" fill="none" stroke="#5588ee" stroke-width="1" stroke-dasharray="3 3"/>
+      <circle cx="14" cy="14" r="6" fill="none" stroke="#4477cc" stroke-width="0.5"/>
+    </symbol>
+  </defs>
+
+  <!-- ===== BACKGROUND ===== -->
+  <rect width="1200" height="800" fill="#1a1a2e" rx="0"/>
+
+  <!-- ===== TABLE ===== -->
+  <!-- Outer rim shadow -->
+  <ellipse cx="600" cy="400" rx="480" ry="280" fill="#1a0e08" opacity="0.6"/>
+  <!-- Table rim -->
+  <ellipse cx="600" cy="395" rx="475" ry="275" fill="url(#rimGrad)" stroke="#2a1508" stroke-width="3"/>
+  <!-- Padded rail -->
+  <ellipse cx="600" cy="395" rx="460" ry="262" fill="#4a3020" stroke="#3a2010" stroke-width="2"/>
+  <ellipse cx="600" cy="395" rx="455" ry="258" fill="#5a3828" stroke="#6a4838" stroke-width="1"/>
+  <!-- Felt surface -->
+  <ellipse cx="600" cy="395" rx="430" ry="240" fill="url(#feltGrad)" filter="url(#feltNoise)"/>
+  <!-- Felt inner line -->
+  <ellipse cx="600" cy="395" rx="380" ry="210" fill="none" stroke="#1f7a44" stroke-width="2" opacity="0.5"/>
+
+  <!-- ===== DEALER BUTTON AREA ===== -->
+  <text x="600" y="315" text-anchor="middle" font-family="'Georgia', serif" font-size="14" fill="#c8a84e" opacity="0.7" letter-spacing="4">NO LIMIT HOLD'EM</text>
+
+  <!-- ===== COMMUNITY CARDS (center) ===== -->
+  <g transform="translate(380, 360)" filter="url(#cardShadow)">
+    <!-- Card 1: Ace of Spades -->
+    <g transform="translate(0, 0)">
+      <rect width="44" height="62" rx="4" fill="#fff" stroke="#ccc" stroke-width="0.5"/>
+      <text x="5" y="15" font-family="'Georgia', serif" font-size="13" font-weight="bold" fill="#222">A</text>
+      <use href="#spade" x="3" y="16" width="12" height="12" color="#222"/>
+      <use href="#spade" x="14" y="22" width="16" height="16" color="#222"/>
+    </g>
+    <!-- Card 2: King of Hearts -->
+    <g transform="translate(50, 0)">
+      <rect width="44" height="62" rx="4" fill="#fff" stroke="#ccc" stroke-width="0.5"/>
+      <text x="5" y="15" font-family="'Georgia', serif" font-size="13" font-weight="bold" fill="#cc1111">K</text>
+      <use href="#heart" x="3" y="16" width="12" height="12" color="#cc1111"/>
+      <use href="#heart" x="14" y="22" width="16" height="16" color="#cc1111"/>
+    </g>
+    <!-- Card 3: Queen of Diamonds -->
+    <g transform="translate(100, 0)">
+      <rect width="44" height="62" rx="4" fill="#fff" stroke="#ccc" stroke-width="0.5"/>
+      <text x="5" y="15" font-family="'Georgia', serif" font-size="13" font-weight="bold" fill="#cc1111">Q</text>
+      <use href="#diamond" x="3" y="16" width="12" height="12" color="#cc1111"/>
+      <use href="#diamond" x="14" y="22" width="16" height="16" color="#cc1111"/>
+    </g>
+    <!-- Card 4: 10 of Clubs -->
+    <g transform="translate(150, 0)">
+      <rect width="44" height="62" rx="4" fill="#fff" stroke="#ccc" stroke-width="0.5"/>
+      <text x="3" y="15" font-family="'Georgia', serif" font-size="12" font-weight="bold" fill="#222">10</text>
+      <use href="#club" x="3" y="16" width="12" height="12" color="#222"/>
+      <use href="#club" x="14" y="22" width="16" height="16" color="#222"/>
+    </g>
+    <!-- Card 5: 7 of Spades -->
+    <g transform="translate(200, 0)">
+      <rect width="44" height="62" rx="4" fill="#fff" stroke="#ccc" stroke-width="0.5"/>
+      <text x="5" y="15" font-family="'Georgia', serif" font-size="13" font-weight="bold" fill="#222">7</text>
+      <use href="#spade" x="3" y="16" width="12" height="12" color="#222"/>
+      <use href="#spade" x="14" y="22" width="16" height="16" color="#222"/>
+    </g>
+  </g>
+
+  <!-- ===== POT CHIPS (center) ===== -->
+  <g transform="translate(540, 440)" filter="url(#chipShadow)">
+    <use href="#chipBlack" x="0" y="0" width="24" height="24"/>
+    <use href="#chipBlack" x="2" y="-4" width="24" height="24"/>
+    <use href="#chipRed" x="18" y="2" width="24" height="24"/>
+    <use href="#chipRed" x="20" y="-2" width="24" height="24"/>
+    <use href="#chipGreen" x="36" y="-1" width="24" height="24"/>
+    <use href="#chipBlue" x="54" y="1" width="24" height="24"/>
+    <use href="#chipBlue" x="56" y="-3" width="24" height="24"/>
+    <use href="#chipWhite" x="72" y="0" width="24" height="24"/>
+  </g>
+  <!-- Pot label -->
+  <text x="600" y="480" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="14" fill="#ffdd66" font-weight="bold">POT: $2,450</text>
+
+  <!-- =================================================================== -->
+  <!-- ===== PLAYER POSITIONS (9 seats around the table) ===== -->
+  <!-- =================================================================== -->
+
+  <!-- PLAYER 1 — Bottom center (Hero) -->
+  <g transform="translate(600, 680)">
+    <!-- Seat glow -->
+    <ellipse cx="0" cy="-10" rx="62" ry="30" fill="#c8a84e" opacity="0.08"/>
+    <!-- Name plate -->
+    <rect x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#c8a84e" stroke-width="1.5" opacity="0.9"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="11" fill="#f0d060" font-weight="bold">HERO</text>
+    <!-- Stack -->
+    <text x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="10" fill="#aaa">$12,500</text>
+    <!-- Cards (face up for hero) -->
+    <g transform="translate(-32, -90)" filter="url(#cardShadow)">
+      <rect width="38" height="54" rx="3" fill="#fff" stroke="#ccc" stroke-width="0.5"/>
+      <text x="4" y="13" font-family="'Georgia', serif" font-size="11" font-weight="bold" fill="#222">A</text>
+      <use href="#spade" x="2" y="14" width="10" height="10" color="#222"/>
+      <use href="#spade" x="12" y="19" width="14" height="14" color="#222"/>
+    </g>
+    <g transform="translate(-6, -90)" filter="url(#cardShadow)">
+      <rect width="38" height="54" rx="3" fill="#fff" stroke="#ccc" stroke-width="0.5"/>
+      <text x="4" y="13" font-family="'Georgia', serif" font-size="11" font-weight="bold" fill="#222">A</text>
+      <use href="#club" x="2" y="14" width="10" height="10" color="#222"/>
+      <use href="#club" x="12" y="19" width="14" height="14" color="#222"/>
+    </g>
+    <!-- Dealer button -->
+    <circle cx="42" cy="-50" r="10" fill="#ffffcc" stroke="#c8a84e" stroke-width="1.5"/>
+    <text x="42" y="-46" text-anchor="middle" font-family="'Arial', sans-serif" font-size="8" font-weight="bold" fill="#333">D</text>
+    <!-- Chips -->
+    <g transform="translate(30, -30)" filter="url(#chipShadow)">
+      <use href="#chipRed" x="0" y="0" width="20" height="20"/>
+      <use href="#chipBlack" x="8" y="-3" width="20" height="20"/>
+    </g>
+  </g>
+
+  <!-- PLAYER 2 — Bottom left -->
+  <g transform="translate(280, 640)">
+    <rect x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">PLAYER 2</text>
+    <text x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="10" fill="#aaa">$8,200</text>
+    <g transform="translate(-28, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(-8, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(28, -30)" filter="url(#chipShadow)">
+      <use href="#chipGreen" x="0" y="0" width="20" height="20"/>
+      <use href="#chipWhite" x="10" y="-3" width="20" height="20"/>
+    </g>
+    <!-- Bet amount -->
+    <text x="55" y="-50" font-family="'Trebuchet MS', sans-serif" font-size="9" fill="#ffdd66">$150</text>
+  </g>
+
+  <!-- PLAYER 3 — Left -->
+  <g transform="translate(140, 480)">
+    <rect x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">PLAYER 3</text>
+    <text x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="10" fill="#aaa">$5,430</text>
+    <g transform="translate(-28, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(-8, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(30, -30)" filter="url(#chipShadow)">
+      <use href="#chipRed" x="0" y="0" width="20" height="20"/>
+      <use href="#chipRed" x="4" y="-4" width="20" height="20"/>
+    </g>
+    <!-- FOLD indicator -->
+    <rect x="-30" y="16" width="60" height="16" rx="8" fill="#882222" opacity="0.7"/>
+    <text x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="9" fill="#ff8888" font-weight="bold">FOLD</text>
+  </g>
+
+  <!-- PLAYER 4 — Upper left -->
+  <g transform="translate(170, 260)">
+    <rect x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">PLAYER 4</text>
+    <text x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="10" fill="#aaa">$15,800</text>
+    <g transform="translate(-28, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(-8, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(30, -25)" filter="url(#chipShadow)">
+      <use href="#chipBlack" x="0" y="0" width="20" height="20"/>
+      <use href="#chipBlue" x="8" y="-3" width="20" height="20"/>
+    </g>
+    <text x="60" y="-40" font-family="'Trebuchet MS', sans-serif" font-size="9" fill="#ffdd66">$300</text>
+    <!-- SB indicator -->
+    <circle cx="-42" cy="-50" r="9" fill="#335588" stroke="#5588cc" stroke-width="1"/>
+    <text x="-42" y="-47" text-anchor="middle" font-family="'Arial', sans-serif" font-size="7" font-weight="bold" fill="#aaddff">SB</text>
+  </g>
+
+  <!-- PLAYER 5 — Top left -->
+  <g transform="translate(340, 140)">
+    <rect x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">PLAYER 5</text>
+    <text x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="10" fill="#aaa">$9,750</text>
+    <g transform="translate(-28, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(-8, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(28, -25)" filter="url(#chipShadow)">
+      <use href="#chipGreen" x="0" y="0" width="20" height="20"/>
+    </g>
+    <text x="55" y="-38" font-family="'Trebuchet MS', sans-serif" font-size="9" fill="#ffdd66">$300</text>
+    <!-- BB indicator -->
+    <circle cx="-42" cy="-50" r="9" fill="#885533" stroke="#cc8844" stroke-width="1"/>
+    <text x="-42" y="-47" text-anchor="middle" font-family="'Arial', sans-serif" font-size="7" font-weight="bold" fill="#ffcc88">BB</text>
+  </g>
+
+  <!-- PLAYER 6 — Top center -->
+  <g transform="translate(600, 108)">
+    <!-- Active player highlight -->
+    <ellipse cx="0" cy="-10" rx="62" ry="30" fill="#44dd66" opacity="0.06"/>
+    <rect x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#44cc66" stroke-width="2" opacity="0.95"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="11" fill="#66ff88" font-weight="bold">PLAYER 6</text>
+    <text x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="10" fill="#aaa">$22,100</text>
+    <g transform="translate(-28, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(-8, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(28, -25)" filter="url(#chipShadow)">
+      <use href="#chipBlack" x="0" y="0" width="20" height="20"/>
+      <use href="#chipBlack" x="4" y="-4" width="20" height="20"/>
+      <use href="#chipRed" x="14" y="0" width="20" height="20"/>
+    </g>
+    <!-- Timer bar -->
+    <rect x="-40" y="16" width="80" height="5" rx="2.5" fill="#333" opacity="0.6"/>
+    <rect x="-40" y="16" width="52" height="5" rx="2.5" fill="#44cc66" opacity="0.8"/>
+    <text x="0" y="32" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="8" fill="#88ffaa">THINKING...</text>
+  </g>
+
+  <!-- PLAYER 7 — Top right -->
+  <g transform="translate(860, 140)">
+    <rect x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">PLAYER 7</text>
+    <text x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="10" fill="#aaa">$3,100</text>
+    <g transform="translate(-28, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(-8, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <!-- ALL-IN indicator -->
+    <rect x="-30" y="16" width="60" height="16" rx="8" fill="#cc8800" opacity="0.8"/>
+    <text x="0" y="28" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="9" fill="#fff" font-weight="bold">ALL-IN</text>
+  </g>
+
+  <!-- PLAYER 8 — Upper right -->
+  <g transform="translate(1030, 260)">
+    <rect x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">PLAYER 8</text>
+    <text x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="10" fill="#aaa">$7,650</text>
+    <g transform="translate(-28, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(-8, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(28, -25)" filter="url(#chipShadow)">
+      <use href="#chipBlue" x="0" y="0" width="20" height="20"/>
+      <use href="#chipWhite" x="10" y="-3" width="20" height="20"/>
+    </g>
+    <text x="-60" y="-40" font-family="'Trebuchet MS', sans-serif" font-size="9" fill="#ffdd66">$150</text>
+  </g>
+
+  <!-- PLAYER 9 — Bottom right -->
+  <g transform="translate(920, 640)">
+    <rect x="-55" y="-28" width="110" height="24" rx="12" fill="#1a1a2e" stroke="#4a90d9" stroke-width="1.2" opacity="0.9"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="11" fill="#7ab8f5" font-weight="bold">PLAYER 9</text>
+    <text x="0" y="8" text-anchor="middle" font-family="'Trebuchet MS', sans-serif" font-size="10" fill="#aaa">$11,300</text>
+    <g transform="translate(-28, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(-8, -85)" filter="url(#cardShadow)">
+      <use href="#cardDown" width="36" height="50"/>
+    </g>
+    <g transform="translate(-55, -30)" filter="url(#chipShadow)">
+      <use href="#chipRed" x="0" y="0" width="20" height="20"/>
+      <use href="#chipGreen" x="10" y="-3" width="20" height="20"/>
+    </g>
+    <text x="-50" y="-50" font-family="'Trebuchet MS', sans-serif" font-size="9" fill="#ffdd66">$300</text>
+  </g>
+
+
+
+</svg>

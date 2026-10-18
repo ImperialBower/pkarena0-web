@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pkarena0 — the table in a page</title>
+  <style>
+    /* A plain host page, on purpose: this is what a book or a blog looks like. */
+    :root { --bg: #fdfdfb; --fg: #222; --links: #1a5fb4; }
+    body { max-width: 52rem; margin: 2rem auto; padding: 0 1rem; font: 17px/1.55 Georgia, serif; color: var(--fg); background: var(--bg); }
+    h1 { font-size: 1.6rem; } code { font: 0.9em ui-monospace, Menlo, Consolas, monospace; }
+    pk-table img { width: 100%; height: auto; display: block; border-radius: 12px; }
+  </style>
+  <script type="module" src="js/embed/pk-table.js"></script>
+</head>
+<body>
+  <h1>The table, in a page</h1>
+  <p>Below is <code>pkarena0-web</code> mounted the way a book mounts it: an
+  ordinary picture of the table, which a module upgrades to the real thing
+  when you press <strong>Deal</strong>. With script off, or from a file, you
+  see the picture. Nothing is fetched until you ask.</p>
+
+  <pk-table base="pkg/" css="css/pk-table.css">
+    <img src="img/table-still.svg" alt="A nine-seat poker table, seen from above" width="1200" height="675">
+  </pk-table>
+
+  <p>Two lines put it on a page:</p>
+<pre><code>&lt;script type="module" src="pk-table.js"&gt;&lt;/script&gt;
+&lt;pk-table seed="42"&gt;&lt;img src="table.png" alt="…"&gt;&lt;/pk-table&gt;</code></pre>
+
+  <p>And a second one, further down, is its own game: each element imports
+  its own copy of the engine, so two tables on one page deal two hands.</p>
+
+  <pk-table seed="7" base="pkg/" css="css/pk-table.css">
+    <img src="img/table-still.svg" alt="A second nine-seat poker table" width="1200" height="675">
+  </pk-table>
+
+  <p>Attributes: <code>seed</code> pins which bots sit down (the cards are
+  dealt fresh every hand), <code>delay</code> is the
+  pause between bot actions in milliseconds (default 1000), <code>base</code>
+  is where the engine files live and <code>css</code> where the stylesheet is
+  (both default to beside the module, which is the release layout; this
+  checkout keeps them under <code>pkg/</code> and <code>css/</code>), and
+  <code>bots</code> is reserved.</p>
+</body>
+</html>

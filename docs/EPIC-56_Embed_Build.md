@@ -15,14 +15,14 @@
 
 ## Status
 
-**Phases 0 and 1 done 18 October 2026; Phase 2 next.** Drafted the same day at `0884ca8` (v0.2.0).
+**Phases 0–3 done 18 October 2026; Phase 4 (the release) next.** Drafted the same day at `0884ca8` (v0.2.0).
 
 | Component | Status |
 |---|---|
 | Phase 0 — decisions: Shadow DOM, the action-row extraction, the block registration | **Complete** — 18 October 2026, commit pending: `tests/shadow.spec.ts` green; pkcore `ROADMAP.md` line added; `bots` reserved in § Design |
 | Phase 1 — `www/js/actions.js`: `buttonsFor(state)` lifted out of `main.js`, parity-tested | **Complete** — 18 October 2026, commit pending: `tests/actions.spec.ts` four green; full suite 70/70 |
-| Phase 2 — `www/js/embed/pk-table.js`, `www/css/pk-table.css`, `www/embed.html` | Planned |
-| Phase 3 — `tests/embed.spec.ts`: the eight contract rules | Planned |
+| Phase 2 — `www/js/embed/pk-table.js`, `www/css/pk-table.css`, `www/embed.html` | **Complete** — 18 October 2026, commit pending |
+| Phase 3 — `tests/embed.spec.ts`: the eight contract rules | **Complete** — 18 October 2026, commit pending: 10 green (eight rules, a seed rule, script off); full suite 79/79 |
 | Phase 4 — `release.yml`: `pk-table-<tag>.tar.gz` + `MANIFEST.sha256` on every tag; size gate | Planned |
 | Phase 5 — README "Embedding", CHANGELOG, `EPICS.md`, the isolation-trick comment, the tag | Planned |
 
@@ -157,7 +157,8 @@ function for the action row, one workflow.
 | Attribute | Meaning | Default |
 |---|---|---|
 | `base` | URL prefix for `pkarena0_web.js`, `pkarena0_web_bg.wasm`, `pk-table.css`; resolved against the document | the module's own directory (`import.meta.url`) |
-| `seed` | passed to `init_game(seed)`; a number | fresh per Deal |
+| `seed` | passed to `init_game(seed)`, which seeds **the bot lineup** (`src/lib.rs:281-289` shuffles the profile pool with it). It does not pin the cards: pkcore's `start_hand` shuffles from entropy (`lib.rs:3617`). A number | fresh per Deal |
+| `css` | URL of `pk-table.css`, resolved against the document | beside the module (the release layout; a checkout keeps it under `css/`) |
 | `delay` | ms between bot actions (`BOT_ACTION_MS`); `0` for tests | `1000` |
 | `bots` | **reserved** (EPIC-54) | `8` |
 
@@ -236,7 +237,10 @@ customElements.define('pk-table', PkTable);
 ```
 
 Target size: `pk-table.js` ≤ 12 KB, `pk-table.css` ≤ 30 KB (table.css +
-the card rules + one theme's tokens + the row and the surround).
+the card rules + one theme's tokens + the row and the surround). As built
+the module is 16.6 KB raw — over its own line, mostly comments and the
+raise strip — and the pair is 30 KB raw / 8 KB brotli against the
+consumer's binding budget of 60 KB (bower EPIC-19 § Scope). Left as is.
 
 ### `www/embed.html`
 
@@ -299,16 +303,25 @@ the `TECHNICAL_DEBT.md:55` worry). `deploy.yml` is untouched.
 
 ## Phase 2 — The element
 
-- [ ] **2a.** `www/js/embed/pk-table.js` per § Design; `www/css/pk-table.css`;
-  `www/embed.html`.
-- [ ] **2b.** Comment the import site (`main.js:321`) and the embed's
-  `?instance=` with the invariant; close `TECHNICAL_DEBT.md:55`'s first
-  suggestion.
-- [ ] **2c.** Sizes of the two files recorded in § Measured, below budget.
+- [x] **2a.** `www/js/embed/pk-table.js` per § Design; `www/css/pk-table.css`
+  (a `:host` token block, the surround, then `table.css` verbatim — a
+  bundle step in Phase 4 keeps the copy in step); `www/embed.html` with two
+  tables and `www/img/table-still.svg` (the repo's `img/poker-table.svg`)
+  as the picture. Found by the first screenshot: the still stayed above the
+  live table, so `.pk-live` now hides the slot once the engine is up and
+  rule 7 asserts it. Found by the second: the same seed dealt different
+  cards — `seed` seeds the lineup, not the deck; the attribute table, the
+  demo page, bower EPIC-19 and rule 2 now say so.
+- [ ] **2b.** Comment the import site (`main.js:321`) with the invariant
+  (the embed's `#load` already carries it); close `TECHNICAL_DEBT.md:55`'s
+  first suggestion. *(Deferred to Phase 4 with the bundle step, which is
+  where a bundler would break it.)*
+- [x] **2c.** Sizes in § Measured: 16,606 / 13,418 raw; 4,896 / 3,137
+  brotli.
 
 ## Phase 3 — `tests/embed.spec.ts`
 
-- [ ] **3a.** One `test` per rule, against `/embed.html`: request log empty
+- [x] **3a.** One `test` per rule, against `/embed.html`: request log empty
   for `pkg/` before Deal (1); two elements, two `hand_number`s and
   different hero cards for different seeds (2); `route('**/*.wasm', abort)`
   → `<img>` present, Deal disabled, message, `pk-table:error` (3); set of
@@ -316,8 +329,11 @@ the `TECHNICAL_DEBT.md:55` worry). `deploy.yml` is untouched.
   (5); focus Fold, force a render, `activeElement` still in the row (6);
   computed font-family contains no Google name; `--pk-bg` follows a host
   `--bg` (7); badge text equals `CARGO_PKG_VERSION` read from `Cargo.toml`
-  (8).
-- [ ] **3b.** Script-off run (`javaScriptEnabled: false`): the `<img>` and
+  (8). Plus 2b: the same seed seats the same bots. Written first: nine
+  red against a page that did not exist, then green one fix at a time —
+  the dev layout needed `base="pkg/"` and the new `css` attribute, and the
+  local `www/pkg` had to be rebuilt at 0.2.0 for rule 8.
+- [x] **3b.** Script-off run (`javaScriptEnabled: false`): the `<img>` and
   nothing else inside `pk-table`.
 
 ## Phase 4 — The release
@@ -346,9 +362,10 @@ Filled by Phases 2 and 4.
 |---|---|---|---|
 | `pkarena0_web_bg.wasm` (release, v0.2.1) | | | ≤ 2.3 MB / ≤ 600 KB |
 | `pkarena0_web.js` | | | |
-| `pk-table.js` (bundled) | | | ≤ 12 KB |
-| `pk-table.css` | | | ≤ 30 KB |
-| requests before Deal | 0 | | 0 |
+| `pk-table.js` (checkout, unbundled) | 16,606 | 4,896 | ≤ 12 KB — missed; pair ≤ 60 KB holds |
+| `pk-table.css` | 13,418 | 3,137 | ≤ 30 KB |
+| `pkarena0_web_bg.wasm` (dev build, 18 Oct) | 2,156,142 | | release numbers in Phase 4 |
+| requests before Deal | 0 | | 0 (rule 1) |
 | Deal → first bot action, `delay=1000` | | | |
 
 ## Verification
