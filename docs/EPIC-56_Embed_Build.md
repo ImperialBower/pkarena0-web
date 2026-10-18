@@ -15,12 +15,12 @@
 
 ## Status
 
-**Phase 0 done 18 October 2026; Phase 1 next.** Drafted the same day at `0884ca8` (v0.2.0).
+**Phases 0 and 1 done 18 October 2026; Phase 2 next.** Drafted the same day at `0884ca8` (v0.2.0).
 
 | Component | Status |
 |---|---|
 | Phase 0 — decisions: Shadow DOM, the action-row extraction, the block registration | **Complete** — 18 October 2026, commit pending: `tests/shadow.spec.ts` green; pkcore `ROADMAP.md` line added; `bots` reserved in § Design |
-| Phase 1 — `www/js/actions.js`: `buttonsFor(state)` lifted out of `main.js`, parity-tested | Planned |
+| Phase 1 — `www/js/actions.js`: `buttonsFor(state)` lifted out of `main.js`, parity-tested | **Complete** — 18 October 2026, commit pending: `tests/actions.spec.ts` four green; full suite 70/70 |
 | Phase 2 — `www/js/embed/pk-table.js`, `www/css/pk-table.css`, `www/embed.html` | Planned |
 | Phase 3 — `tests/embed.spec.ts`: the eight contract rules | Planned |
 | Phase 4 — `release.yml`: `pk-table-<tag>.tar.gz` + `MANIFEST.sha256` on every tag; size gate | Planned |
@@ -205,8 +205,11 @@ JSON), `pk-table:error` (`detail.message`).
 
 ```js
 // Pure: GameState JSON → the action row. No DOM, no closure state.
-export function buttonsFor(state) → [{ label, cls, act, amount?, betAction? }]
+export function buttonsFor(state) → [{ label, cls, action, amount?, betAction? }]
 ```
+
+(The field is `action`, as `renderButtons` already reads it — the sketch's
+`act` would have meant touching the dock's renderer for no gain.)
 
 The body is `renderActionButtons` (`main.js:856-897`) minus the pre-fold
 check at `:855` and the `renderButtons` call at `:899`. `main.js` imports it
@@ -282,10 +285,17 @@ the `TECHNICAL_DEBT.md:55` worry). `deploy.yml` is untouched.
 
 ## Phase 1 — `actions.js`
 
-- [ ] **1a.** Lift `buttonsFor(state)`; `main.js` calls it; three-state
-  parity test in `tests/actions.spec.ts` (evaluate in the page, compare to a
-  fixture captured from `main` before the lift).
-- [ ] **1b.** `npx playwright test` — every existing spec green.
+- [x] **1a.** `www/js/actions.js` holds `buttonsFor(state)`, the 44 lines
+  of `renderActionButtons`'s body verbatim; `main.js` imports it and
+  `renderActionButtons` is now the pre-fold check plus
+  `renderButtons(buttonsFor(state), state)`. `tests/actions.spec.ts` pins
+  four states — facing a bet (½ pot suppressed below the min raise), option
+  to check, a short stack whose call is clamped and marked all-in with
+  Undo, and no legal actions — with expected rows derived from the code at
+  `ccb874e` before the lift. Red first (module missing), then green.
+- [x] **1b.** `npx playwright test`: 70 passed, 0 failed (18 October 2026,
+  1.4 min), the 66 pre-existing specs plus `shadow.spec.ts` and the four
+  in `actions.spec.ts`.
 
 ## Phase 2 — The element
 
