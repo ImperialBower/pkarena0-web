@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] — 2026-10-19
+
+The compact seats follow the table's own width, so `<pk-table>` fits a
+narrow column inside a wide page. Found by bower EPIC-19 the first time the
+embed was mounted in a book (a 750px content column in a 1280px window).
+
+### Fixed
+- **Seat plates clipped in a narrow host.** `www/css/table.css` keyed its
+  compact-seat rules on `@media (max-width: 759px)`, the window's width; an
+  embed in a 750px column never met it and the UTG and CO plates ran off the
+  frame. The block is now `@container (max-width: 759px)` with
+  `#table-zone, .pk-zone { container-type: inline-size; }`. The main site is
+  unchanged: `#table-zone` is as wide as the window.
+- `tests/embed.spec.ts` rule 3 awaited every assertion but one; under load
+  the floating `toHaveCount(0)` failed after the page had closed.
+
+### Added
+- `tests/embed.spec.ts` 6b: in a 750px host every `.seat-plate` stays inside
+  `.pk-zone` (red at v0.2.1, four plates out by 15px; green now).
+
+No game logic, wasm export or bot data changed.
+
 ## [0.2.1] — 2026-10-18
 
 The embed build ([EPIC-56](docs/EPIC-56_Embed_Build.md)): the table as a

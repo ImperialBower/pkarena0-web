@@ -107,7 +107,7 @@ test.describe('<pk-table> contract', () => {
     await expect(el.locator('img')).toBeVisible();
     await expect(el.locator('button.pk-deal')).toBeDisabled();
     await expect(el.locator('.pk-status')).toContainText('did not load');
-    expect(el.locator('.pk-spinner')).toHaveCount(0);
+    await expect(el.locator('.pk-spinner')).toHaveCount(0);
     expect(errors.length).toBe(1);
   });
 
@@ -175,6 +175,28 @@ test.describe('<pk-table> contract', () => {
     expect(got.fonts).not.toMatch(/Space Grotesk|IBM Plex|Archivo|JetBrains|Marcellus/);
     expect(got.feltPosition).toBe('absolute');
     expect(got.hostSeats).toBe(0);
+  });
+
+  test('6b. in a 750px host the seats stay inside the zone (container, not viewport)', async ({ page }) => {
+    // bower EPIC-19 corrigendum 4: mdBook's content column is 750px inside a
+    // 1280px viewport. The compact-seat rules must key on the box the table
+    // is drawn in, not on the window, or the UTG and CO plates clip.
+    await page.goto('/embed.html');
+    await page.evaluate(() => { (document.querySelector('pk-table') as HTMLElement).style.width = '750px'; });
+    await deal(page, 0, { seed: '0.5', delay: '0' });
+    await waitForPhase(page, 0, 'WaitingForHuman');
+    const got = await page.evaluate(() => {
+      const root = (document.querySelector('pk-table') as any).shadowRoot as ShadowRoot;
+      const zone = root.querySelector('.pk-zone')!.getBoundingClientRect();
+      const out = [...root.querySelectorAll('.seat-plate')].map(el => {
+        const r = el.getBoundingClientRect();
+        const name = el.querySelector('.seat-name')?.textContent ?? '?';
+        return { name, left: r.left - zone.left, right: zone.right - r.right };
+      }).filter(p => p.left < 0 || p.right < 0);
+      return { width: zone.width, out };
+    });
+    expect(got.width).toBeLessThanOrEqual(750);
+    expect(got.out).toEqual([]);
   });
 
   test('8. the badge shows the engine version, which is the crate version', async ({ page }) => {

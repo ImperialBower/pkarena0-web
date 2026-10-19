@@ -415,3 +415,38 @@ Exit criteria:
    badge reads `v0.2.1`; the wasm is under 2.3 MB.
 6. README documents the two lines and the attributes; `bots` is listed as
    reserved.
+
+---
+
+## Implementation corrigendum
+
+### 1. Compact seats were keyed on the window, not the table (v0.2.2)
+
+The contract's rule 6 says the surround follows the host; nothing said the
+*felt* must fit the host. Mounted in a book (bower EPIC-19, 19 October 2026)
+the element sat in mdBook's 750px column inside a 1280px window, and
+`table.css`'s `@media (max-width: 759px)` never fired, so the desktop plates
+(`.seat-plate { min-width: 120px }`) ran in a 750px zone: `loose_aggressive`
+(UTG) and `loose_passive` (CO) clipped, in the live table and in the book's
+still. Fix: `#table-zone, .pk-zone { container-type: inline-size; }` and the
+block becomes `@container (max-width: 759px)` — the same rules, keyed on the
+box the table is drawn in. The main site is unaffected (`#table-zone` is the
+window's width); the replay overlay clones an SVG and never used the seat
+classes. Test: `tests/embed.spec.ts` 6b sets the first host to 750px, deals,
+and asserts every `.seat-plate` rect lies inside `.pk-zone` — red at v0.2.1
+(four plates, 14.9px out each side), green after. `pk-table.css` regenerated
+(surround unchanged, 4,721 bytes; `table.css` verbatim after it, as the
+bundler requires). Shipped as v0.2.2.
+
+### 2. A floating assertion in the rule-3 test
+
+`expect(el.locator('.pk-spinner')).toHaveCount(0)` lacked `await`; under a
+loaded machine it resolved after the page closed and failed with
+`Received: undefined`, once in a full run of 86. Awaited.
+
+### Phase status summary
+
+| Phase | Status | Notes |
+|---|---|---|
+| 0–5 | Shipped | v0.2.1, `f90337c` |
+| corrigendum 1–2 | Shipped | v0.2.2 |

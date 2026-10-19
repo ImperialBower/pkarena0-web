@@ -164,7 +164,13 @@
 }
 
 /* ─────────────────────────── mobile (< 760px) ─────────────────────────── */
-@media (max-width: 759px) {
+/* Compact seats are keyed on the box the table is drawn in, not on the
+   window: the embed (<pk-table>, bower EPIC-19) sits in a 750px column inside
+   a wide page, where a viewport query never fires and the plates clip. On
+   the main site #table-zone is as wide as the window, so nothing changes. */
+#table-zone, .pk-zone { container-type: inline-size; }
+
+@container (max-width: 759px) {
   .felt, .felt-ring { left: 5%; right: 5%; top: 4%; bottom: 5%; }
   .seat { left: var(--mx); top: var(--my); }
   .seat-plate { min-width: 62px; padding: 4px 8px; }
