@@ -15,6 +15,14 @@
 
 ## Status
 
+**Superseded by bowery on 22 October 2026.** `<bowery-table>` (bower
+[EPIC-20](https://github.com/ImperialBower/bower/blob/main/docs/EPIC-20_Bowery.md),
+bowery v0.1.0 on crates.io, npm `@imperialbower/bowery` and its GitHub
+release) replaces this embed for other people's pages. From then on no
+release attaches `pk-table-*.tar.gz`: `.github/workflows/release.yml` is
+removed. The tags that carry one (v0.2.1, v0.2.2) stay, and so do the
+element's source, `make embed` and its tests; the app is unchanged.
+
 **Shipped as v0.2.1 on 18 October 2026** (`f90337c`, PR #39; `release.yml` run 39172102196 green; `pk-table-v0.2.1.tar.gz` on the release, 714,101 bytes, manifest verified on a download). Drafted the same day at `0884ca8` (v0.2.0).
 
 | Component | Status |

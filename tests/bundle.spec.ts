@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync
 import path from 'path';
 
 // EPIC-56 Phase 4: the release is one flat directory made by
-// scripts/embed-bundle.mjs. This drives the script the way release.yml does
+// scripts/embed-bundle.mjs. This drives the script the way the v0.2.x release.yml did
 // and then uses its output the way a consumer does: two lines, no attributes.
 const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'www', 'dist');

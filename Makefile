@@ -32,7 +32,7 @@ kill:
 build-release:
 	wasm-pack build --release --target web --out-dir www/pkg
 
-# The embed release directory, as release.yml builds it (EPIC-56). The
+# The embed release directory, as the v0.2.x releases carried it (EPIC-56). The
 # bundler refuses a stale pk-table.css or an oversized wasm; pass TAG=vX.Y.Z
 # to also assert the tag names Cargo.toml's version.
 embed: build-release

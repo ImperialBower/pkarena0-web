@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- **The embed release.** `.github/workflows/release.yml` attached
+  `pk-table-<tag>.tar.gz` to every tag; bowery's `<bowery-table>` replaces the
+  embed (bower EPIC-20), so later releases carry no embed tarball. v0.2.1 and
+  v0.2.2 keep theirs. The element's source, `make embed` and its tests stay.
+  [EPIC-56](docs/EPIC-56_Embed_Build.md) is marked superseded.
+
 ## [0.2.2] — 2026-10-19
 
 The compact seats follow the table's own width, so `<pk-table>` fits a

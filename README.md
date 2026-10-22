@@ -2,7 +2,6 @@
 
 [![Deploy to GitHub Pages](https://github.com/ImperialBower/pkarena0-web/actions/workflows/deploy.yml/badge.svg)](https://github.com/ImperialBower/pkarena0-web/actions/workflows/deploy.yml)
 [![Playwright Tests](https://github.com/ImperialBower/pkarena0-web/actions/workflows/playwright.yml/badge.svg)](https://github.com/ImperialBower/pkarena0-web/actions/workflows/playwright.yml)
-[![Release embed](https://github.com/ImperialBower/pkarena0-web/actions/workflows/release.yml/badge.svg)](https://github.com/ImperialBower/pkarena0-web/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE-APACHE)
 
@@ -106,9 +105,16 @@ npx playwright test --ui
 
 ## Embedding the table in your own page
 
-Every tagged release carries `pk-table-<tag>.tar.gz`: one flat directory
-with a custom element, its stylesheet, the engine, and the licenses. Unpack
-it beside your page and write two lines:
+> **Superseded.** For a poker table in your own page, use
+> [bowery](https://github.com/ImperialBower/bowery)'s `<bowery-table>`
+> (npm `@imperialbower/bowery`): replays, takeovers and play from a YAML
+> config. Releases after v0.2.2 no longer attach `pk-table-<tag>.tar.gz`;
+> the v0.2.1 and v0.2.2 releases keep theirs, and what follows describes
+> them.
+
+The v0.2.1 and v0.2.2 releases carry `pk-table-<tag>.tar.gz`: one flat
+directory with a custom element, its stylesheet, the engine, and the
+licenses. Unpack it beside your page and write two lines:
 
 ```html
 <script type="module" src="pk-table/pk-table.js"></script>
